@@ -9,6 +9,7 @@ export type RuntimeDiagnostic = {
 
 const DIAGNOSTICS_KEY = "growdash:runtime-diagnostics";
 const RECOVERY_KEY = "growdash:runtime-recovery";
+const fallbackRecoveryAttempts = new Map<string, { attempts: number; startedAt: number }>();
 const CHUNK_ERROR =
   /dynamically imported module|loading chunk|importing a module script|failed to fetch|module script|\bload failed\b|unable to preload (?:css|module)|error loading dynamically imported/i;
 
@@ -36,9 +37,16 @@ export function consumeRecoveryAttempt(scope: string, windowMs = 30_000, limit =
     sessionStorage.setItem(RECOVERY_KEY, JSON.stringify({ ...stored, [scope]: current }));
     return { ...current, blocked: current.attempts > limit };
   } catch {
-    // With blocked sessionStorage, keep a single safe attempt instead of
-    // creating a reload loop that cannot be remembered.
-    return { attempts: 1, startedAt: Date.now(), blocked: false };
+    // With blocked sessionStorage, keep the budget in memory so a private or
+    // restricted browser still cannot turn recovery into an infinite loop.
+    const now = Date.now();
+    const previous = fallbackRecoveryAttempts.get(scope);
+    const current = previous && now - previous.startedAt < windowMs
+      ? { attempts: previous.attempts, startedAt: previous.startedAt }
+      : { attempts: 0, startedAt: now };
+    current.attempts += 1;
+    fallbackRecoveryAttempts.set(scope, current);
+    return { ...current, blocked: current.attempts > limit };
   }
 }
 
@@ -50,7 +58,7 @@ export function clearRecoveryAttempts(scope: string) {
       sessionStorage.setItem(RECOVERY_KEY, JSON.stringify(stored));
     }
   } catch {
-    /* recovery storage is optional */
+    fallbackRecoveryAttempts.delete(scope);
   }
 }
 

@@ -695,6 +695,12 @@ export default function Campaigns() {
     hasError: isError,
     timedOut: campaignLoadTimedOut,
   }) === "loading";
+  const campaignsUnavailable = showCampaignLoadError && campaigns.length === 0;
+  const hierarchyCountLabel = (label: string, count: number) => campaignsUnavailable
+    ? `${label} (indisponível)`
+    : campaignsLoading
+      ? `${label} (carregando…)`
+      : `${label} (${count})`;
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -1206,10 +1212,10 @@ export default function Campaigns() {
                 <FolderKanban className="h-3.5 w-3.5" /> {campaignCountLabel}
               </TabsTrigger>
               <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <Layers3 className="h-3.5 w-3.5" /> Conjuntos de anúncios ({selectedAdsets.length})
+                <Layers3 className="h-3.5 w-3.5" /> {hierarchyCountLabel("Conjuntos de anúncios", selectedAdsets.length)}
               </TabsTrigger>
               <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
+                <RectangleHorizontal className="h-3.5 w-3.5" /> {hierarchyCountLabel("Anúncios", selectedAds.length)}
               </TabsTrigger>
             </TabsList>
             <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5" aria-hidden="true" />
@@ -1341,6 +1347,8 @@ export default function Campaigns() {
           <TabsContent value="campaigns" className={cn("campaigns-campaigns-tab m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
             {campaignsLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
+            ) : campaignsUnavailable ? (
+              <CampaignUnavailableState message={campaignLoadErrorMessage} onRetry={() => void refetch()} />
             ) : (
               <Card className={cn(
                 "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
@@ -2047,6 +2055,18 @@ function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen:
 
 function LevelLoading() {
   return <div className="space-y-2 p-3" aria-label="Carregando dados da Meta Ads">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>;
+}
+
+function CampaignUnavailableState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <section className="grid min-h-64 place-items-center border-t border-border bg-card p-6 text-center">
+    <div className="max-w-md">
+      <TriangleAlert className="mx-auto h-8 w-8 text-amber-500" />
+      <h2 className="mt-3 text-sm font-black">Campanhas indisponíveis neste momento</h2>
+      <p className="mt-2 text-xs text-muted-foreground">{message}</p>
+      <p className="mt-1 text-xs text-muted-foreground">Nenhuma contagem ou valor zero foi inferido enquanto a Meta não confirma o recorte.</p>
+      <Button className="mt-4" variant="outline" size="sm" onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button>
+    </div>
+  </section>;
 }
 
 function LevelEmpty({ level, selected, onClear }: { level: string; selected: boolean; onClear: () => void }) {

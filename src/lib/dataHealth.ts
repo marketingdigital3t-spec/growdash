@@ -4,8 +4,14 @@ export function throwOnQueryError(error: unknown, context: string) {
   throw new Error(`${context}: ${detail}`);
 }
 
-export function dataHealthScopeKey({ workspaceId, adAccountIds, startDate, endDate }: { workspaceId?: string; adAccountIds: string[]; startDate: string; endDate: string }) {
-  return [workspaceId || "none", adAccountIds.slice().sort().join(",") || "all", startDate, endDate].join(":");
+export function dataHealthScopeKey({ workspaceId, adAccountIds, funnelIds = [], startDate, endDate }: { workspaceId?: string; adAccountIds: string[]; funnelIds?: string[]; startDate: string; endDate: string }) {
+  return [
+    workspaceId || "none",
+    adAccountIds.slice().sort().join(",") || "all",
+    funnelIds.slice().sort().join(",") || "all",
+    startDate,
+    endDate,
+  ].join(":");
 }
 
 export function resolveDataHealthState({ isLoading, hasData, error }: { isLoading: boolean; hasData: boolean; error?: unknown }) {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Chrome, Facebook, Globe, Globe2, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +14,7 @@ import { aggregateMetrics } from "@/lib/metrics";
 import { PLATFORM_COLORS } from "@/lib/platformColors";
 import { buildPlatformBreakdown, type PlatformBreakdownRow } from "@/lib/platformBreakdown";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
+import { isMetricAvailable, type MetricAvailability } from "@/lib/metricAvailability";
 
 type PlatformRow = PlatformBreakdownRow;
 
@@ -29,10 +31,24 @@ export function PaymentChartWidget() {
  * but makes the whole block a first-class grid item with its own resize/move handle.
  */
 export function PlatformDistributionWidget() {
-  const { sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, insights } = useDashboard();
+  const { sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, insights, metricAvailability, revenueAvailability } = useDashboard();
+  const queryClient = useQueryClient();
   const { data: platformRules = [] } = usePlatformRules();
   const [drilldown, setDrilldown] = useState<TopPlatform | null>(null);
   const [platformView, setPlatformView] = useState<"leads" | "revenue" | "conv">("leads");
+  const availability: MetricAvailability | undefined = platformView === "revenue"
+    ? revenueAvailability
+    : metricAvailability?.leads;
+  const blocked = Boolean(availability && !isMetricAvailable(availability));
+  const statusLabel = availability?.state === "loading"
+    ? "Carregando dados…"
+    : availability?.state === "unavailable"
+      ? "Dados indisponíveis"
+      : availability?.state === "stale"
+        ? "Último snapshot válido"
+        : availability?.state === "partial"
+          ? "Dados parciais"
+          : null;
 
   const platformBreakdown = useMemo<PlatformRow[]>(() => buildPlatformBreakdown({
     metaLeads: leadBreakdown?.total ?? aggregateMetrics(insights).totalLeads,
@@ -66,7 +82,7 @@ export function PlatformDistributionWidget() {
       <CardHeader className="expert-chart-card-header space-y-3 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4" />Distribuição por Plataforma</CardTitle>
-          <span className="text-xs tabular-nums text-muted-foreground">{headerLabel}</span>
+          <span className="text-xs tabular-nums text-muted-foreground">{blocked ? statusLabel : headerLabel}</span>
         </div>
         <Tabs className="gd-platform-tabs" value={platformView} onValueChange={(value) => setPlatformView(value as typeof platformView)}>
           <TabsList className="mx-auto grid h-9 w-full max-w-md grid-cols-3 place-items-stretch p-1">
@@ -77,7 +93,15 @@ export function PlatformDistributionWidget() {
         </Tabs>
       </CardHeader>
       <CardContent className="expert-chart-card-content">
-        <div className="flex flex-col items-center gap-4 md:flex-row">
+        {blocked ? <div className="flex min-h-[188px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border/70 px-4 text-center">
+          <p className="text-sm font-medium text-muted-foreground">{statusLabel}</p>
+          <p className="max-w-sm text-xs text-muted-foreground">{availability?.reason || "A fonte ainda não confirmou este recorte. Nenhum zero foi inferido."}</p>
+          <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-muted" onClick={() => {
+            void queryClient.invalidateQueries({ queryKey: ["insights"] });
+            void queryClient.invalidateQueries({ queryKey: ["action-totals-by-ads"] });
+            void queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] });
+          }}>Tentar novamente</button>
+        </div> : <div className="flex flex-col items-center gap-4 md:flex-row">
           {!isConversion && <div className="relative h-[188px] w-[188px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -116,7 +140,7 @@ export function PlatformDistributionWidget() {
               return <div className="mt-2 border-t border-border/40 pt-2 text-[10px] text-muted-foreground">{unknown.sales} venda{unknown.sales === 1 ? "" : "s"} sem plataforma identificada ({formatCurrency(unknown.revenue)}).</div>;
             })()}
           </div>
-        </div>
+        </div>}
       </CardContent>
     </Card>
     <PlatformDrilldownSheet platform={drilldown} onClose={() => setDrilldown(null)} />

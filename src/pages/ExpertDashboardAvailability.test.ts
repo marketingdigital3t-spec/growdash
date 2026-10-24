@@ -12,6 +12,28 @@ describe("Expert dashboard metric availability", () => {
     })).toEqual({ state: "loading" });
   });
 
+  it("does not confirm empty while a dependency is still pending", () => {
+    expect(queryMetricAvailability({
+      hasSnapshot: false,
+      hasRows: false,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      dependencyPending: true,
+    })).toEqual({ state: "loading" });
+  });
+
+  it("keeps a dependency error unavailable even when the dependent query is disabled", () => {
+    expect(queryMetricAvailability({
+      hasSnapshot: false,
+      hasRows: false,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      dependencyError: "Meta indisponível",
+    })).toEqual({ state: "unavailable", reason: "Meta indisponível" });
+  });
+
   it("only reports confirmed empty after loading has settled", () => {
     expect(queryMetricAvailability({
       hasSnapshot: true,

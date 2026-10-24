@@ -33,7 +33,7 @@ export type PagePermission =
   | "expertDashboard";
 
 export function usePermissions() {
-  const { user } = useAuth();
+  const { user, setBootstrapStep } = useAuth();
   const { data: isMaster = false, isLoading: loadingMaster } = useIsMaster();
   const {
     data: workspace,
@@ -51,6 +51,7 @@ export function usePermissions() {
     retry: 1,
     retryDelay: 1_000,
     queryFn: async () => withRequestTimeout((async () => {
+      setBootstrapStep("permissions");
       const scopedPermPromise =
         workspace?.id && !workspace.id.startsWith("legacy-")
           ? withRequestTimeout(

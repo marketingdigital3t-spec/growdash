@@ -3,7 +3,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
-import { AUTH_SESSION_TIMEOUT_MS, authSessionErrorMessage } from "@/lib/authAvailability";
+import { AUTH_SESSION_TIMEOUT_MS, authSessionErrorMessage, type AccessBootstrapSnapshot } from "@/lib/authAvailability";
 
 const SESSION_CHECK_TIMEOUT_MS = AUTH_SESSION_TIMEOUT_MS;
 
@@ -15,6 +15,13 @@ interface AuthContextType {
   errorMessage: string | null;
   retrySession: () => Promise<void>;
   signOut: () => Promise<void>;
+  bootstrap: AccessBootstrapSnapshot;
+  setBootstrapStep: (step: AccessBootstrapSnapshot["step"]) => void;
+}
+
+function createBootstrapSnapshot(attempt = 0): AccessBootstrapSnapshot {
+  const now = new Date().toISOString();
+  return { status: "hydrating", step: "session", startedAt: now, updatedAt: now, errorCode: null, errorMessage: null, retryAvailable: true, attempt };
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +32,8 @@ const AuthContext = createContext<AuthContextType>({
   errorMessage: null,
   retrySession: async () => {},
   signOut: async () => {},
+  bootstrap: createBootstrapSnapshot(),
+  setBootstrapStep: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -34,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthContextType["status"]>("hydrating");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bootstrap, setBootstrap] = useState<AccessBootstrapSnapshot>(() => createBootstrapSnapshot());
+  const attemptRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -41,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Nunca trate um timeout de rede como logout. Isso era a origem de telas de
     // login indevidas quando o token ainda estava sendo hidratado pelo Supabase.
     const timeout = window.setTimeout(() => {
-      if (active) setStatus((current) => current === "hydrating" ? "unavailable" : current);
+      if (active) {
+        setStatus((current) => current === "hydrating" ? "unavailable" : current);
+        setBootstrap((current) => current.status === "hydrating" ? { ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_TIMEOUT", errorMessage: authSessionErrorMessage(new Error("timeout")), retryAvailable: true } : current);
+      }
     }, SESSION_CHECK_TIMEOUT_MS);
 
     const applySession = (nextSession: Session | null) => {
@@ -54,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       setStatus(nextSession ? "authenticated" : "unauthenticated");
       setErrorMessage(null);
+      setBootstrap((current) => ({ ...current, status: "ready", step: "session", updatedAt: new Date().toISOString(), errorCode: null, errorMessage: null, retryAvailable: true }));
       window.clearTimeout(timeout);
     };
 
@@ -70,7 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void withRequestTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS).then(({ data: { session } }) => applySession(session)).catch((error) => {
       if (active) {
         setStatus("unavailable");
-        setErrorMessage(authSessionErrorMessage(error));
+        const message = authSessionErrorMessage(error);
+        setErrorMessage(message);
+        setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
       }
       window.clearTimeout(timeout);
     });
@@ -83,8 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const retrySession = async () => {
+    attemptRef.current += 1;
     setStatus("hydrating");
     setErrorMessage(null);
+    setBootstrap({ ...createBootstrapSnapshot(attemptRef.current), startedAt: new Date().toISOString() });
     try {
       // A manual retry must have the same bounded behavior as the initial
       // boot. Without this timeout a flaky Supabase connection could return
@@ -95,9 +114,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userIdRef.current = nextUserId;
       setSession(data.session);
       setStatus(data.session ? "authenticated" : "unauthenticated");
+      setBootstrap((current) => ({ ...current, status: "ready", updatedAt: new Date().toISOString(), errorCode: null, errorMessage: null }));
     } catch (error) {
       setStatus("unavailable");
-      setErrorMessage(authSessionErrorMessage(error));
+      const message = authSessionErrorMessage(error);
+      setErrorMessage(message);
+      setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
     }
   };
 
@@ -105,8 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const setBootstrapStep = (step: AccessBootstrapSnapshot["step"]) => {
+    setBootstrap((current) => ({ ...current, step, updatedAt: new Date().toISOString() }));
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, errorMessage, retrySession, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, errorMessage, retrySession, signOut, bootstrap, setBootstrapStep }}>
       {children}
     </AuthContext.Provider>
   );

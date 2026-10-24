@@ -6,7 +6,7 @@ on:
     - cron: "17 */3 * * *"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   detect:
@@ -27,12 +27,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browser for visual checks
+        run: npx playwright install --with-deps chromium
+
       - name: Run loop engineering detection
         id: loop
         continue-on-error: true
         env:
           LOOP_ENGINEERING_BACKEND_SCAN: "1"
+          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
+          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
         run: npm run loop-engineering:detect
+
+      - name: Attempt deterministic repairs
+        id: repair
+        if: steps.loop.outcome == 'failure'
+        continue-on-error: true
+        env:
+          LOOP_ENGINEERING_BACKEND_SCAN: "1"
+          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
+          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
+        run: npm run loop-engineering:repair:auto
+
+      - name: Commit validated automatic repairs
+        if: steps.repair.outcome == 'success'
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git add src supabase/functions supabase/migrations scripts package.json package-lock.json docs
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "growdash-loop-engineering[bot]"
+          git config user.email "growdash-loop-engineering[bot]@users.noreply.github.com"
+          git commit -m "fix: apply validated loop engineering repairs"
+          git push origin HEAD:main
 
       - name: Upload loop report
         if: always()

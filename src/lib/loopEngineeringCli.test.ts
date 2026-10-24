@@ -30,6 +30,21 @@ describe("loop engineering CLI", () => {
     expect(report.findings).toEqual([]);
   });
 
+  it("blocks a release check without real auth state and Sentry credentials", async () => {
+    const report = await runLoop({
+      mode: "detect",
+      output: "reports/loop-engineering-cli-auth-gate.json",
+      commands: [],
+      authenticatedRuntime: true,
+      authStatePath: undefined,
+      sentryRequired: true,
+      sentryToken: undefined,
+      runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }),
+    });
+    expect(report.status).toBe("blocked");
+    expect(report.findings.map((finding) => finding.category)).toEqual(["authentication", "observability"]);
+  });
+
   it("applies a complete declarative patch in repair mode", async () => {
     let content = "return 0;";
     const fail = { exitCode: 1, signal: null, timedOut: false, stdout: "", stderr: "regression" };

@@ -1,8 +1,9 @@
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { createAutomaticRemediationPlan } from "./loop-engineering-auto-repair.mjs";
 
 const execFile = promisify(execFileCallback);
 const DEFAULT_COMMANDS = ["npm test", "npm run lint", "npm run build", "npm run test:visual", "git diff --check"];
@@ -51,16 +52,53 @@ function finding({ title, category = "runtime", severity = "medium", command, re
 }
 
 export function parseArgs(argv) {
-  const args = { mode: "detect", output: "reports/loop-engineering.json", plan: null };
+  const args = { mode: "detect", output: "reports/loop-engineering.json", plan: null, autoRepair: false };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--mode" && argv[index + 1]) args.mode = argv[++index];
     else if (flag === "--output" && argv[index + 1]) args.output = argv[++index];
     else if (flag === "--plan" && argv[index + 1]) args.plan = argv[++index];
+    else if (flag === "--auto") args.autoRepair = true;
     else if (flag === "--help") args.help = true;
   }
   if (!["detect", "repair", "release"].includes(args.mode)) throw new Error(`Modo inválido: ${args.mode}`);
   return args;
+}
+
+async function authenticatedRuntimeFinding({ authStatePath = process.env.GROWDASH_AUTH_STATE, required = false } = {}) {
+  if (!required) return null;
+  if (!authStatePath) {
+    return finding({
+      command: "npm run test:visual -- --workers=1",
+      result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "GROWDASH_AUTH_STATE ausente; smoke autenticado real não foi executado." },
+      severity: "high",
+      category: "authentication",
+      title: "Smoke autenticado bloqueado: sessão ausente",
+    });
+  }
+  try {
+    await access(authStatePath);
+    return null;
+  } catch {
+    return finding({
+      command: "npm run test:visual -- --workers=1",
+      result: { exitCode: 2, signal: null, timedOut: false, stdout: `auth_state=${authStatePath}`, stderr: "Arquivo GROWDASH_AUTH_STATE não encontrado; smoke autenticado real não foi executado." },
+      severity: "high",
+      category: "authentication",
+      title: "Smoke autenticado bloqueado: estado inválido",
+    });
+  }
+}
+
+function sentryConfigurationFinding({ required = false, token = process.env.SENTRY_AUTH_TOKEN } = {}) {
+  if (!required || token) return null;
+  return finding({
+    command: "sentry-release-check",
+    result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "SENTRY_AUTH_TOKEN ausente; eventos e source maps não podem ser verificados." },
+    severity: "high",
+    category: "observability",
+    title: "Gate de observabilidade bloqueado: Sentry não configurado",
+  });
 }
 
 export function validatePlan(plan) {
@@ -163,7 +201,7 @@ function renderMarkdown(report) {
   return `# Loop Engineering\n\n- Execução: ${report.runId}\n- Commit: ${report.commitSha}\n- Modo: ${report.mode}\n- Status: ${report.status}\n\n## Achados\n\n| Severidade | Categoria | Título | Remediação | Release |\n|---|---|---|---|---|\n${rows}\n\n## Pendências\n\n${report.findings.length ? report.findings.map((item) => `- ${item.title}: ${sanitizeText(item.evidence.stderr || "evidência registrada")}`).join("\n") : "- Nenhuma"}\n`;
 }
 
-export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", backendScan = false, fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
+export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, autoRepair = false, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", backendScan = false, authenticatedRuntime = false, authStatePath = process.env.GROWDASH_AUTH_STATE, sentryRequired = false, sentryToken = process.env.SENTRY_AUTH_TOKEN, fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
   const unlock = await acquireReportLock(output);
   if (!unlock) {
     const locked = { schemaVersion: 1, runId: `loop_locked_${stableHash({ output })}`, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), commitSha, mode, status: "blocked", findings: [finding({ command: output, result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Outra execução do loop já está usando este relatório." }, severity: "high", category: "runtime", title: "Execução concorrente bloqueada" })] };
@@ -173,6 +211,10 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
   try {
     const runId = `loop_${stableHash({ mode, commitSha, startedAt })}`;
     const findings = [];
+    const authFinding = await authenticatedRuntimeFinding({ authStatePath, required: authenticatedRuntime });
+    if (authFinding) findings.push(authFinding);
+    const sentryFinding = sentryConfigurationFinding({ required: sentryRequired, token: sentryToken });
+    if (sentryFinding) findings.push(sentryFinding);
     for (const command of commands) {
       const result = await runCommand(command);
       if (result.exitCode !== 0 || result.timedOut) {
@@ -194,22 +236,30 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
         }
       }
     }
-    if (mode !== "detect" && !plan) findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Plano de remediação obrigatório" }, severity: "high", category: "authorization", title: "Plano de remediação ausente" }), remediation: "blocked" });
-    if (mode !== "detect" && plan) {
-    const planValidation = validatePlan(plan);
-    const matchedFindings = findings.filter((item) => plan.findingSignatures?.includes(item.signature));
-    if (!planValidation.valid) {
-      findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: planValidation.reasons.join("; ") }, severity: "high", category: "authorization", title: "Plano de remediação inválido" }), remediation: "blocked" });
-    } else if (!matchedFindings.length) {
-      findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Nenhum achado reproduzido corresponde às assinaturas declaradas." }, severity: "high", category: "authorization", title: "Remediação sem achado reproduzido" }), remediation: "blocked" });
-    } else {
-      const remediation = await applyPlan(plan, fileSystem, runCommand);
-      if (remediation.status === "blocked") {
-      findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: remediation.reasons.join("; ") }, severity: "high", category: "authorization", title: "Remediação bloqueada" }), remediation: "blocked" });
-      } else {
+    if (mode !== "detect") {
+      const plans = plan ? [plan] : autoRepair ? findings.map((item) => createAutomaticRemediationPlan(item)).filter(Boolean) : [];
+      if (!plans.length && !autoRepair) {
+        findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Plano de remediação obrigatório" }, severity: "high", category: "authorization", title: "Plano de remediação ausente" }), remediation: "blocked" });
+      }
+      for (const currentPlan of plans) {
+        const planValidation = validatePlan(currentPlan);
+        const matchedFindings = findings.filter((item) => currentPlan.findingSignatures?.includes(item.signature));
+        if (!planValidation.valid) {
+          findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: planValidation.reasons.join("; ") }, severity: "high", category: "authorization", title: "Plano de remediação inválido" }), remediation: "blocked" });
+          continue;
+        }
+        if (!matchedFindings.length) {
+          findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Nenhum achado reproduzido corresponde às assinaturas declaradas." }, severity: "high", category: "authorization", title: "Remediação sem achado reproduzido" }), remediation: "blocked" });
+          continue;
+        }
+        const remediation = await applyPlan(currentPlan, fileSystem, runCommand);
+        if (remediation.status === "blocked") {
+          findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: remediation.reasons.join("; ") }, severity: "high", category: "authorization", title: "Remediação bloqueada" }), remediation: "blocked" });
+          continue;
+        }
         const validationResults = [];
         let validationFailed = false;
-        for (const test of plan.tests) {
+        for (const test of currentPlan.tests) {
           const result = await runCommand(test);
           validationResults.push({ command: test, exitCode: result.exitCode, timedOut: result.timedOut });
           if (result.exitCode !== 0 || result.timedOut) {
@@ -225,11 +275,10 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
             item.remediation = "applied";
             item.validation = { status: "passed", tests: validationResults };
             item.releaseDecision = "manual_review";
-            item.rollback = { status: "defined", instructions: plan.rollback };
+            item.rollback = { status: "defined", instructions: currentPlan.rollback };
           }
         }
       }
-    }
     }
     const unique = [...new Map(findings.map((item) => [item.signature, item])).values()];
     const unresolved = unique.filter((item) => item.remediation !== "applied" || item.validation?.status !== "passed");
@@ -249,12 +298,18 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Uso: node scripts/loop-engineering.mjs [--mode detect|repair|release] [--output arquivo.json] [--plan arquivo.json]");
+    console.log("Uso: node scripts/loop-engineering.mjs [--mode detect|repair|release] [--auto] [--output arquivo.json] [--plan arquivo.json]");
     return;
   }
   let commitSha = "unknown";
   try { commitSha = (await execFile("git", ["rev-parse", "HEAD"])).stdout.trim(); } catch { /* relatório ainda é útil sem Git */ }
-  const report = await runLoop({ ...args, commitSha, backendScan: process.env.LOOP_ENGINEERING_BACKEND_SCAN === "1" });
+  const report = await runLoop({
+    ...args,
+    commitSha,
+    backendScan: process.env.LOOP_ENGINEERING_BACKEND_SCAN === "1",
+    authenticatedRuntime: process.env.LOOP_ENGINEERING_AUTH_REQUIRED === "1",
+    sentryRequired: process.env.LOOP_ENGINEERING_SENTRY_REQUIRED === "1",
+  });
   console.log(JSON.stringify({ runId: report.runId, status: report.status, findings: report.findings.length, output: args.output }, null, 2));
   if (report.status === "blocked") process.exitCode = 2;
 }

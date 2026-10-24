@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { clearRecoveryAttempts, consumeRecoveryAttempt, isRecoverableChunkError, latestBuildRecoveryUrl } from "./resilience";
 
 describe("resilience helpers", () => {
@@ -26,6 +26,16 @@ describe("resilience helpers", () => {
     expect(consumeRecoveryAttempt("chunk:traffic", 60_000, 1).blocked).toBe(false);
     expect(consumeRecoveryAttempt("chunk:traffic", 60_000, 1).blocked).toBe(true);
     clearRecoveryAttempts("chunk:traffic");
+  });
+
+  it("keeps a recovery budget when sessionStorage is unavailable", () => {
+    const storage = globalThis.sessionStorage;
+    vi.stubGlobal("sessionStorage", undefined);
+    clearRecoveryAttempts("storage-unavailable");
+    expect(consumeRecoveryAttempt("storage-unavailable", 60_000, 1).blocked).toBe(false);
+    expect(consumeRecoveryAttempt("storage-unavailable", 60_000, 1).blocked).toBe(true);
+    vi.stubGlobal("sessionStorage", storage);
+    clearRecoveryAttempts("storage-unavailable");
   });
 
   it("keeps the active route while cache-busting a stale deployment shell", () => {

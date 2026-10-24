@@ -43,20 +43,17 @@ function formatSafeDate(value: string | Date | null | undefined, pattern: string
   return isValid(date) ? format(date, pattern, { locale: ptBR }) : "data inválida";
 }
 
-function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; startDate: Date; endDate: Date }) {
+function useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; funnelIds: string[]; startDate: Date; endDate: Date }) {
   const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
-    queryKey: ["data-health", dataHealthScopeKey({ workspaceId, adAccountIds: scopedAccountIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) })],
+    queryKey: ["data-health", dataHealthScopeKey({ workspaceId, adAccountIds: scopedAccountIds, funnelIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) })],
     queryFn: () => withRequestTimeout((async (): Promise<HealthData> => {
-      let linkedFunnelIds: string[] = [];
-      if (scopedAccountIds.length) {
+      let linkedFunnelIds = funnelIds.slice();
+      if (!linkedFunnelIds.length && scopedAccountIds.length) {
         const { data: funnels, error } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
         throwOnQueryError(error, "rd_funnels");
         linkedFunnelIds = (funnels ?? []).map((funnel: any) => String(funnel.id)).filter(Boolean);
       }
-      const rdScopeFilters = scopedAccountIds.length
-        ? [`ad_account_id.in.(${scopedAccountIds.join(",")})`, ...(linkedFunnelIds.length ? [`rd_funnel_id.in.(${linkedFunnelIds.join(",")})`] : [])]
-        : [];
       // Orphan sales: sales with rd_deal_id but no matching rd_deals
       let salesQuery = supabase
         .from("sales")
@@ -65,8 +62,8 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         .not("rd_deal_id", "is", null)
         .gte("sale_date", businessDateKey(startDate))
         .lte("sale_date", businessDateKey(endDate));
-      if (rdScopeFilters.length > 1) salesQuery = salesQuery.or(rdScopeFilters.join(","));
-      else if (scopedAccountIds.length) salesQuery = salesQuery.in("ad_account_id", scopedAccountIds);
+      if (scopedAccountIds.length) salesQuery = salesQuery.in("ad_account_id", scopedAccountIds);
+      if (linkedFunnelIds.length) salesQuery = salesQuery.in("rd_funnel_id", linkedFunnelIds);
       const { data: sales, error: salesError } = await salesQuery;
       throwOnQueryError(salesError, "sales");
       const dealIds = (sales || []).map((s: any) => s.rd_deal_id).filter(Boolean);
@@ -77,8 +74,8 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         for (let i = 0; i < dealIds.length; i += CHUNK) {
           const slice = dealIds.slice(i, i + CHUNK);
           let rdQuery = supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
-          if (rdScopeFilters.length > 1) rdQuery = rdQuery.or(rdScopeFilters.join(","));
-          else if (scopedAccountIds.length) rdQuery = rdQuery.in("ad_account_id", scopedAccountIds);
+          if (scopedAccountIds.length) rdQuery = rdQuery.in("ad_account_id", scopedAccountIds);
+          if (linkedFunnelIds.length) rdQuery = rdQuery.in("rd_funnel_id", linkedFunnelIds);
           const { data: rd, error: rdError } = await rdQuery;
           throwOnQueryError(rdError, "rd_deals por vínculo");
           for (const r of (rd || []) as any[]) matched.add(r.rd_deal_id);
@@ -89,12 +86,13 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
       // Deals missing state
       let missingQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true }).is("lead_state", null);
       let totalQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true });
-      if (rdScopeFilters.length > 1) {
-        missingQuery = missingQuery.or(rdScopeFilters.join(","));
-        totalQuery = totalQuery.or(rdScopeFilters.join(","));
-      } else if (scopedAccountIds.length) {
+      if (scopedAccountIds.length) {
         missingQuery = missingQuery.in("ad_account_id", scopedAccountIds);
         totalQuery = totalQuery.in("ad_account_id", scopedAccountIds);
+      }
+      if (linkedFunnelIds.length) {
+        missingQuery = missingQuery.in("rd_funnel_id", linkedFunnelIds);
+        totalQuery = totalQuery.in("rd_funnel_id", linkedFunnelIds);
       }
       const { count: missing, error: missingError } = await missingQuery;
       throwOnQueryError(missingError, "rd_deals sem estado");
@@ -168,16 +166,17 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
   });
 }
 
-function useOperationalAudit(adAccountId: string, adAccountIds: string[], startDate: Date, endDate: Date) {
+function useOperationalAudit(adAccountId: string, adAccountIds: string[], funnelIds: string[], startDate: Date, endDate: Date) {
   const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
-    queryKey: ["rd-operational-audit", dataHealthScopeKey({ adAccountIds: scopedAccountIds, startDate: startDate.toISOString(), endDate: endDate.toISOString() })],
+    queryKey: ["rd-operational-audit", dataHealthScopeKey({ adAccountIds: scopedAccountIds, funnelIds, startDate: startDate.toISOString(), endDate: endDate.toISOString() })],
     queryFn: async () => {
       const pageSize = 1000;
       let rows: any[] = [];
       for (let page = 0; ; page += 1) {
         let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at");
         if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+        if (funnelIds.length) query = query.in("rd_funnel_id", funnelIds);
         const start = startDate.toISOString();
         const end = endDate.toISOString();
         query = query.or(`and(closed_at.gte.${start},closed_at.lte.${end}),and(stage_updated_at.gte.${start},stage_updated_at.lte.${end})`);
@@ -205,9 +204,9 @@ function useOperationalAudit(adAccountId: string, adAccountIds: string[], startD
 }
 
 export default function DataHealth() {
-  const { adAccountId, adAccountIds, startDate, endDate, workspaceId } = useGlobalFilters();
-  const { data, isLoading, isFetching, error: healthError, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate });
-  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, adAccountIds, startDate, endDate);
+  const { adAccountId, adAccountIds, funnelIds, startDate, endDate, workspaceId } = useGlobalFilters();
+  const { data, isLoading, isFetching, error: healthError, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDate, endDate });
+  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, adAccountIds, funnelIds, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [syncingLeads, setSyncingLeads] = useState(false);

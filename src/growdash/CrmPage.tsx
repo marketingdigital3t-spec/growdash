@@ -230,7 +230,13 @@ export default function CrmPage() {
     dateScope: preset === "max" ? "pipeline" : "period",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
-  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, dataUpdatedAt: salesUpdatedAt, isError: salesError, error: salesQueryError } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, dataUpdatedAt: salesUpdatedAt, isError: salesError, error: salesQueryError } = useSales({
+    adAccountId: accountFilter,
+    adAccountIds: accountScopeIds,
+    funnelIds: selectedFunnelIds,
+    startDate: preset === "max" ? undefined : startDate,
+    endDate: preset === "max" ? undefined : endDate,
+  });
   const { data: attributionInsights = [] } = useInsights({ adAccountIds: accountScopeIds, startDate, endDate, enabled: canReadCrm && accountScopeIds.length > 0 });
   const { data: firstPartyLeads = [] } = useQuery({
     queryKey: ["crm_leads", workspace?.id],
@@ -286,17 +292,19 @@ export default function CrmPage() {
   // materially misleading in CRM. Fail closed until every account-scoped
   // source belongs to the selection.
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
-  const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingFunnels || loadingDeals || loadingSales;
+  const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingRDIntegration || loadingFunnels || loadingDeals || loadingSales;
   const crmUpdatedAt = Math.max(dealsUpdatedAt || 0, funnelsUpdatedAt || 0, salesUpdatedAt || 0);
-  const crmError = funnelsError || dealsError || salesError;
-  const crmErrorMessage = funnelsQueryError instanceof Error
+  const crmError = adAccountsError || funnelsError || dealsError || salesError;
+  const crmErrorMessage = adAccountsQueryError instanceof Error
+    ? adAccountsQueryError.message
+    : funnelsQueryError instanceof Error
     ? funnelsQueryError.message
     : dealsQueryError instanceof Error
       ? dealsQueryError.message
       : salesQueryError instanceof Error
         ? salesQueryError.message
         : "Não foi possível consultar o RD Station.";
-  const crmAvailability: MetricAvailability = loadingDeals || loadingFunnels || loadingSales
+  const crmAvailability: MetricAvailability = loadingAdAccounts || loadingRDIntegration || loadingDeals || loadingFunnels || loadingSales
     ? (crmUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
     : crmError
       ? (crmUpdatedAt ? { state: "partial", reason: "Uma fonte falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: crmErrorMessage })

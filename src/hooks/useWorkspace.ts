@@ -105,7 +105,7 @@ export interface WorkspaceAccessState {
 }
 
 export function useWorkspace() {
-  const { user } = useAuth();
+  const { user, setBootstrapStep } = useAuth();
   const cacheKey = user?.id ? `growdash:workspace:${user.id}` : "";
   const cachedWorkspace = readLocalCache<WorkspaceFoundation>(cacheKey);
 
@@ -121,6 +121,7 @@ export function useWorkspace() {
     // request revalidates. Cached data is never used as authorization.
     placeholderData: cachedWorkspace,
     queryFn: async (): Promise<WorkspaceFoundation> => withRequestTimeout((async () => {
+      setBootstrapStep("workspace");
       const cached = (): WorkspaceFoundation | null => {
         const value = readLocalCache<WorkspaceFoundation>(cacheKey);
         return value?.id && !value.id.startsWith("legacy-") ? value : null;
@@ -170,6 +171,7 @@ export function useWorkspace() {
         if (memberError) throw memberError;
         if (unitsError) throw unitsError;
         const foundation = { ...workspace, role: membership.role, units: units ?? [] };
+        setBootstrapStep("permissions");
         writeLocalCache(cacheKey, foundation);
         return foundation;
       } catch (err: any) {

@@ -16,6 +16,7 @@
     "test:visual:update": "playwright test --update-snapshots",
     "loop-engineering": "node scripts/loop-engineering.mjs",
     "loop-engineering:detect": "node scripts/loop-engineering.mjs --mode detect",
+    "loop-engineering:repair:auto": "node scripts/loop-engineering.mjs --mode repair --auto",
     "traffic-agent": "node scripts/traffic-agent-runner.mjs"
   },
   "dependencies": {

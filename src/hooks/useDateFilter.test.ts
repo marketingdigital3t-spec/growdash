@@ -28,8 +28,8 @@ describe("date filter maximum history", () => {
       from: new Date(2026, 7, 10, 15, 30),
       to: new Date(2026, 7, 12, 9, 15),
     });
-    expect(range.startDate).toEqual(new Date(2026, 7, 10, 0, 0, 0, 0));
-    expect(range.endDate).toEqual(new Date(2026, 7, 12, 23, 59, 59, 999));
+    expect(range.startDate).toEqual(new Date("2026-08-10T00:00:00-03:00"));
+    expect(range.endDate).toEqual(new Date("2026-08-12T23:59:59.999-03:00"));
   });
 
   it("preserves the selected November 2026 calendar year", () => {

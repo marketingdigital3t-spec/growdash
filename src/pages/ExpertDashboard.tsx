@@ -37,9 +37,12 @@ export function queryMetricAvailability(input: {
   isFetching: boolean;
   isError: boolean;
   reason?: string;
+  /** A dependent query can be disabled until its scope is ready. */
+  dependencyPending?: boolean;
+  dependencyError?: string;
 }): MetricAvailability {
-  if (!input.hasSnapshot && input.isLoading) return { state: "loading" };
-  if (!input.hasSnapshot && input.isError) return { state: "unavailable", reason: input.reason };
+  if (!input.hasSnapshot && (input.isLoading || input.isFetching || input.dependencyPending)) return { state: "loading" };
+  if (!input.hasSnapshot && (input.isError || input.dependencyError)) return { state: "unavailable", reason: input.reason || input.dependencyError };
   if (input.isError) return { state: "partial", reason: input.reason || "A fonte falhou; o último snapshot foi preservado." };
   if (input.isFetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
   return input.hasRows === false ? { state: "empty_confirmed" } : { state: "fresh" };
@@ -174,11 +177,16 @@ export default function ExpertDashboard() {
     reason: "Não foi possível consultar os insights Meta para este recorte.",
   });
   const leadAvailability = queryMetricAvailability({
-    hasSnapshot: actionQuery.data !== undefined,
+    // When there are no ads, the action query is intentionally disabled. Its
+    // absence is only a confirmed zero after the canonical insights scope has
+    // settled successfully; before that it is still pending.
+    hasSnapshot: actionQuery.data !== undefined || (insightsQuery.data !== undefined && actionAdIds.length === 0 && !insightsQuery.isError),
     hasRows: Number(actionData?.metaLeadActions?.total || 0) > 0,
     isLoading: loadingAccounts || actionQuery.isLoading,
     isFetching: actionQuery.isFetching,
     isError: actionQuery.isError,
+    dependencyPending: loadingAccounts || insightsQuery.isLoading || insightsQuery.isFetching,
+    dependencyError: insightsQuery.isError ? "Os insights Meta não puderam ser confirmados para este recorte." : undefined,
     reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",
   });
   const metricAvailability = useMemo(() => ({
@@ -232,7 +240,7 @@ export default function ExpertDashboard() {
             {[
               ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
-            <DashboardWidgetHelp type="kpi" title="Leads Meta" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
+            <DashboardWidgetHelp type="kpi" title="Leads Meta" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} availability={leadAvailability} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
             {[
               ["CPL", "cpl"], ["ROAS", "roas"],
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Taxa de conversão", "conversion_rate"],
