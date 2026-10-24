@@ -15220,6 +15220,28 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter option,
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
 
+/* Keep the ranking scope tabs in the same emerald control system. The
+   platform-wide button layer otherwise turns these two tabs white/blue in
+   dark mode, which breaks the Comercial visual hierarchy. */
+.brand-shell .commercial-ranking-shell .commercial-ranking-tabs button {
+  background: var(--gd-surface-control) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-content-muted) !important;
+  box-shadow: none !important;
+}
+.brand-shell .commercial-ranking-shell .commercial-ranking-tabs button.is-active,
+.brand-shell .commercial-ranking-shell .commercial-ranking-tabs button[aria-selected="true"] {
+  background: var(--gd-emerald) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+  box-shadow: 0 8px 20px -12px rgba(16, 185, 129, .9) !important;
+}
+.dark .brand-shell .commercial-ranking-shell .commercial-ranking-tabs button:not(.is-active):not([aria-selected="true"]) {
+  color: #fff !important;
+}
+
 /* The global button contract is intentionally strong and includes a white
    surface. Commercial controls are a semantic filter group, so give them a
    more specific final rule in both the page and fullscreen portal. Without
