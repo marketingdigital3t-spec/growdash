@@ -9,6 +9,12 @@ import type { FlowData } from "./types";
 import { excalidrawToFlow, flowToExcalidraw } from "./excalidrawAdapter";
 import "@excalidraw/excalidraw/index.css";
 
+// Keep the editor safe when it is mounted in isolation (for example in a
+// route-level test) before the application entry module runs.
+if (typeof window !== "undefined") {
+  window.EXCALIDRAW_ASSET_PATH ??= "/excalidraw/";
+}
+
 type Props = {
   initialFlow: FlowData;
   title: string;

@@ -10,6 +10,8 @@ import "./index.css";
 declare global {
   interface Window {
     __GROWDASH_BOOTED__?: boolean;
+    /** Local base path for Excalidraw's bundled font assets. */
+    EXCALIDRAW_ASSET_PATH?: string;
   }
 }
 
@@ -22,4 +24,8 @@ const rootElement = document.getElementById("root")!;
 rootElement.dataset.build = "2026-08-12-loading-recovery";
 rootElement.dataset.growdashBooted = "true";
 window.__GROWDASH_BOOTED__ = true;
+// Excalidraw falls back to esm.sh when this path is not configured. The
+// production CSP intentionally blocks that remote font origin, so point it
+// at the self-hosted assets shipped under public/excalidraw instead.
+window.EXCALIDRAW_ASSET_PATH = "/excalidraw/";
 createRoot(rootElement).render(<App />);
