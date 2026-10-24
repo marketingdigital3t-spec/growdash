@@ -66,6 +66,31 @@ export function hasActionMetricSnapshot(input: {
   return input.hasActionData && (input.actionAdCount > 0 || input.insightsDataUpdatedAt > 0);
 }
 
+export function buildExpertMetricAvailability(input: {
+  insightAvailability: MetricAvailability;
+  leadAvailability: MetricAvailability;
+  revenueAvailability: MetricAvailability;
+}) {
+  return {
+    spend: input.insightAvailability,
+    leads: input.leadAvailability,
+    cpl: input.leadAvailability,
+    conversion_rate: input.leadAvailability,
+    campaign_leads: input.leadAvailability,
+    campaign_cpl: input.leadAvailability,
+    campaign_conversion_rate: input.leadAvailability,
+    revenue_gross: input.revenueAvailability,
+    revenue_net: input.revenueAvailability,
+    sales_count: input.revenueAvailability,
+    roas: input.revenueAvailability,
+    roi: input.revenueAvailability,
+    profit: input.revenueAvailability,
+    profit_margin: input.revenueAvailability,
+    receivables: input.revenueAvailability,
+    average_ticket: input.revenueAvailability,
+  };
+}
+
 /**
  * Deliberately separate from the editable operational dashboard. The page only
  * queries metric sources protected by account RLS and renders no write actions,
@@ -211,23 +236,7 @@ export default function ExpertDashboard() {
     dependencyError: insightsQuery.isError ? "Os insights Meta não puderam ser confirmados para este recorte." : undefined,
     reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",
   });
-  const metricAvailability = useMemo(() => ({
-    spend: insightAvailability,
-    leads: leadAvailability,
-    cpl: leadAvailability,
-    campaign_leads: leadAvailability,
-    campaign_cpl: leadAvailability,
-    campaign_conversion_rate: leadAvailability,
-    revenue_gross: revenueAvailability,
-    revenue_net: revenueAvailability,
-    sales_count: revenueAvailability,
-    roas: revenueAvailability,
-    roi: revenueAvailability,
-    profit: revenueAvailability,
-    profit_margin: revenueAvailability,
-    receivables: revenueAvailability,
-    average_ticket: revenueAvailability,
-  }), [insightAvailability, leadAvailability, revenueAvailability]);
+  const metricAvailability = useMemo(() => buildExpertMetricAvailability({ insightAvailability, leadAvailability, revenueAvailability }), [insightAvailability, leadAvailability, revenueAvailability]);
 
   return (
     <MotionPage className="expert-dashboard expert-dashboard-shell gd-module-shell min-w-0 space-y-3 sm:space-y-4">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasActionMetricSnapshot, queryMetricAvailability } from "./ExpertDashboard";
+import { buildExpertMetricAvailability, hasActionMetricSnapshot, queryMetricAvailability } from "./ExpertDashboard";
 
 describe("Expert dashboard metric availability", () => {
   it("keeps disabled queries in loading while account scope is hydrating", () => {
@@ -77,6 +77,17 @@ describe("Expert dashboard metric availability", () => {
       isError: false,
       dependencyError: "Meta indisponível",
     })).toEqual({ state: "partial", reason: "Meta indisponível" });
+  });
+
+  it("uses the lead availability state for the derived conversion KPI", () => {
+    const leadAvailability = { state: "loading" as const };
+    const revenueAvailability = { state: "fresh" as const };
+    const availability = buildExpertMetricAvailability({
+      insightAvailability: { state: "loading" },
+      leadAvailability,
+      revenueAvailability,
+    });
+    expect(availability.conversion_rate).toEqual(leadAvailability);
   });
 
   it("preserves a partial snapshot when a refresh fails", () => {
