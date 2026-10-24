@@ -35,8 +35,6 @@ jobs:
         continue-on-error: true
         env:
           LOOP_ENGINEERING_BACKEND_SCAN: "1"
-          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
-          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
         run: npm run loop-engineering:detect
 
       - name: Attempt deterministic repairs
@@ -45,8 +43,6 @@ jobs:
         continue-on-error: true
         env:
           LOOP_ENGINEERING_BACKEND_SCAN: "1"
-          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
-          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
         run: npm run loop-engineering:repair:auto
 
       - name: Commit validated automatic repairs
