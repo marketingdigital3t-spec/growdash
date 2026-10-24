@@ -15219,3 +15219,25 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control { color: #fff !important; }
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter option,
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
+
+/* The global button contract is intentionally strong and includes a white
+   surface. Commercial controls are a semantic filter group, so give them a
+   more specific final rule in both the page and fullscreen portal. Without
+   this override, the expert and date triggers keep white backgrounds in dark
+   mode even though their text token is already light. */
+.brand-shell .commercial-ranking-shell .commercial-ranking-controls .commercial-ranking-control,
+.brand-shell .commercial-ranking-shell .commercial-ranking-filter,
+:is(section[role="dialog"], section.isolate) .commercial-ranking-controls .commercial-ranking-control,
+:is(section[role="dialog"], section.isolate) .commercial-ranking-filter {
+  background: var(--gd-surface-control) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+.dark .brand-shell .commercial-ranking-shell .commercial-ranking-controls .commercial-ranking-control,
+.dark .brand-shell .commercial-ranking-shell .commercial-ranking-filter,
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-controls .commercial-ranking-control,
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter {
+  color: #fff !important;
+}
