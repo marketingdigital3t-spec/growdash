@@ -3,6 +3,7 @@ import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
   shouldHydrateRDAnalyticsItem,
+  shouldSkipRDDealEnrichment,
 } from "../../supabase/functions/_shared/rdSyncCursor";
 
 describe("RD resumable sync cursors", () => {
@@ -51,6 +52,12 @@ describe("RD resumable sync cursors", () => {
       skipEnrichment: true,
       fullHistoryRequested: false,
     })).toBe(false);
+  });
+
+  it("skips detail/contact calls in bounded realtime syncs", () => {
+    expect(shouldSkipRDDealEnrichment({ boundedRealtime: true, skipEnrichment: false })).toBe(true);
+    expect(shouldSkipRDDealEnrichment({ boundedRealtime: false, skipEnrichment: true })).toBe(true);
+    expect(shouldSkipRDDealEnrichment({ boundedRealtime: false, skipEnrichment: false })).toBe(false);
   });
 
   it("hydrates only a won item without closed_at during a fast realtime pass", () => {

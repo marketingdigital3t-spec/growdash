@@ -5,6 +5,7 @@ import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
   shouldHydrateRDAnalyticsItem,
+  shouldSkipRDDealEnrichment,
 } from "../_shared/rdSyncCursor.ts";
 import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
 
@@ -595,7 +596,10 @@ Deno.serve(async (req) => {
     // the boolean flag, otherwise the function walks the complete RD archive
     // and hydrates every row before returning to the UI.
     const boundedRealtime = realtime === true || ["auto_realtime", "integrations_realtime"].includes(String(trigger_source || ""));
-    const effectiveSkipEnrichment = skip_enrichment === true || boundedRealtime;
+    const effectiveSkipEnrichment = shouldSkipRDDealEnrichment({
+      boundedRealtime,
+      skipEnrichment: skip_enrichment === true,
+    });
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
       return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
@@ -1059,6 +1063,7 @@ Deno.serve(async (req) => {
 
     async function processDeal(d: any) {
       const id = String(d.id || d._id);
+      if (effectiveSkipEnrichment) return { ...d, _contacts: [] };
       let detail: any = d;
       let detailOk = false;
       try {

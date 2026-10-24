@@ -22,6 +22,15 @@ export type RDAnalyticsItemHydrationOptions = RDAnalyticsHydrationOptions & {
 };
 
 /**
+ * Realtime list syncs must persist the provider payload without hydrating
+ * every deal and contact. Hydration is reserved for bounded analytics or
+ * explicit/manual reconciliation paths.
+ */
+export function shouldSkipRDDealEnrichment({ boundedRealtime, skipEnrichment }: { boundedRealtime: boolean; skipEnrichment: boolean }) {
+  return boundedRealtime || skipEnrichment;
+}
+
+/**
  * A full-history reconciliation mirrors the provider list payload. Hydrating
  * every deal through detail/contact endpoints can exhaust the Edge runtime
  * before the page cursor is persisted. Bounded analytics runs still hydrate
