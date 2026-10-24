@@ -8,5 +8,6 @@ describe("campaignLoadState", () => {
     expect(campaignLoadState({ isLoading: false, isFetching: false, hasData: true, hasError: false })).toBe("ready");
     expect(campaignLoadState({ isLoading: false, isFetching: false, hasData: false, hasError: false })).toBe("empty");
     expect(campaignLoadState({ isLoading: false, isFetching: false, hasData: false, hasError: true })).toBe("error");
+    expect(campaignLoadState({ isLoading: true, isFetching: true, hasData: false, hasError: false, timedOut: true })).toBe("error");
   });
 });

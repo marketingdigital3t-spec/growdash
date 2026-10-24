@@ -102,6 +102,7 @@ const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; ac
   { id: "healthy", label: "Saudável", dot: "bg-emerald-500", active: "border-emerald-500/55 bg-emerald-500/10 text-emerald-500" },
   { id: "inactive", label: "Inativas", dot: "bg-zinc-400", active: "border-zinc-400/55 bg-zinc-400/10 text-zinc-500" },
 ];
+const CAMPAIGN_SOFT_TIMEOUT_MS = 15_000;
 
 const CAMPAIGN_COLUMN_FILTERS: Array<{ key: string; label: string; column?: CampaignColumnKey }> = [
   { key: "status", label: "Status" }, { key: "name", label: "Campanha" },
@@ -248,6 +249,7 @@ export default function Campaigns() {
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [duplicatingCampaign, setDuplicatingCampaign] = useState<{ id: string; name: string; status?: string | null } | null>(null);
+  const [campaignLoadTimedOut, setCampaignLoadTimedOut] = useState(false);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
   const [adsetSortKey, setAdsetSortKey] = useState<AdsetColKey>("spend");
@@ -576,6 +578,18 @@ export default function Campaigns() {
     },
   });
 
+  const campaignScopeKey = `${selectedAccount}:${visibleAdAccounts.map((account) => account.id).sort().join(",")}:${startDate?.toISOString() || ""}:${endDate?.toISOString() || ""}`;
+  useEffect(() => {
+    const loading = isLoading || isFetching || isLoadingAdAccounts;
+    if (!loading) {
+      setCampaignLoadTimedOut(false);
+      return;
+    }
+    setCampaignLoadTimedOut(false);
+    const timeoutId = window.setTimeout(() => setCampaignLoadTimedOut(true), CAMPAIGN_SOFT_TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [campaignScopeKey, isFetching, isLoading, isLoadingAdAccounts]);
+
   const campaignAdIds = useMemo(() => campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
   const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
@@ -668,12 +682,18 @@ export default function Campaigns() {
   // Uma falha transitória no catálogo pode coexistir com linhas canônicas de
   // Insights. Nesse caso a tabela continua utilizável em modo somente leitura
   // e não deve pintar um erro global por cima de dados válidos.
-  const showCampaignLoadError = isError && campaigns.length === 0;
+  const showCampaignLoadError = (isError || campaignLoadTimedOut) && campaigns.length === 0;
+  const campaignLoadErrorMessage = campaignError instanceof Error
+    ? campaignError.message
+    : campaignLoadTimedOut
+      ? "A Meta não respondeu em 15 segundos. O painel continua utilizável; tente novamente para atualizar."
+      : "Não foi possível consultar os dados.";
   const campaignsLoading = campaignLoadState({
     isLoading: isLoading || isLoadingAdAccounts,
     isFetching: isFetching || isLoadingAdAccounts,
     hasData: dataUpdatedAt > 0,
     hasError: isError,
+    timedOut: campaignLoadTimedOut,
   }) === "loading";
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
@@ -745,8 +765,8 @@ export default function Campaigns() {
 
   useEffect(() => {
     if (!showCampaignLoadError) return;
-    toast({ title: "Erro ao carregar campanhas", description: campaignError instanceof Error ? campaignError.message : "Tente novamente.", variant: "destructive" });
-  }, [campaignError, showCampaignLoadError, toast]);
+    toast({ title: "Erro ao carregar campanhas", description: campaignLoadErrorMessage, variant: "destructive" });
+  }, [campaignLoadErrorMessage, showCampaignLoadError, toast]);
 
   const campaignIds = useMemo(() => campaigns.map((campaign: any) => campaign.id), [campaigns]);
   const { data: campaignTargets = [] } = useQuery({
@@ -1175,7 +1195,7 @@ export default function Campaigns() {
         </div>
       </MotionItem>
 
-      {showCampaignLoadError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
+      {showCampaignLoadError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignLoadErrorMessage}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
       {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
 
       <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
