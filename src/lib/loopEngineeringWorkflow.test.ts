@@ -11,8 +11,8 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("npm run loop-engineering:repair:auto");
     expect(workflow).toContain("git push origin HEAD:main");
     expect(workflow).toContain("actions/upload-artifact@v4");
-    expect(workflow).not.toContain("LOOP_ENGINEERING_AUTH_REQUIRED: \"1\"");
-    expect(workflow).not.toContain("LOOP_ENGINEERING_SENTRY_REQUIRED: \"1\"");
+    expect(workflow).toContain("LOOP_ENGINEERING_AUTH_REQUIRED: \"1\"");
+    expect(workflow).toContain("LOOP_ENGINEERING_SENTRY_REQUIRED: \"1\"");
     expect(workflow).not.toContain("wrangler pages deploy");
   });
 });
