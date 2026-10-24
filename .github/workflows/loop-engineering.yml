@@ -40,7 +40,7 @@ jobs:
             exit 0
           fi
           mkdir -p .auth
-          printf '%s' "$GROWDASH_AUTH_STATE_B64" | base64 --decode > .auth/growdash.json
+          printf '%s' "$GROWDASH_AUTH_STATE_B64" | base64 --decode | gzip -d > .auth/growdash.json
           chmod 600 .auth/growdash.json
           echo "GROWDASH_AUTH_STATE=$GITHUB_WORKSPACE/.auth/growdash.json" >> "$GITHUB_ENV"
 

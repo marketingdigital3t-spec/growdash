@@ -51,8 +51,9 @@ cada três horas, no minuto 17, em UTC. Ele também pode ser iniciado manualment
 com `workflow_dispatch`.
 
 Para liberar o smoke autenticado no CI, cadastre o conteúdo do arquivo de
-Playwright em base64 como o secret `GROWDASH_AUTH_STATE_B64`. O workflow grava
-esse conteúdo somente no runner, com permissão `600`, e define
+Playwright compactado com gzip e codificado em base64 como o secret
+`GROWDASH_AUTH_STATE_B64`. O workflow descompacta e grava esse conteúdo somente
+no runner, com permissão `600`, e define
 `GROWDASH_AUTH_STATE` para a execução. Sem esse secret, o gate autenticado fica
 bloqueado deliberadamente.
 

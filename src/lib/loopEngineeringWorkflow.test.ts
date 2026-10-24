@@ -18,7 +18,7 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}");
     expect(workflow).toContain("SENTRY_ORG: ${{ vars.SENTRY_ORG }}");
     expect(workflow).toContain("SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}");
-    expect(workflow).toContain("base64 --decode > .auth/growdash.json");
+    expect(workflow).toContain("base64 --decode | gzip -d > .auth/growdash.json");
     expect(workflow).not.toContain("wrangler pages deploy");
   });
 });
