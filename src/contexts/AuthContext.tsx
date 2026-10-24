@@ -3,14 +3,16 @@ import { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
+import { AUTH_SESSION_TIMEOUT_MS, authSessionErrorMessage } from "@/lib/authAvailability";
 
-const SESSION_CHECK_TIMEOUT_MS = 30_000;
+const SESSION_CHECK_TIMEOUT_MS = AUTH_SESSION_TIMEOUT_MS;
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
   status: "hydrating" | "authenticated" | "unauthenticated" | "unavailable";
+  errorMessage: string | null;
   retrySession: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   status: "hydrating",
+  errorMessage: null,
   retrySession: async () => {},
   signOut: async () => {},
 });
@@ -30,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthContextType["status"]>("hydrating");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userIdRef.current = nextUserId;
       setSession(nextSession);
       setStatus(nextSession ? "authenticated" : "unauthenticated");
+      setErrorMessage(null);
       window.clearTimeout(timeout);
     };
 
@@ -62,8 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    void supabase.auth.getSession().then(({ data: { session } }) => applySession(session)).catch(() => {
-      if (active) setStatus("unavailable");
+    void withRequestTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS).then(({ data: { session } }) => applySession(session)).catch((error) => {
+      if (active) {
+        setStatus("unavailable");
+        setErrorMessage(authSessionErrorMessage(error));
+      }
       window.clearTimeout(timeout);
     });
 
@@ -76,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const retrySession = async () => {
     setStatus("hydrating");
+    setErrorMessage(null);
     try {
       // A manual retry must have the same bounded behavior as the initial
       // boot. Without this timeout a flaky Supabase connection could return
@@ -86,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userIdRef.current = nextUserId;
       setSession(data.session);
       setStatus(data.session ? "authenticated" : "unauthenticated");
-    } catch {
+    } catch (error) {
       setStatus("unavailable");
+      setErrorMessage(authSessionErrorMessage(error));
     }
   };
 
@@ -96,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, retrySession, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, errorMessage, retrySession, signOut }}>
       {children}
     </AuthContext.Provider>
   );

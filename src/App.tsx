@@ -86,7 +86,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function LoadingModule() {
+function LoadingModule({ context = "module", onRetry }: { context?: "module" | "auth"; onRetry?: () => void }) {
   const [slow, setSlow] = useState(false);
   const [reloading, setReloading] = useState(false);
   useEffect(() => {
@@ -104,10 +104,10 @@ function LoadingModule() {
 
   return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
-      <p className="font-bold">A Growdash está demorando para responder.</p>
-      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. Sua sessão não foi removida.</p>
+      <p className="font-bold">{context === "auth" ? "O serviço de acesso está demorando para responder." : "A Growdash está demorando para responder."}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{context === "auth" ? "A autenticação não respondeu a tempo. Sua sessão não foi removida." : "A conexão ou uma atualização foi interrompida. Sua sessão não foi removida."}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
-        <button type="button" onClick={reloadLatestBuild} disabled={reloading} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70">{reloading ? "Atualizando…" : "Atualizar aplicação"}</button>
+        <button type="button" onClick={onRetry || reloadLatestBuild} disabled={reloading} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70">{reloading ? "Atualizando…" : context === "auth" ? "Tentar conexão" : "Atualizar aplicação"}</button>
         <button type="button" onClick={() => window.location.assign("/auth")} className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-bold transition hover:bg-muted">Abrir acesso</button>
       </div>
     </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
@@ -182,16 +182,16 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 }
 
 function AuthenticatedLayout() {
-  const { user, loading, status, retrySession } = useAuth();
-  if (loading) return <LoadingModule />;
-  if (status === "unavailable") return <section className="grid min-h-[52vh] place-items-center px-4 text-center"><div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl"><p className="text-lg font-black">Não foi possível validar seu acesso.</p><p className="mt-2 text-sm text-muted-foreground">Sua sessão não foi removida. Verifique a conexão e tente novamente.</p><button type="button" onClick={() => void retrySession()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Tentar conexão</button></div></section>;
+  const { user, loading, status, errorMessage, retrySession } = useAuth();
+  if (loading) return <LoadingModule context="auth" onRetry={() => void retrySession()} />;
+  if (status === "unavailable") return <section className="grid min-h-[52vh] place-items-center px-4 text-center"><div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl"><p className="text-lg font-black">Não foi possível validar seu acesso.</p><p className="mt-2 text-sm text-muted-foreground">{errorMessage || "Sua sessão não foi removida. Verifique a conexão e tente novamente."}</p><button type="button" onClick={() => void retrySession()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Tentar conexão</button></div></section>;
   if (!user) return <Navigate to="/auth" replace />;
   return <MfaChallengeGate><GlobalFiltersProvider><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></GlobalFiltersProvider></MfaChallengeGate>;
 }
 
 function PublicOnlyRoute({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
-  if (status === "hydrating") return <LoadingModule />;
+  const { status, retrySession } = useAuth();
+  if (status === "hydrating") return <LoadingModule context="auth" onRetry={() => void retrySession()} />;
   // A failed session check is not proof of logout. Keep the public screen
   // available so the user can recover access, but never bounce between it and
   // an authenticated route.
