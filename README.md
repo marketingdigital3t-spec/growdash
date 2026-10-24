@@ -44,6 +44,10 @@ npm run loop-engineering:detect
 
 O runner preserva evidências sanitizadas, não transforma timeout em zero e
 bloqueia alterações de alto risco sem plano versionado, testes e rollback.
+No GitHub Actions, uma execução com falhas tenta correções determinísticas
+catalogadas, valida novamente e só envia o commit quando todos os gates passam;
+achados desconhecidos de front-end ou back-end permanecem bloqueados para não
+serem corrigidos por inferência.
 
 ## Estrutura da nova interface
 

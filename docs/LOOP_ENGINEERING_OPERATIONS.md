@@ -21,6 +21,14 @@ executa shell arbitrário: somente comandos allowlistados e arquivos declarados.
 Cada relatório usa lock e escrita atômica; uma execução concorrente é bloqueada
 para não sobrescrever evidências.
 
+No CI, quando `detect` encontra falhas, o workflow executa
+`npm run loop-engineering:repair:auto`. Esse modo consulta um catálogo versionado
+de correções determinísticas de baixo risco, reaplica os testes, lint, build e
+diff check e só envia um commit para `main` quando a validação termina verde.
+Achados desconhecidos, de back-end ou de alto risco continuam bloqueados e são
+entregues no relatório para um plano declarativo específico; o loop nunca
+inventa uma migration, alteração de RLS, permissão, segredo, webhook ou métrica.
+
 ## Plano de remediação
 
 Um plano para alterar RLS, permissões, autenticação, webhooks, callbacks,

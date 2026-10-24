@@ -51,6 +51,6 @@ describe("automatic loop engineering remediation", () => {
 
     expect(report.status).toBe("validated");
     expect(content).toContain('new Date("2026-08-10T00:00:00-03:00")');
-    expect(calls).toBe(2);
+    expect(calls).toBe(5);
   });
 });
