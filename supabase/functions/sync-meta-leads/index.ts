@@ -513,7 +513,7 @@ Deno.serve(async (req) => {
         const body = new URLSearchParams({
           object: "page",
           callback_url: callbackUrl,
-          fields: "leadgen",
+          fields: "leadgen,messages",
           verify_token: verifyToken,
           access_token: `${appId}|${appSecret}`,
         });
@@ -525,14 +525,14 @@ Deno.serve(async (req) => {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.error || payload?.success === false) {
           const message = payload?.error?.message || `HTTP ${response.status}`;
-          const warning = `A assinatura global leadgen da Meta não foi confirmada: ${message}`;
+          const warning = `As assinaturas globais leadgen/mensagens da Meta não foi confirmada: ${message}`;
           appSubscriptionByToken.set(token, warning);
           return warning;
         }
         appSubscriptionByToken.set(token, null);
         return null;
       } catch (error) {
-        const warning = `A assinatura global leadgen da Meta falhou: ${error instanceof Error ? error.message : String(error)}`;
+        const warning = `As assinaturas globais leadgen/mensagens da Meta falhou: ${error instanceof Error ? error.message : String(error)}`;
         appSubscriptionByToken.set(token, warning);
         return warning;
       }
@@ -542,7 +542,7 @@ Deno.serve(async (req) => {
       const warnings = pageSubscriptionWarningsByToken.get(token) || [];
       try {
         const body = new URLSearchParams({
-          subscribed_fields: "leadgen",
+          subscribed_fields: "leadgen,messages",
           access_token: pageAccessToken,
         });
         const response = await fetch(`${GRAPH}/${encodeURIComponent(pageId)}/subscribed_apps`, {
@@ -552,10 +552,10 @@ Deno.serve(async (req) => {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.error || payload?.success === false) {
-          warnings.push(`Página ${pageId}: assinatura leadgen não confirmada (${payload?.error?.message || `HTTP ${response.status}`}).`);
+          warnings.push(`Página ${pageId}: assinatura leadgen/mensagens não confirmada (${payload?.error?.message || `HTTP ${response.status}`}).`);
         }
       } catch (error) {
-        warnings.push(`Página ${pageId}: falha ao ativar assinatura leadgen (${error instanceof Error ? error.message : String(error)}).`);
+        warnings.push(`Página ${pageId}: falha ao ativar assinatura leadgen/mensagens (${error instanceof Error ? error.message : String(error)}).`);
       }
       pageSubscriptionWarningsByToken.set(token, warnings);
     }

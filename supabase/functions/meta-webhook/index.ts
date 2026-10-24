@@ -301,6 +301,12 @@ Deno.serve(async (req) => {
           errors.push(`${event.provider_event_id}: ${message}`);
           await admin.from("meta_webhook_events").update({ error_message: message }).eq("id", data.id);
         }
+      } else if (!leadId) {
+        // Conversation/message webhooks do not expose a Meta Lead ID. Keep the
+        // raw event auditable and mark ingestion complete; individual CRM
+        // attribution still requires the downstream connector to send the
+        // contact identifier plus the referral fields into crm-lead-webhook.
+        await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
       }
     }
     return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking, workflow_tracking: workflowTracking }, 200);
