@@ -15,3 +15,5 @@ Cada teste usa 1× o CPL de referência, respeita o teto da conta, limita dois t
 O botão de pausa global usa `set_growth_engine_mode`. `dry_run` cria diagnósticos e não publica. `autonomous_full` permite publicar somente quando todos os bloqueios forem resolvidos.
 
 A fábrica usa somente assets aprovados. Imagens com `storage_path` são anexadas ao creative quando a URL assinada está disponível; variantes de vídeo ficam bloqueadas até que o upload de vídeo da Meta esteja configurado, evitando publicar uma peça diferente da aprovada.
+
+As regras podem ser reexecutadas sem Meta ou RD pelo replay harness em `src/lib/growthEngineHarness.ts`. Ele cobre snapshots stale, token inválido, política, orçamento, perdedores, vencedores e chaves de idempotência antes de qualquer publicação.
