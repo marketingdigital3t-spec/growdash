@@ -36,9 +36,9 @@ describe("loop engineering CLI", () => {
       output: "reports/loop-engineering-cli-auth-gate.json",
       commands: [],
       authenticatedRuntime: true,
-      authStatePath: undefined,
+      authStatePath: null,
       sentryRequired: true,
-      sentryToken: undefined,
+      sentryToken: null,
       runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }),
     });
     expect(report.status).toBe("blocked");
