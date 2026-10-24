@@ -11647,18 +11647,18 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   min-height: 38px;
   border: 1px solid var(--gd-content-border) !important;
   border-radius: 8px !important;
-  background: #fff !important;
-  color: #222 !important;
+  background: var(--gd-content-surface) !important;
+  color: var(--gd-content-text) !important;
   box-shadow: none !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"][data-state="active"] {
   border-color: var(--gd-emerald-border) !important;
-  background: #fff !important;
-  color: #111 !important;
+  background: var(--gd-content-surface) !important;
+  color: var(--gd-content-text) !important;
   box-shadow: inset 0 -2px var(--gd-emerald) !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]) {
-  background: #fff !important;
+  background: var(--gd-content-surface) !important;
   border-color: var(--gd-emerald-border) !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 button,

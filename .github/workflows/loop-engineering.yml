@@ -30,6 +30,8 @@ jobs:
       - name: Run loop engineering detection
         id: loop
         continue-on-error: true
+        env:
+          LOOP_ENGINEERING_BACKEND_SCAN: "1"
         run: npm run loop-engineering:detect
 
       - name: Upload loop report

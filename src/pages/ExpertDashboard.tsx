@@ -30,7 +30,7 @@ function expertGreeting(name: string) {
   return `${feminine ? "Bem-vinda" : "Bem-vindo"} ${clean}`;
 }
 
-function queryMetricAvailability(input: {
+export function queryMetricAvailability(input: {
   hasSnapshot: boolean;
   hasRows?: boolean;
   isLoading: boolean;
@@ -160,15 +160,15 @@ export default function ExpertDashboard() {
   const revenueAvailability = useMemo<MetricAvailability>(() => queryMetricAvailability({
     hasSnapshot: salesQuery.data !== undefined || revenueDealsQuery.data !== undefined,
     hasRows: (salesQuery.data?.length || 0) + (revenueDealsQuery.data?.length || 0) > 0,
-    isLoading: salesQuery.isLoading || revenueDealsQuery.isLoading,
+    isLoading: loadingAccounts || salesQuery.isLoading || revenueDealsQuery.isLoading,
     isFetching: salesQuery.isFetching || revenueDealsQuery.isFetching,
     isError: salesQuery.isError || revenueDealsQuery.isError,
     reason: "Não foi possível consultar o faturamento confirmado no RD Station.",
-  }), [revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
+  }), [loadingAccounts, revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
   const insightAvailability = queryMetricAvailability({
     hasSnapshot: insightsQuery.data !== undefined,
     hasRows: insights.length > 0,
-    isLoading: insightsQuery.isLoading,
+    isLoading: loadingAccounts || insightsQuery.isLoading,
     isFetching: insightsQuery.isFetching,
     isError: insightsQuery.isError,
     reason: "Não foi possível consultar os insights Meta para este recorte.",
@@ -176,7 +176,7 @@ export default function ExpertDashboard() {
   const leadAvailability = queryMetricAvailability({
     hasSnapshot: actionQuery.data !== undefined,
     hasRows: Number(actionData?.metaLeadActions?.total || 0) > 0,
-    isLoading: actionQuery.isLoading,
+    isLoading: loadingAccounts || actionQuery.isLoading,
     isFetching: actionQuery.isFetching,
     isError: actionQuery.isError,
     reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",

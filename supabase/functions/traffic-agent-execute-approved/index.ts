@@ -22,11 +22,14 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: "Unauthorized" }, 401);
   const { data: workspace } = await admin.from("workspaces").select("id").eq("owner_id", user.id).maybeSingle();
   if (!workspace) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
-  const { data: proposals } = await admin.from("traffic_action_proposals").select("id,ad_account_id,entity_type,entity_id,approved_by,proposed_value,current_value").eq("workspace_id", workspace.id).eq("status", "approved").not("approved_by", "is", null).limit(20);
+  const now = new Date().toISOString();
+  const { data: proposals, error: proposalQueryError } = await admin.from("traffic_action_proposals").select("id,ad_account_id,entity_type,entity_id,approved_by,proposed_value,current_value,valid_until").eq("workspace_id", workspace.id).eq("status", "approved").not("approved_by", "is", null).or(`valid_until.is.null,valid_until.gt.${now}`).limit(20);
+  if (proposalQueryError) return json({ error: "PROPOSAL_QUERY_FAILED" }, 500);
   const results: Array<Record<string, unknown>> = [];
   for (const proposal of proposals || []) {
     if (proposal.entity_type !== "adset" || !proposal.entity_id || !proposal.ad_account_id) continue;
-    await admin.from("traffic_action_proposals").update({ status: "executing", updated_at: new Date().toISOString() }).eq("id", proposal.id).eq("status", "approved");
+    const { data: claimed, error: claimError } = await admin.from("traffic_action_proposals").update({ status: "executing", updated_at: new Date().toISOString() }).eq("id", proposal.id).eq("status", "approved").select("id").maybeSingle();
+    if (claimError || !claimed) continue;
     const { data: account } = await admin.from("ad_accounts").select("account_id,access_token").eq("id", proposal.ad_account_id).eq("user_id", user.id).maybeSingle();
     const change = (proposal.proposed_value || {}) as { status?: string; daily_budget?: number };
     if (!account?.access_token) {
@@ -47,12 +50,43 @@ Deno.serve(async (req) => {
       results.push({ id: proposal.id, status: "failed", error: message });
       continue;
     }
-    const { data: adset } = await admin.from("adsets").select("campaign_id,status,daily_budget").eq("id", proposal.entity_id).maybeSingle();
+    const { data: adset, error: adsetError } = await admin.from("adsets").select("campaign_id,status,daily_budget").eq("id", proposal.entity_id).maybeSingle();
+    if (adsetError || !adset) {
+      const message = adsetError?.message || "ADSET_NOT_FOUND";
+      await admin.from("traffic_action_proposals").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", proposal.id);
+      await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "failed", error_message: message });
+      results.push({ id: proposal.id, status: "failed", error: message });
+      continue;
+    }
+    const expected = (proposal.current_value || {}) as { status?: string; daily_budget?: number };
+    if ((expected.status && String(adset.status).toUpperCase() !== String(expected.status).toUpperCase()) || (expected.daily_budget != null && Math.abs(Number(adset.daily_budget || 0) - Number(expected.daily_budget)) > 0.01)) {
+      const message = "REMOTE_STATE_CHANGED_SINCE_APPROVAL";
+      await admin.from("traffic_action_proposals").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", proposal.id);
+      await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "failed", error_message: message, evidence: { expected, actual: adset } });
+      results.push({ id: proposal.id, status: "failed", error: message });
+      continue;
+    }
     const localUpdate = change.status ? { status: change.status, updated_at: new Date().toISOString() } : { daily_budget: change.daily_budget, updated_at: new Date().toISOString() };
-    await admin.from("adsets").update(localUpdate).eq("id", proposal.entity_id);
-    await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "executed", actor_id: user.id, old_value: proposal.current_value, new_value: change, evidence: { provider } });
-    await admin.from("campaign_changes").insert({ campaign_id: adset?.campaign_id, entity_type: "adset", entity_id: proposal.entity_id, change_type: "traffic_agent_approved", field: change.status ? "status" : "daily_budget", old_value: String(change.status ? adset?.status : adset?.daily_budget), new_value: String(change.status || change.daily_budget), created_by: user.id, note: "Alteração executada após aprovação explícita do proprietário" });
-    await admin.from("traffic_action_proposals").update({ status: "executed", executed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", proposal.id);
+    const { error: localError } = await admin.from("adsets").update(localUpdate).eq("id", proposal.entity_id);
+    if (localError) {
+      await admin.from("traffic_action_proposals").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", proposal.id);
+      await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "failed", error_message: `LOCAL_MIRROR_UPDATE_FAILED: ${localError.message}`, evidence: { provider } });
+      results.push({ id: proposal.id, status: "failed", error: "LOCAL_MIRROR_UPDATE_FAILED" });
+      continue;
+    }
+    const { error: auditError } = await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "executed", actor_id: user.id, old_value: proposal.current_value, new_value: change, evidence: { provider } });
+    const { error: changeError } = await admin.from("campaign_changes").insert({ campaign_id: adset.campaign_id, entity_type: "adset", entity_id: proposal.entity_id, change_type: "traffic_agent_approved", field: change.status ? "status" : "daily_budget", old_value: String(change.status ? adset.status : adset.daily_budget), new_value: String(change.status || change.daily_budget), created_by: user.id, note: "Alteração executada após aprovação explícita do proprietário" });
+    if (auditError || changeError) {
+      await admin.from("traffic_action_proposals").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", proposal.id);
+      results.push({ id: proposal.id, status: "failed", error: "AUDIT_MIRROR_WRITE_FAILED" });
+      continue;
+    }
+    const { error: finalError } = await admin.from("traffic_action_proposals").update({ status: "executed", executed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", proposal.id).eq("status", "executing");
+    if (finalError) {
+      await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "failed", error_message: `PROPOSAL_FINALIZE_FAILED: ${finalError.message}` });
+      results.push({ id: proposal.id, status: "failed", error: "PROPOSAL_FINALIZE_FAILED" });
+      continue;
+    }
     results.push({ id: proposal.id, status: "executed" });
   }
   return json({ status: "completed", executed: results.filter((item) => item.status === "executed").length, results });

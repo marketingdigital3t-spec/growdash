@@ -13,9 +13,13 @@ node scripts/loop-engineering.mjs --mode repair --plan caminho/plano.json
 node scripts/loop-engineering.mjs --mode release --plan caminho/plano.json
 ```
 
-`detect` roda testes, lint, build e `git diff --check`. `repair` e `release`
+`detect` roda testes, lint, build, smoke visual e `git diff --check`. No CI,
+`LOOP_ENGINEERING_BACKEND_SCAN=1` também inspeciona Edge Functions e bloqueia
+consultas Supabase que descartam erros. `repair` e `release`
 exigem um plano declarativo; sem plano o resultado é bloqueado. O runner nunca
 executa shell arbitrário: somente comandos allowlistados e arquivos declarados.
+Cada relatório usa lock e escrita atômica; uma execução concorrente é bloqueada
+para não sobrescrever evidências.
 
 ## Plano de remediação
 
@@ -23,6 +27,11 @@ Um plano para alterar RLS, permissões, autenticação, webhooks, callbacks,
 secrets ou métricas financeiras deve declarar a causa reproduzida, assinaturas
 dos achados, arquivos/migrations, testes, escopo, snapshot/backup, rollback e
 condições de abortar. Sem esses campos não há alteração parcial.
+
+As assinaturas precisam corresponder exatamente a achados reproduzidos na mesma
+execução; curingas como `*` são rejeitados. Depois de aplicar um patch, cada
+teste declarado é executado novamente. Se algum teste falhar ou expirar, os
+arquivos alterados são restaurados e o relatório fica `blocked`.
 
 ## Relatórios
 
@@ -39,6 +48,11 @@ horas e manualmente. O artefato é preservado por 14 dias. O job falha quando o
 gate encontra uma regressão, mas não faz deploy. Publicação exige uma execução
 `release` validada, revisão do diff e os gates de Cloudflare/Supabase descritos
 em `AGENTS.md`.
+
+O scan local de backend é estático e preventivo: ele registra o arquivo e a
+linha para revisão, mas não reescreve Edge Functions por inferência. Correções
+automáticas só usam planos declarativos com pré-condição, teste pós-patch,
+snapshot e rollback.
 
 ## Leitura do resultado
 
