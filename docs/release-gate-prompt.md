@@ -43,3 +43,19 @@ Cloudflare.
 Supabase, dependências e observabilidade estiverem verificáveis e o domínio
 principal servir o mesmo commit validado. Qualquer gate ausente mantém o
 release bloqueado.
+
+## Execução automática
+
+O workflow `.github/workflows/loop-engineering.yml` roda no GitHub Actions a
+cada três horas, no minuto 17, em UTC. Ele também pode ser iniciado manualmente
+com `workflow_dispatch`.
+
+Para liberar o smoke autenticado no CI, cadastre o conteúdo do arquivo de
+Playwright em base64 como o secret `GROWDASH_AUTH_STATE_B64`. O workflow grava
+esse conteúdo somente no runner, com permissão `600`, e define
+`GROWDASH_AUTH_STATE` para a execução. Sem esse secret, o gate autenticado fica
+bloqueado deliberadamente.
+
+Para o gate de observabilidade, configure o secret `SENTRY_AUTH_TOKEN` e as
+variáveis `SENTRY_ORG` e `SENTRY_PROJECT`. O workflow passa esses valores
+somente ao processo do loop; nenhum deles é incluído no frontend.
