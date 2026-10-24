@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -61,8 +61,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas";
+import { isCompatibleFlow } from "@/components/GrowdashFlow/excalidrawAdapter";
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate, normalizeSqlTrafficFunnelElements } from "@/components/GrowdashFlow/utils/templates";
+
+const ExcalidrawFlowEditor = lazy(() => import("@/components/GrowdashFlow/ExcalidrawFlowEditor").then(({ ExcalidrawFlowEditor: Editor }) => ({ default: Editor })));
 
 function FlowDataScopeSync() {
   const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
@@ -1799,7 +1802,14 @@ function FreeCanvasEditor({ funnelId, initialNodes, initialConnections, initialN
     }
   };
 
-  return <GrowdashFlowCanvas initialFlow={initialFlow} onSave={handleSave} onBack={onBack} title={initialName} />;
+  if (!isCompatibleFlow(initialFlow)) {
+    return <GrowdashFlowCanvas initialFlow={initialFlow} onSave={handleSave} onBack={onBack} title={initialName} />;
+  }
+  return (
+    <Suspense fallback={<div className="flex min-h-[540px] items-center justify-center rounded-2xl border border-border/70 bg-card/90 text-sm text-muted-foreground">Carregando editor visual…</div>}>
+      <ExcalidrawFlowEditor initialFlow={initialFlow} onSave={handleSave} onBack={onBack} title={initialName} />
+    </Suspense>
+  );
 }
 
 /* ─── Main Page ─── */
@@ -1856,6 +1866,8 @@ const Funnelytics = () => {
     if (canvasData.funnelType === "blank") {
       return <div className="space-y-4"><FlowDataScopeSync /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
     }
+    // Linked funnels keep the metrics-aware canvas as a compatibility fallback
+    // until their live Meta/RD overlays are mapped into Excalidraw elements.
     return (
       <div className="space-y-4">
         <FlowDataScopeSync />

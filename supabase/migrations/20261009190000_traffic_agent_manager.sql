@@ -19,7 +19,7 @@ create table if not exists public.traffic_agent_settings (
   enabled boolean not null default true,
   analysis_timezone text not null default 'America/Sao_Paulo',
   morning_time time not null default '08:00',
-  afternoon_time time not null default '14:00',
+  afternoon_time time not null default '15:00',
   allow_manual_analysis boolean not null default true,
   max_budget_change_percent numeric not null default 20 check (max_budget_change_percent between 0 and 100),
   max_daily_budget_change numeric not null default 500 check (max_daily_budget_change >= 0),

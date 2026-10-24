@@ -221,7 +221,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       }
     });
     return task;
-  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, scope, startDate, startDateKey, timezone]);
+  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, queryClient, scope, startDate, startDateKey, timezone]);
 
   useEffect(() => {
     if (!enabled) return;
