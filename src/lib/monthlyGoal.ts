@@ -1,5 +1,35 @@
 type Rgb = { r: number; g: number; b: number };
 
+export interface MonthlySalesGoalRecord {
+  ad_account_id: string;
+  goal_month: string;
+  target_revenue: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Resolve the effective goal for each account without mutating history.
+ * A month inherits the closest previous record until it receives its own
+ * explicit record. Calendar keys are compared as civil dates so the result is
+ * stable regardless of the browser timezone.
+ */
+export function resolveEffectiveSalesGoals<T extends MonthlySalesGoalRecord>(records: T[], selectedMonth: string) {
+  const selectedKey = selectedMonth.slice(0, 7);
+  const latestByAccount = new Map<string, T>();
+  for (const record of records) {
+    const recordKey = String(record.goal_month).slice(0, 7);
+    if (!record.ad_account_id || recordKey > selectedKey) continue;
+    const current = latestByAccount.get(record.ad_account_id);
+    if (!current || String(current.goal_month).slice(0, 7) < recordKey) latestByAccount.set(record.ad_account_id, record);
+  }
+  return Array.from(latestByAccount.values()).map((record) => ({
+    ...record,
+    target_revenue: Number(record.target_revenue),
+    source_goal_month: record.goal_month,
+    is_inherited: String(record.goal_month).slice(0, 7) < selectedKey,
+  }));
+}
+
 const GOAL_RED: Rgb = { r: 239, g: 68, b: 68 };
 const GOAL_YELLOW: Rgb = { r: 245, g: 158, b: 11 };
 const GOAL_GREEN: Rgb = { r: 34, g: 197, b: 94 };

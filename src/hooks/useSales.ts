@@ -142,7 +142,11 @@ export function useSales(params?: UseSalesParams) {
         : all;
       return dedupeCanonicalSales(scoped);
     },
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
 }
 

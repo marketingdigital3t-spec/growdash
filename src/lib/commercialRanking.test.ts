@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking } from "@/lib/commercialRanking";
+import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking, resolveCommercialSaleAttribution } from "@/lib/commercialRanking";
 
 const sale = (id: string, account: string, seller: string, revenue: number, status = "confirmed") => ({
   sale: { id, ad_account_id: account, status, net_revenue: revenue, quantity: 1 } as any,
@@ -65,5 +65,27 @@ describe("buildCommercialAccountRankings", () => {
     expect(global.totalRevenue).toBe(200);
     expect(global.sellers.map((seller) => seller.seller)).toEqual(["Ana", "Bia"]);
     expect(global.sellers.find((seller) => seller.seller === "Ana")?.count).toBe(1);
+  });
+
+  it("prioriza o responsável RD e atribui venda sem conta pelo funil selecionado", () => {
+    const sale = { id: "sale-rd", ad_account_id: null, rd_deal_id: "deal-1", rd_funnel_id: "funnel-1", custom_fields: { vendedor: "Vendedor manual" } } as any;
+    const result = resolveCommercialSaleAttribution(sale, {
+      dealById: new Map([["deal-1", { ad_account_id: null, rd_funnel_id: "funnel-1", deal_owner_name: "Responsável RD" }]]),
+      funnelAccountByProviderId: new Map(),
+      selectedAccountIds: ["account-a"],
+      resolvedFunnelIds: new Set(["funnel-1"]),
+    });
+    expect(result).toEqual({ seller: "Responsável RD", accountId: "account-a" });
+  });
+
+  it("não inventa conta quando o funil sem conta é ambíguo", () => {
+    const result = resolveCommercialSaleAttribution({ id: "sale", ad_account_id: null, rd_deal_id: "deal", rd_funnel_id: "funnel" } as any, {
+      dealById: new Map([["deal", { ad_account_id: null, rd_funnel_id: "funnel", deal_owner_name: null }]]),
+      funnelAccountByProviderId: new Map(),
+      selectedAccountIds: ["account-a", "account-b"],
+      resolvedFunnelIds: new Set(["funnel"]),
+    });
+    expect(result.accountId).toBeNull();
+    expect(result.seller).toBe("Não informado");
   });
 });

@@ -15169,3 +15169,40 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
   border-color: var(--gd-accent) !important;
   color: #f2f4f7 !important;
 }
+
+/* Commercial final authority: keep controls readable after every legacy theme layer. */
+.commercial-ranking-shell .commercial-ranking-filter,
+.commercial-ranking-shell .commercial-ranking-control {
+  border: 1px solid var(--gd-emerald-border) !important;
+  border-radius: 12px !important;
+  background: var(--gd-surface-control) !important;
+  color: var(--gd-content) !important;
+  font-weight: 800 !important;
+  outline: none !important;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.dark .commercial-ranking-shell .commercial-ranking-filter,
+.dark .commercial-ranking-shell .commercial-ranking-control { color: #fff !important; }
+.commercial-ranking-shell .commercial-ranking-filter:focus-visible,
+.commercial-ranking-shell .commercial-ranking-control:focus-visible {
+  border-color: var(--gd-emerald-bright) !important;
+  box-shadow: 0 0 0 3px rgba(52,211,153,.2) !important;
+}
+.commercial-ranking-shell .commercial-ranking-filter option,
+.commercial-ranking-shell .commercial-ranking-control option { background: var(--gd-surface-card) !important; color: var(--gd-content) !important; }
+.dark .commercial-ranking-shell .commercial-ranking-filter option,
+.dark .commercial-ranking-shell .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
+.commercial-ranking-shell .commercial-ranking-expand {
+  border: 1px solid var(--gd-emerald-bright) !important;
+  background: var(--gd-emerald) !important;
+  color: #062015 !important;
+  box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
+}
+.commercial-ranking-shell .commercial-ranking-expand:hover,
+.commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-emerald-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(52,211,153,.22), 0 10px 26px rgba(16,185,129,.34) !important; }
+.commercial-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--gd-emerald-deep) 22%, var(--gd-surface-control)); }
+.commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #047857, #10b981 58%, #6ee7b7); transition: width .55s ease; }
+.commercial-goal-fill::after { content: ""; position: absolute; inset: 0 auto 0 -35%; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); animation: commercial-goal-shimmer 2.8s ease-in-out infinite; }
+@keyframes commercial-goal-shimmer { from { transform: translateX(0); } to { transform: translateX(390%); } }
+@media (prefers-reduced-motion: reduce) { .commercial-goal-fill, .commercial-goal-fill::after { animation: none !important; transition: none !important; } }
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) { background: var(--gd-surface-card) !important; border-color: var(--gd-emerald-border) !important; }

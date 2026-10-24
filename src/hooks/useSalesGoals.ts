@@ -1,9 +1,11 @@
 /* Generated Supabase types are refreshed only after the additive migration is applied. */
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfMonth } from "date-fns";
+import { startOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { businessDateKey } from "@/lib/businessDate";
+import { resolveEffectiveSalesGoals } from "@/lib/monthlyGoal";
 
 export interface SalesGoal {
   id: string;
@@ -14,6 +16,8 @@ export interface SalesGoal {
   target_revenue: number;
   created_by: string | null;
   updated_at: string;
+  source_goal_month?: string;
+  is_inherited?: boolean;
 }
 
 function isPendingSchema(error: { code?: string; message?: string } | null) {
@@ -27,7 +31,7 @@ interface UseSalesGoalsOptions {
 export function useSalesGoals(month: Date = new Date(), options: UseSalesGoalsOptions = {}) {
   const { data: workspace } = useWorkspace();
   const { businessUnitId } = useGlobalFilters();
-  const goalMonth = format(startOfMonth(month), "yyyy-MM-dd");
+  const goalMonth = `${businessDateKey(startOfMonth(month)).slice(0, 7)}-01`;
   const ready = !!workspace?.id && !workspace.id.startsWith("legacy-") && !!businessUnitId && !businessUnitId.startsWith("legacy-");
 
   return useQuery({
@@ -41,12 +45,14 @@ export function useSalesGoals(month: Date = new Date(), options: UseSalesGoalsOp
         .select("id,workspace_id,business_unit_id,ad_account_id,goal_month,target_revenue,created_by,updated_at")
         .eq("workspace_id", workspace!.id)
         .eq("business_unit_id", businessUnitId)
-        .eq("goal_month", goalMonth);
+        .lte("goal_month", goalMonth)
+        .order("goal_month", { ascending: false });
       if (error) {
         if (isPendingSchema(error)) return { rows: [], schemaReady: false };
         throw error;
       }
-      return { rows: (data ?? []).map((row: SalesGoal) => ({ ...row, target_revenue: Number(row.target_revenue) })), schemaReady: true };
+      const rows = resolveEffectiveSalesGoals((data ?? []).map((row: SalesGoal) => ({ ...row, target_revenue: Number(row.target_revenue) })), goalMonth) as SalesGoal[];
+      return { rows, schemaReady: true };
     },
   });
 }
