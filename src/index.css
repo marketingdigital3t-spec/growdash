@@ -15206,3 +15206,16 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 @keyframes commercial-goal-shimmer { from { transform: translateX(0); } to { transform: translateX(390%); } }
 @media (prefers-reduced-motion: reduce) { .commercial-goal-fill, .commercial-goal-fill::after { animation: none !important; transition: none !important; } }
 .commercial-ranking-shell :is(section[role="dialog"], section.isolate) { background: var(--gd-surface-card) !important; border-color: var(--gd-emerald-border) !important; }
+
+/* The fullscreen portal is mounted under document.body, outside the page
+   shell, so its controls need a portal-local authority as well. */
+:is(section[role="dialog"], section.isolate) .commercial-ranking-filter,
+:is(section[role="dialog"], section.isolate) .commercial-ranking-control {
+  border: 1px solid var(--gd-emerald-border) !important;
+  background: var(--gd-surface-control) !important;
+  color: var(--gd-content) !important;
+}
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter,
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control { color: #fff !important; }
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter option,
+.dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
