@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { funnelStageDistributionTotal, funnelStageStageTone, funnelStageTransitionRate } from "@/lib/funnelStageDistribution";
+import {
+  funnelStageDistributionTotal,
+  funnelStageStageTone,
+  funnelStageTransitionRate,
+  funnelStageVisualColor,
+  funnelStageVisualTextColor,
+  funnelStageVisualWidth,
+} from "@/lib/funnelStageDistribution";
 
 const stage = (count: number) => ({
   rd_stage_id: `stage-${count}`,
@@ -26,6 +33,28 @@ describe("FunnelStageDistribution", () => {
   it("calculates the next-stage rate from the current stage", () => {
     expect(funnelStageTransitionRate(10, 4)).toBe(40);
     expect(funnelStageTransitionRate(3, 1)).toBeCloseTo(33.3, 1);
+  });
+
+  it("creates a descending metallic funnel width from the first to the last stage", () => {
+    const widths = [0, 1, 2, 3].map((index) => funnelStageVisualWidth(index, 4));
+
+    expect(widths).toEqual([100, 76, 52, 28]);
+    expect(widths).toEqual([...widths].sort((a, b) => b - a));
+  });
+
+  it("keeps a single or empty funnel stage valid", () => {
+    expect(funnelStageVisualWidth(0, 0)).toBe(100);
+    expect(funnelStageVisualWidth(0, 1)).toBe(100);
+    expect(funnelStageVisualWidth(8, 3)).toBe(28);
+  });
+
+  it("uses a restrained stage accent and readable metallic text", () => {
+    expect(funnelStageVisualColor(0, 3)).toBe("hsl(0 84% 56%)");
+    expect(funnelStageVisualColor(1, 3)).toBe("hsl(71 84% 56%)");
+    expect(funnelStageVisualColor(2, 3)).toBe("hsl(142 84% 56%)");
+    expect(funnelStageVisualTextColor(0, 3)).toBe("hsl(0 0% 100%)");
+    expect(funnelStageVisualTextColor(1, 3)).toBe("hsl(0 0% 100%)");
+    expect(funnelStageVisualTextColor(2, 3)).toBe("hsl(0 0% 100%)");
   });
 
   it("does not invent a conversion rate when the current stage is empty", () => {
