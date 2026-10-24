@@ -58,6 +58,30 @@ export function queryMetricAvailability(input: {
   return input.hasRows === false ? { state: "empty_confirmed" } : { state: "fresh" };
 }
 
+export function getExpertAccountScopeAvailability(input: {
+  data: unknown[] | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  isPlaceholderData: boolean;
+}): MetricAvailability {
+  const hasRows = (input.data?.length || 0) > 0;
+  const reason = "Não foi possível consultar as contas autorizadas para este recorte.";
+
+  // An empty placeholder is only a cache seed. It is not evidence that the
+  // workspace has no connected accounts, so dependent metrics must remain in
+  // loading until the server returns a confirmed snapshot.
+  if (input.isLoading || (input.isPlaceholderData && !hasRows) || (!input.data && input.isFetching)) {
+    return { state: "loading" };
+  }
+  if (input.isError) {
+    return hasRows ? { state: "stale", reason } : { state: "unavailable", reason };
+  }
+  if (!input.data) return { state: "unavailable", reason };
+  if (input.isFetching) return { state: "stale", reason: "Atualizando as contas autorizadas; o último snapshot permanece visível." };
+  return hasRows ? { state: "fresh" } : { state: "empty_confirmed" };
+}
+
 export function hasActionMetricSnapshot(input: {
   hasActionData: boolean;
   actionAdCount: number;
@@ -98,7 +122,19 @@ export function buildExpertMetricAvailability(input: {
  */
 export default function ExpertDashboard() {
   const { startDate, endDate, adAccountIds, setAdAccountIds, funnelIds } = useGlobalFilters();
-  const { data: accounts = [], isLoading: loadingAccounts } = useAdAccounts();
+  const accountsQuery = useAdAccounts();
+  const { data: accounts = [], isLoading: loadingAccounts } = accountsQuery;
+  const accountScopeAvailability = getExpertAccountScopeAvailability({
+    data: accountsQuery.data,
+    isLoading: accountsQuery.isLoading,
+    isFetching: accountsQuery.isFetching,
+    isError: accountsQuery.isError,
+    isPlaceholderData: accountsQuery.isPlaceholderData,
+  });
+  const accountScopePending = accountScopeAvailability.state === "loading";
+  const accountScopeError = accountScopeAvailability.state === "unavailable" || accountScopeAvailability.state === "stale"
+    ? accountScopeAvailability.reason || undefined
+    : undefined;
   const accountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
   const selectedAccountName = useMemo(() => {
     const selected = accounts.find((account) => account.id === accountId)?.name ?? "";
@@ -209,14 +245,18 @@ export default function ExpertDashboard() {
     isLoading: loadingAccounts || salesQuery.isLoading || revenueDealsQuery.isLoading,
     isFetching: salesQuery.isFetching || revenueDealsQuery.isFetching,
     isError: salesQuery.isError || revenueDealsQuery.isError,
+    dependencyPending: accountScopePending,
+    dependencyError: accountScopeError,
     reason: "Não foi possível consultar o faturamento confirmado no RD Station.",
-  }), [loadingAccounts, revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
+  }), [accountScopeError, accountScopePending, loadingAccounts, revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
   const insightAvailability = queryMetricAvailability({
     hasSnapshot: insightsQuery.data !== undefined,
     hasRows: insights.length > 0,
     isLoading: loadingAccounts || insightsQuery.isLoading,
     isFetching: insightsQuery.isFetching,
     isError: insightsQuery.isError,
+    dependencyPending: accountScopePending,
+    dependencyError: accountScopeError,
     reason: "Não foi possível consultar os insights Meta para este recorte.",
   });
   const leadAvailability = queryMetricAvailability({
@@ -232,8 +272,8 @@ export default function ExpertDashboard() {
     isLoading: loadingAccounts || actionQuery.isLoading,
     isFetching: actionQuery.isFetching,
     isError: actionQuery.isError,
-    dependencyPending: loadingAccounts || insightsQuery.isLoading || insightsQuery.isFetching,
-    dependencyError: insightsQuery.isError ? "Os insights Meta não puderam ser confirmados para este recorte." : undefined,
+    dependencyPending: accountScopePending || insightsQuery.isLoading || insightsQuery.isFetching,
+    dependencyError: accountScopeError || (insightsQuery.isError ? "Os insights Meta não puderam ser confirmados para este recorte." : undefined),
     reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",
   });
   const metricAvailability = useMemo(() => buildExpertMetricAvailability({ insightAvailability, leadAvailability, revenueAvailability }), [insightAvailability, leadAvailability, revenueAvailability]);
@@ -292,7 +332,7 @@ export default function ExpertDashboard() {
 
       </DashboardProvider>}
 
-      {!isLoading && accounts.length === 0 && (
+      {!isLoading && accountScopeAvailability.state === "empty_confirmed" && accounts.length === 0 && (
         <Card className="border-dashed"><CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground"><LockKeyhole className="h-5 w-5 text-primary" />Nenhuma conta foi autorizada para este acesso. Solicite ao administrador que vincule uma conta de anúncio.</CardContent></Card>
       )}
     </MotionPage>

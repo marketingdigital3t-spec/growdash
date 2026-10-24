@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { buildExpertMetricAvailability, hasActionMetricSnapshot, queryMetricAvailability } from "./ExpertDashboard";
+import { buildExpertMetricAvailability, getExpertAccountScopeAvailability, hasActionMetricSnapshot, queryMetricAvailability } from "./ExpertDashboard";
 
 describe("Expert dashboard metric availability", () => {
+  it("marks an account scope timeout unavailable instead of confirming no accounts", () => {
+    expect(getExpertAccountScopeAvailability({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      isPlaceholderData: false,
+    })).toEqual({ state: "unavailable", reason: "Não foi possível consultar as contas autorizadas para este recorte." });
+  });
+
+  it("keeps an empty placeholder account cache loading until the server confirms it", () => {
+    expect(getExpertAccountScopeAvailability({
+      data: [],
+      isLoading: false,
+      isFetching: true,
+      isError: false,
+      isPlaceholderData: true,
+    })).toEqual({ state: "loading" });
+  });
+
   it("keeps disabled queries in loading while account scope is hydrating", () => {
     expect(queryMetricAvailability({
       hasSnapshot: false,
