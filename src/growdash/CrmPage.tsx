@@ -63,6 +63,7 @@ import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import type { MetricAvailability } from "@/lib/metricAvailability";
+import { crmBoardSummaryLabel } from "@/lib/crmAvailability";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
@@ -304,7 +305,7 @@ export default function CrmPage() {
       : salesQueryError instanceof Error
         ? salesQueryError.message
         : "Não foi possível consultar o RD Station.";
-  const crmAvailability: MetricAvailability = loadingAdAccounts || loadingRDIntegration || loadingDeals || loadingFunnels || loadingSales
+  const crmAvailability: MetricAvailability = isLoadingSelectedScope || loadingRDIntegration
     ? (crmUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
     : crmError
       ? (crmUpdatedAt ? { state: "partial", reason: "Uma fonte falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: crmErrorMessage })
@@ -868,7 +869,7 @@ export default function CrmPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) no quadro · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
+          <span>{crmBoardSummaryLabel(crmAvailability.state, deals.length)}{!["loading", "unavailable"].includes(crmAvailability.state) && <> · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</>}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>
