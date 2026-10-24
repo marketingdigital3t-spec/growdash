@@ -371,7 +371,10 @@ Deno.serve(async (req) => {
         console.log(`Found ${campaigns.length} campaigns (incl. archived/completed)`);
 
         // Batch upsert campaigns + detect status changes / track last_activated_at
-        if (campaigns.length > 0) {
+        if (campaigns.length > 0 && !fastMode) {
+          // The fast snapshot already read the persisted catalog above. Do
+          // not rewrite every campaign during a KPI refresh; the normal
+          // catalog cycle remains responsible for metadata changes.
           const ids = campaigns.map((c: any) => c.id);
           const { data: prevCampaigns } = await supabaseAdmin
             .from("campaigns").select("id, status, last_activated_at").in("id", ids);
@@ -448,7 +451,10 @@ Deno.serve(async (req) => {
           auxiliaryErrors.push(message);
         }
         const adsetsList = adsetsRes.data;
-        if (adsetsList.length > 0) {
+        if (adsetsList.length > 0 && !fastMode) {
+          // As with campaigns, the fast path only needs the stored catalog for
+          // joins. Rewriting it here delays the Insights snapshot without
+          // changing the metrics shown to the person.
           console.log(`Found ${adsetsList.length} adsets`);
           const ids = adsetsList.map((a: any) => a.id);
           const { data: prev } = await supabaseAdmin

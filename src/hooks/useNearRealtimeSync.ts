@@ -20,8 +20,11 @@ const STORAGE_PREFIX = "growdash:last-background-sync";
 // for a quiet window prevents each write from reloading the same heavy traffic
 // queries and making every tab appear to refresh continuously.
 const REALTIME_UI_BATCH_MS = 1_000;
-const FAST_SYNC_TIMEOUT_MS = 12_000;
-const RD_RECONCILIATION_TIMEOUT_MS = 15_000;
+// The selected Meta snapshot completes in roughly 6–10s in production. Keep
+// enough budget for Edge auth, database writes and the network hop so a valid
+// completed sync is not reported as a client timeout.
+const FAST_SYNC_TIMEOUT_MS = 30_000;
+const RD_RECONCILIATION_TIMEOUT_MS = 30_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
