@@ -50,6 +50,10 @@ const expertDashboard = readFileSync(
   fileURLToPath(new URL("./ExpertDashboard.tsx", import.meta.url)),
   "utf8",
 );
+const funnelAudienceProfile = readFileSync(
+  fileURLToPath(new URL("../components/funnel-analysis/FunnelAudienceProfile.tsx", import.meta.url)),
+  "utf8",
+);
 
 describe("frontend theme and responsive contracts", () => {
   it("keeps the campaign card stack measurable on mobile", () => {
@@ -89,5 +93,15 @@ describe("frontend theme and responsive contracts", () => {
     expect(expertDashboard).toContain("expert-dashboard-readonly-badge");
     expect(css).toContain("html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-brand");
     expect(css).toContain("html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-readonly-badge");
+  });
+
+  it("does not repaint semantic funnel controls with the global white button skin", () => {
+    expect(css).not.toContain(
+      '.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action)',
+    );
+    expect(funnelAudienceProfile).toContain("gd-audience-accordion");
+    expect(css).toContain(".gd-audience-accordion");
+    expect(css).toContain("html.dark .brand-shell .gd-audience-accordion");
+    expect(css).toContain("html:not(.dark) .brand-shell .gd-audience-accordion");
   });
 });

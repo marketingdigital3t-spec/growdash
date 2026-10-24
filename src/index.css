@@ -14812,17 +14812,19 @@ html[data-accent="metallic-gold"] {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .98), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 8px 22px -18px rgba(255, 255, 255, .7) !important;
 }
 
-/* Platform button contract: controls are neutral white by default. Emerald
-   is reserved for active/highlighted controls inside the 3D experiences. */
-.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action) {
+/* Platform button contract: explicit action primitives are neutral white by
+   default. Do not target every button: raw semantic controls such as
+   accordions, tabs and switches own their surface and must inherit the page
+   theme instead of becoming white bars in dark mode. */
+.brand-shell .growdash-main :is(button.premium-button, [role="button"].premium-button, a.gd-button, a.gd-primary-action) {
   background: #ffffff !important;
   background-image: none !important;
   border-color: rgba(255, 255, 255, .78) !important;
   color: #0b0b0b !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .98), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 8px 22px -18px rgba(255, 255, 255, .64) !important;
 }
-.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action):hover:not(:disabled),
-.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action):focus-visible:not(:disabled) {
+.brand-shell .growdash-main :is(button.premium-button, [role="button"].premium-button, a.gd-button, a.gd-primary-action):hover:not(:disabled),
+.brand-shell .growdash-main :is(button.premium-button, [role="button"].premium-button, a.gd-button, a.gd-primary-action):focus-visible:not(:disabled) {
   background: #f3f4f6 !important;
   border-color: #ffffff !important;
   color: #0b0b0b !important;
@@ -15337,4 +15339,79 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-controls .commercial-ranking-control,
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter {
   color: #fff !important;
+}
+
+/* Funnel analysis semantic controls. The generic action skin above is limited
+   to explicit action primitives; these rules make the audience accordions and
+   funnel filters resilient to any legacy cascade that targets buttons. */
+.brand-shell .gd-audience-accordion {
+  border-color: var(--gd-content-border) !important;
+  background: var(--gd-content-surface) !important;
+  background-image: none !important;
+  color: var(--gd-content-text) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-audience-accordion > button {
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--gd-content-text) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-audience-accordion > button:hover,
+.brand-shell .gd-audience-accordion > button:focus-visible {
+  background: color-mix(in srgb, var(--gd-accent) 8%, var(--gd-content-surface)) !important;
+  color: var(--gd-content-text) !important;
+}
+.brand-shell .gd-audience-accordion > button :is(h3, span, p, svg) {
+  color: inherit;
+}
+.brand-shell .gd-audience-accordion > button .text-muted-foreground {
+  color: var(--gd-content-muted) !important;
+}
+html.dark .brand-shell .gd-audience-accordion {
+  background: #171a1c !important;
+  color: #f4f7f5 !important;
+}
+html.dark .brand-shell .gd-audience-accordion > button {
+  color: #f4f7f5 !important;
+}
+html.dark .brand-shell .gd-audience-accordion > button .text-muted-foreground {
+  color: #9aa8a1 !important;
+}
+html:not(.dark) .brand-shell .gd-audience-accordion {
+  background: #ffffff !important;
+  color: #17231d !important;
+}
+html:not(.dark) .brand-shell .gd-audience-accordion > button {
+  color: #17231d !important;
+}
+html:not(.dark) .brand-shell .gd-audience-accordion > button .text-muted-foreground {
+  color: #5d6c63 !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) {
+  border-color: var(--gd-content-border) !important;
+  background: var(--gd-content-panel) !important;
+  background-image: none !important;
+  color: var(--gd-content-text) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) > *,
+.brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) svg {
+  color: inherit !important;
+}
+html.dark .brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) {
+  background: #1d2124 !important;
+  color: #f4f7f5 !important;
+}
+html.dark .brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) > * {
+  color: #f4f7f5 !important;
+}
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) {
+  background: #ffffff !important;
+  color: #17231d !important;
+}
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-filter-strip :is(.gd-filter-control, .gd-filter-account) > * {
+  color: #17231d !important;
 }

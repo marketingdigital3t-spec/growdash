@@ -290,7 +290,7 @@ function MetaBreakdown({
   const totalLeads = rows.reduce((sum, row) => sum + row.leads, 0);
   const totalSpend = rows.reduce((sum, row) => sum + row.spend, 0);
   return (
-    <section className="rounded-lg border border-border/60 bg-muted/[0.08] p-3">
+    <section className="gd-audience-accordion rounded-lg border border-border/60 bg-muted/[0.08] p-3">
       <button
         type="button"
         onClick={onToggle}
@@ -692,7 +692,7 @@ export function FunnelAudienceProfile({
             Falha ao carregar detalhamentos da Meta: {errorMessage}
           </div>
         )}
-        <section className="rounded-lg border border-border/60 p-4">
+        <section className="gd-audience-accordion rounded-lg border border-border/60 p-4">
           <button
             type="button"
             onClick={() =>
@@ -730,7 +730,7 @@ export function FunnelAudienceProfile({
             </>
           )}
         </section>
-        <section className="rounded-lg border border-border/60 p-4">
+        <section className="gd-audience-accordion rounded-lg border border-border/60 p-4">
           <button
             type="button"
             onClick={() => setDealsCollapsed((current) => !current)}
