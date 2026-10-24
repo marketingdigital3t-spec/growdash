@@ -7,6 +7,8 @@ import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
+import { useAuth } from "@/contexts/AuthContext";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 export interface RDDealLite {
   id: string;
@@ -127,9 +129,14 @@ const FIELDS =
   "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_campaign_name, meta_adset_name, meta_ad_name, meta_form_name, meta_platform, meta_placement, meta_is_organic, meta_attribution_status, meta_attribution_method, manual_tracking, manual_tracking_updated_at, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, raw, updated_at";
 
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
+  const { user } = useAuth();
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
   const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
+  const cacheKey = user?.id
+    ? `growdash:rd-deals-period:${user.id}:${businessDateKey(startDate)}:${businessDateKey(endDate)}:${resolvedFunnelIds?.slice().sort().join(",") || "all"}:${selectedAccountIds.slice().sort().join(",") || "all"}`
+    : "";
+  const cachedPeriodDeals = readLocalCache<RDDealLite[]>(cacheKey);
   const query = useQuery({
     queryKey: [
       "rd_deals_period",
@@ -194,8 +201,12 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         endDate,
         dateRule: "created_at_for_open_closed_at_for_won",
       }) && (!selectedAccountIds.length || isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, resolvedFunnelIds ?? [])));
-      return dedupeRDDeals(scoped);
+      const result = dedupeRDDeals(scoped);
+      writeLocalCache(cacheKey, result);
+      return result;
     },
+    initialData: cachedPeriodDeals,
+    initialDataUpdatedAt: cachedPeriodDeals ? 0 : undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
@@ -220,9 +231,14 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
  * última alteração de etapa é o fallback para não ocultar vendas reais.
  */
 export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, allHistory = false, enabled = true }: WonDealsParams) {
+  const { user } = useAuth();
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
   const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
+  const cacheKey = user?.id
+    ? `growdash:rd-won-deals-period:${user.id}:${allHistory ? "all-history" : `${businessDateKey(startDate!)}:${businessDateKey(endDate!)}`}:${resolvedFunnelIds?.slice().sort().join(",") || "all"}:${selectedAccountIds.slice().sort().join(",") || "all"}`
+    : "";
+  const cachedWonDeals = readLocalCache<RDDealLite[]>(cacheKey);
   const query = useQuery({
     queryKey: ["rd_won_deals_period", allHistory ? "all-history" : `${businessDateKey(startDate!)}:${businessDateKey(endDate!)}`, resolvedFunnelIds?.join(",") ?? "all", rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
@@ -279,10 +295,14 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       const scoped = deduped.filter((deal) =>
         !selectedAccountIds.length || isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, resolvedFunnelIds ?? []),
       );
-      return allHistory
+      const result = allHistory
         ? scoped.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name))
         : scoped.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate!, endDate!));
+      writeLocalCache(cacheKey, result);
+      return result;
     },
+    initialData: cachedWonDeals,
+    initialDataUpdatedAt: cachedWonDeals ? 0 : undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
