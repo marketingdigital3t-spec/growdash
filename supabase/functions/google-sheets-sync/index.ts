@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
     if (!values.length) throw new Error("A aba da planilha está vazia.");
     const headers = values[0].map(norm);
     const rows = values.slice(1).filter((row: unknown[]) => row.some((cell) => String(cell ?? "").trim()));
-    const { data: classes } = await admin.from("event_classes").select("id,title,expert_name,expert_id");
+    const { data: classes, error: classesError } = await admin.from("event_classes").select("id,title,expert_name,expert_id");
+    if (classesError) throw classesError;
     const expertName = norm(expert?.nome);
     const classRows = (classes || []).filter((item: any) => item.expert_id === connection.expert_id || (Boolean(expertName) && norm(item.expert_name) === expertName));
     const classById = new Map(classRows.map((item: any) => [String(item.id), item]));

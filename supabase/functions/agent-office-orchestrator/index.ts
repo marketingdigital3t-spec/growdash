@@ -119,12 +119,13 @@ Deno.serve(async (req) => {
       const agents = await ensureAgents(workspace);
       const byRole = new Map(agents.map((agent: { id: string; role: string }) => [agent.role, agent.id]));
       const findings = await collectFindings(workspace);
-      const { data: previousRuns } = await admin.from("agent_office_runs")
+      const { data: previousRuns, error: previousRunsError } = await admin.from("agent_office_runs")
         .select("id,status,finished_at")
         .eq("workspace_id", workspace.id)
         .neq("id", run.id)
         .order("started_at", { ascending: false })
         .limit(2);
+      if (previousRunsError) throw previousRunsError;
       // A partial run is an expected outcome when deterministic checks find
       // a real Meta/RD issue; counting it as an infrastructure failure would
       // make this alert self-perpetuate forever. Only consecutive technical

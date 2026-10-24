@@ -1454,9 +1454,10 @@ Deno.serve(async (req) => {
         const existingProfiles = new Map<string, any>();
         const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
         if (ids.length) {
-          const { data: profiles } = await admin.from("rd_deals")
+          const { data: profiles, error: profilesError } = await admin.from("rd_deals")
             .select("rd_deal_id,contact_name,contact_email,contact_phone,lead_city,lead_state,custom_fields,raw,rd_stage_id,amount_total,closed_at,stage_updated_at,win")
             .eq("rd_funnel_id", funnel!.id).in("rd_deal_id", ids);
+          if (profilesError) throw profilesError;
           for (const profile of profiles || []) existingProfiles.set(String(profile.rd_deal_id), profile);
         }
         const HYDRATION_BATCH_SIZE = 4;

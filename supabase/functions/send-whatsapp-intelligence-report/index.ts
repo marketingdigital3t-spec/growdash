@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
   if (!isCron && !isService) {
     const { data: { user } } = await admin.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
+    const { data: memberships, error: membershipError } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
+    if (membershipError) throw membershipError;
     allowedWorkspaceIds = (memberships || []).map((membership) => membership.workspace_id);
     if (!allowedWorkspaceIds.length) return new Response(JSON.stringify({ error: "Workspace not found" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

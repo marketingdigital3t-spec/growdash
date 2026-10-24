@@ -709,15 +709,18 @@ Deno.serve(async (req) => {
         const adsetIds = Array.from(new Set((adsRes.data || []).map((ad: any) => String(ad?.adset_id || "")).filter(Boolean)));
         const adIds = Array.from(new Set((adsRes.data || []).map((ad: any) => String(ad?.id || "")).filter(Boolean)));
         if (campaignIds.length) {
-          const { data } = await admin.from("campaigns").select("id,name").in("id", campaignIds);
+          const { data, error } = await admin.from("campaigns").select("id,name").in("id", campaignIds);
+          if (error) throw error;
           for (const row of data || []) campaignNames.set(String(row.id), String(row.name));
         }
         if (adsetIds.length) {
-          const { data } = await admin.from("adsets").select("id,name").in("id", adsetIds);
+          const { data, error } = await admin.from("adsets").select("id,name").in("id", adsetIds);
+          if (error) throw error;
           for (const row of data || []) adsetNames.set(String(row.id), String(row.name));
         }
         if (adIds.length) {
-          const { data } = await admin.from("ads").select("id,name").in("id", adIds);
+          const { data, error } = await admin.from("ads").select("id,name").in("id", adIds);
+          if (error) throw error;
           for (const row of data || []) adNames.set(String(row.id), String(row.name));
         }
 

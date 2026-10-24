@@ -18,11 +18,19 @@ export function sanitizeText(value) {
 
 export function detectBackendSourceRegressions(source, file) {
   const findings = [];
-  const lines = String(source ?? "").split("\n");
-  if (!/Deno\.serve\s*\(/.test(source)) return findings;
-  const uncheckedQuery = lines.findIndex((line) => /await\s+admin\.from\(/.test(line) && /const\s*\{\s*data(?:\s*[:,}])/.test(line) && !/\berror\b/.test(line));
-  if (uncheckedQuery >= 0) {
-    findings.push({ title: `Consulta Supabase sem tratamento de erro: ${file}`, category: "data_availability", severity: "high", line: uncheckedQuery + 1 });
+  const text = String(source ?? "");
+  if (!/Deno\.serve\s*\(/.test(text)) return findings;
+  const queryPattern = /const\s*\{\s*data(?:\s*:\s*([A-Za-z_$][\w$]*))?\s*\}\s*=\s*await\s+admin\.from\(/g;
+  const lineNumber = (index) => text.slice(0, index).split("\n").length;
+  const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const match of text.matchAll(queryPattern)) {
+    const variable = match[1] || "data";
+    const start = match.index ?? 0;
+    const nextQuery = text.indexOf("const {", start + match[0].length);
+    const context = text.slice(start, nextQuery >= 0 ? nextQuery : start + 1200);
+    const emptyCollectionFallback = new RegExp(`\\b${escapeRegExp(variable)}\\s*(?:\\|\\||\\?\\?)\\s*\\[\\s*\\]`).test(context);
+    if (!emptyCollectionFallback) continue;
+    findings.push({ title: `Consulta Supabase sem tratamento de erro: ${file}`, category: "data_availability", severity: "high", line: lineNumber(start) });
   }
   return findings;
 }
@@ -155,7 +163,7 @@ function renderMarkdown(report) {
   return `# Loop Engineering\n\n- Execução: ${report.runId}\n- Commit: ${report.commitSha}\n- Modo: ${report.mode}\n- Status: ${report.status}\n\n## Achados\n\n| Severidade | Categoria | Título | Remediação | Release |\n|---|---|---|---|---|\n${rows}\n\n## Pendências\n\n${report.findings.length ? report.findings.map((item) => `- ${item.title}: ${sanitizeText(item.evidence.stderr || "evidência registrada")}`).join("\n") : "- Nenhuma"}\n`;
 }
 
-export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
+export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", backendScan = false, fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
   const unlock = await acquireReportLock(output);
   if (!unlock) {
     const locked = { schemaVersion: 1, runId: `loop_locked_${stableHash({ output })}`, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), commitSha, mode, status: "blocked", findings: [finding({ command: output, result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Outra execução do loop já está usando este relatório." }, severity: "high", category: "runtime", title: "Execução concorrente bloqueada" })] };
@@ -175,7 +183,7 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
         findings.push(finding({ command, result, severity: "high", category: "data_availability", title: `Zero exibido durante loading: ${command}` }));
       }
     }
-    if (process.env.LOOP_ENGINEERING_BACKEND_SCAN === "1") {
+    if (backendScan) {
       let files = [];
       try { files = (await execFile("git", ["ls-files", "supabase/functions"])).stdout.split("\n").filter((file) => file.endsWith(".ts")); } catch { files = []; }
       for (const file of files) {
@@ -246,7 +254,7 @@ async function main() {
   }
   let commitSha = "unknown";
   try { commitSha = (await execFile("git", ["rev-parse", "HEAD"])).stdout.trim(); } catch { /* relatório ainda é útil sem Git */ }
-  const report = await runLoop({ ...args, commitSha });
+  const report = await runLoop({ ...args, commitSha, backendScan: process.env.LOOP_ENGINEERING_BACKEND_SCAN === "1" });
   console.log(JSON.stringify({ runId: report.runId, status: report.status, findings: report.findings.length, output: args.output }, null, 2));
   if (report.status === "blocked") process.exitCode = 2;
 }

@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
     const accountId = String(body?.account_id || "");
     if (!accountId) throw new Error("account_id required");
     const requestedDate = typeof body?.date === "string" ? body.date : null;
-    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
+    const { data: memberships, error: membershipsError } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
+    if (membershipsError) throw membershipsError;
     const workspaceIds = (memberships || []).map((membership) => membership.workspace_id);
     if (!workspaceIds.length) throw new Error("Workspace not found");
     const { data: account } = await admin.from("ad_accounts")
@@ -108,8 +109,10 @@ Deno.serve(async (req) => {
       leads_status: leadsAvailable ? "confirmed" : "unavailable",
       leads_reason: leadsAvailable ? undefined : siteScope.error || (lpConfig?.action_type && !siteScope.complete ? "Catálogo Meta sem destino confirmado para todos os anúncios do recorte." : "Ações Meta sem cobertura confirmada para esta conta, data e atribuição."),
     };
-    const { count: rdLeads } = await admin.from("rd_deals").select("id", { count: "exact", head: true }).eq("ad_account_id", accountId).gte("lead_created_at", zonedBoundary(date, timezone)).lte("lead_created_at", zonedBoundary(date, timezone, true));
-    const { data: sales } = await admin.from("sales").select("net_revenue, quantity").eq("ad_account_id", accountId).eq("sale_date", date).in("status", ["confirmed", "pending"]);
+    const { count: rdLeads, error: rdLeadsError } = await admin.from("rd_deals").select("id", { count: "exact", head: true }).eq("ad_account_id", accountId).gte("lead_created_at", zonedBoundary(date, timezone)).lte("lead_created_at", zonedBoundary(date, timezone, true));
+    if (rdLeadsError) throw rdLeadsError;
+    const { data: sales, error: salesError } = await admin.from("sales").select("net_revenue, quantity").eq("ad_account_id", accountId).eq("sale_date", date).in("status", ["confirmed", "pending"]);
+    if (salesError) throw salesError;
     const saleCount = (sales || []).reduce((sum, sale) => sum + number(sale.quantity), 0);
     const revenue = (sales || []).reduce((sum, sale) => sum + number(sale.net_revenue), 0);
     const metrics = { ...media, rdLeads: rdLeads || 0, sales: saleCount, revenue, ctr: ratio(sums.clicks, sums.impressions, 100), cpm: ratio(sums.spend, sums.impressions, 1000), cpc: ratio(sums.spend, sums.clicks), cpl: media.leads === null ? null : ratio(sums.spend, media.leads), cac: ratio(sums.spend, saleCount), roas: ratio(revenue, sums.spend), frequency: ratio(sums.impressions, sums.reach), rdCoverage: media.leads ? ratio(rdLeads || 0, media.leads, 100) : null };

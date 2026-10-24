@@ -330,7 +330,8 @@ Deno.serve(async (req) => {
     }
     const context: Record<string, unknown> = { trigger: input, lead: input.lead || input, date: { now: new Date().toISOString() }, node: {} };
     if (resumeNodeId) {
-      const { data: previousSteps } = await admin.from("growdash_workflow_run_steps").select("node_id,output").eq("run_id", run.id).eq("status", "success").order("created_at", { ascending: true });
+      const { data: previousSteps, error: previousStepsError } = await admin.from("growdash_workflow_run_steps").select("node_id,output").eq("run_id", run.id).eq("status", "success").order("created_at", { ascending: true });
+      if (previousStepsError) throw previousStepsError;
       for (const step of previousSteps || []) {
         (context.node as Record<string, unknown>)[step.node_id] = { output: step.output };
       }

@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
         incoming.push({ type: "instagram_message", id: String(message.message?.mid ?? ""), sender_id: String(message.sender?.id ?? ""), text: String(message.message?.text ?? ""), raw: message });
       }
       if (!incoming.length) continue;
-      const { data: automations } = await admin.from("growdash_automations").select("id,name,trigger_type,trigger_config,workflow_definition").eq("workspace_id", account.workspace_id).eq("status", "active");
+      const { data: automations, error: automationsError } = await admin.from("growdash_automations").select("id,name,trigger_type,trigger_config,workflow_definition").eq("workspace_id", account.workspace_id).eq("status", "active");
+      if (automationsError) throw automationsError;
       for (const event of incoming) {
         for (const automation of automations ?? []) {
           if (automation.workflow_definition) {

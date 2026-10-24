@@ -20,6 +20,16 @@ describe("loop engineering CLI", () => {
     expect(findings[0]).toMatchObject({ category: "data_availability", severity: "high", line: 1 });
   });
 
+  it("ignores a query without an empty-collection fallback", () => {
+    const findings = detectBackendSourceRegressions('Deno.serve(async () => { const { data: account } = await admin.from("ad_accounts").select("id").maybeSingle(); if (!account) return new Response("not found", { status: 404 }); return Response.json(account); });', "supabase/functions/example/index.ts");
+    expect(findings).toEqual([]);
+  });
+
+  it("runs backend scanning only when explicitly enabled", async () => {
+    const report = await runLoop({ mode: "detect", output: "reports/loop-engineering-cli-backend-opt-in.json", commands: [], backendScan: false, runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }) });
+    expect(report.findings).toEqual([]);
+  });
+
   it("applies a complete declarative patch in repair mode", async () => {
     let content = "return 0;";
     const fail = { exitCode: 1, signal: null, timedOut: false, stdout: "", stderr: "regression" };

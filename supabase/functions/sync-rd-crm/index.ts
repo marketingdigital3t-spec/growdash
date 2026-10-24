@@ -76,13 +76,14 @@ Deno.serve(async (req) => {
 
     let funnel = exactFunnels?.[0];
     if (!funnel && pipelineName) {
-      const { data: candidates } = await admin.from("rd_funnels")
+      const { data: candidates, error: candidatesError } = await admin.from("rd_funnels")
         .select("id,user_id,rd_funnel_id,name,ad_account_id,updated_at")
         .eq("user_id", connection.user_id)
         .eq("rd_connection_id", connection.id)
         .eq("is_active", true)
         .order("ad_account_id", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false, nullsFirst: false });
+      if (candidatesError) throw candidatesError;
       const wanted = normalize(pipelineName);
       const namedCandidates = (candidates || []).filter((item: any) => normalize(item.name) === wanted);
       if (namedCandidates.length > 1) {
@@ -215,12 +216,13 @@ async function findMetaLead(admin: any, deal: any) {
   let { data } = await query.maybeSingle();
   if (!data && deal.contact_phone) {
     const wanted = String(deal.contact_phone).replace(/\D/g, "");
-    const { data: candidates } = await admin.from("meta_leads")
+    const { data: candidates, error: candidatesError } = await admin.from("meta_leads")
       .select(select)
       .eq("ad_account_id", deal.ad_account_id)
       .not("phone", "is", null)
       .order("created_time", { ascending: false })
       .limit(5000);
+    if (candidatesError) throw candidatesError;
     data = (candidates || []).find((candidate: any) => String(candidate.phone || "").replace(/\D/g, "") === wanted) || null;
   }
   if (!data) return null;
