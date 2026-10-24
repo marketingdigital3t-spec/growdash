@@ -697,10 +697,15 @@ export default function FunnelAnalysis() {
 
   // `isLoading` can briefly become true during a background refetch. The
   // current snapshot must remain on screen in that case; only the first fetch
-  // for the active scope should replace the page with the loading state.
+  // for the active period should replace the page with the loading state.
+  //
+  // Historical deals and the stage catalog are used to enrich the lower
+  // sections, but they are not prerequisites for the period KPIs. Waiting for
+  // those broad queries here made a fresh visit sit on "Carregando…" for
+  // dozens of seconds while the same period snapshot was already available.
+  // They now hydrate independently and the visible period remains truthful
+  // until they arrive.
   const initialDataLoading = !funnelsFetched
-    || (funnelScopeIds.length > 0 && !stagesFetched)
-    || (funnelScopeIds.length > 0 && !dealsFetched)
     || (funnelScopeIds.length > 0 && !periodDealsFetched)
     || (funnelScopeIds.length > 0 && !periodClosedDealsFetched);
   const rdPeriodError = periodDealsIsError || periodClosedDealsIsError;
