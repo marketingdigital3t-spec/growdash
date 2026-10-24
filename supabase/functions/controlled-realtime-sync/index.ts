@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canRunSelectedMetaLeadSync } from "../../../src/lib/controlledMetaSync.ts";
+import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
 import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
@@ -237,9 +238,14 @@ Deno.serve(async (req) => {
     }
 
     if (includeRD) {
-      // RD funnels are an independent source. A selected Meta account must
-      // never hide or suppress another active RD pipeline.
-      const funnels = await listAccessibleFunnels(admin, user.id, body.funnelIds);
+      // RD funnels are an independent source, but the selected account scope
+      // still bounds automatic reconciliation so an unrelated pipeline cannot
+      // delay the visible workspace snapshot.
+      const selectedAccountIds = Array.from(new Set([
+        ...(body.adAccountIds ?? []),
+        ...(body.adAccountId ? [body.adAccountId] : []),
+      ].map(String).filter((id) => id && id !== "all")));
+      const funnels = await listAccessibleFunnels(admin, user.id, body.funnelIds, selectedAccountIds);
       if (funnels.length === 0) {
         results.push({ provider: "rd", skipped: true, reason: "Nenhum funil RD vinculado para sincronizar." });
       } else {
@@ -473,7 +479,7 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
   return last || { error: `${name} failed` };
 }
 
-async function listAccessibleFunnels(admin: any, userId: string, requestedFunnelIds?: string[]) {
+async function listAccessibleFunnels(admin: any, userId: string, requestedFunnelIds?: string[], selectedAccountIds: readonly string[] = []) {
   // A CRM reader may use a funnel owned by another account through
   // user_rd_funnel_access. The previous owner-only query silently skipped
   // those funnels during automatic sync, while the CRM itself could display
@@ -496,7 +502,7 @@ async function listAccessibleFunnels(admin: any, userId: string, requestedFunnel
   }
   const { data, error } = await query;
   if (error) throw error;
-  const accessible = data || [];
+  const accessible = filterRDFunnelsByAccountScope(data || [], selectedAccountIds);
   if (!requestedFunnelIds?.length) return accessible;
   const requested = new Set(requestedFunnelIds);
   return accessible.filter((funnel: any) => requested.has(String(funnel.id)) || requested.has(String(funnel.rd_funnel_id)));

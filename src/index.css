@@ -15220,6 +15220,27 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-filter option,
 .dark :is(section[role="dialog"], section.isolate) .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
 
+/* The fullscreen ranking is portaled directly under body, so it no longer
+   inherits the page shell selector. Keep the expand control emerald in both
+   locations and themes instead of falling back to the platform button layer. */
+html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand,
+html body section[role="dialog"].isolate .commercial-ranking-expand {
+  background: var(--gd-emerald) !important;
+  background-color: var(--gd-emerald) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald-bright) !important;
+  color: #062015 !important;
+  box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
+}
+html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand:hover,
+html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand:focus-visible,
+html body section[role="dialog"].isolate .commercial-ranking-expand:hover,
+html body section[role="dialog"].isolate .commercial-ranking-expand:focus-visible {
+  background: var(--gd-emerald-bright) !important;
+  background-color: var(--gd-emerald-bright) !important;
+  color: #03140c !important;
+}
+
 /* Keep the ranking scope tabs in the same emerald control system. The
    platform-wide button layer otherwise turns these two tabs white/blue in
    dark mode, which breaks the Comercial visual hierarchy. */

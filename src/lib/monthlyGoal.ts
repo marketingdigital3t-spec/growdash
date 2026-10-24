@@ -30,6 +30,16 @@ export function resolveEffectiveSalesGoals<T extends MonthlySalesGoalRecord>(rec
   }));
 }
 
+/**
+ * An inherited value is already effective for the selected month. Persist a
+ * row only when the person actually changes that value; this keeps the
+ * previous month's history authoritative until an explicit override exists.
+ */
+export function shouldPersistSalesGoal({ draftTarget, currentTarget, isInherited }: { draftTarget: number; currentTarget?: number; isInherited: boolean }) {
+  if (!Number.isFinite(draftTarget) || draftTarget <= 0) return false;
+  return !(isInherited && Number.isFinite(currentTarget) && draftTarget === currentTarget);
+}
+
 const GOAL_RED: Rgb = { r: 239, g: 68, b: 68 };
 const GOAL_YELLOW: Rgb = { r: 245, g: 158, b: 11 };
 const GOAL_GREEN: Rgb = { r: 34, g: 197, b: 94 };

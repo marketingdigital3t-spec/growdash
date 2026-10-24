@@ -11,6 +11,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { shouldPersistSalesGoal } from "@/lib/monthlyGoal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -53,7 +54,8 @@ export function SalesGoalSettingsCard() {
       if (!goalData?.schemaReady || !workspace?.id || !businessUnitId || !user?.id || workspace.id.startsWith("legacy-") || businessUnitId.startsWith("legacy-")) throw new Error("Aplique a migration de metas antes de salvar.");
       const positive = visibleAccounts.flatMap((account) => {
         const target = parseCurrency(drafts[account.id] || "");
-        if (!Number.isFinite(target) || target <= 0) return [];
+        const currentGoal = goalData?.rows?.find((goal) => goal.ad_account_id === account.id);
+        if (!shouldPersistSalesGoal({ draftTarget: target, currentTarget: Number(currentGoal?.target_revenue), isInherited: Boolean(currentGoal?.is_inherited) })) return [];
         return [{ workspace_id: workspace.id, business_unit_id: businessUnitId, ad_account_id: account.id, goal_month: `${monthValue}-01`, target_revenue: target, created_by: user.id, updated_at: new Date().toISOString() }];
       });
       if (positive.length) {
