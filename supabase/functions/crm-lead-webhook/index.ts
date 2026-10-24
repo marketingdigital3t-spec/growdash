@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { extractCrmLeadTracking } from "../_shared/crmLeadTracking.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,6 +84,7 @@ Deno.serve(async (req) => {
     const phone = nested(payload, ["phone", "phone_number", "telefone", "whatsapp", "contact.phone", "lead.phone"]);
     const fullName = nested(payload, ["full_name", "name", "nome", "contact.name", "lead.name"]);
     const utm = payload.utm && typeof payload.utm === "object" ? payload.utm as Record<string, unknown> : {};
+    const tracking = extractCrmLeadTracking(payload);
     const statusCandidate = (nested(payload, ["status", "stage", "deal.stage"]) || "new").toLowerCase();
     const status = ["new", "contacted", "qualified", "opportunity", "won", "lost", "archived"].includes(statusCandidate) ? statusCandidate : "new";
     let adAccountId: string | null = null;
@@ -116,9 +118,18 @@ Deno.serve(async (req) => {
       landing_page: nested(payload, ["landing_page", "landingPage", "page_url"]),
       referrer: nested(payload, ["referrer", "http_referrer"]),
       ad_account_id: adAccountId,
-      campaign_id: nested(payload, ["campaign_id", "campaign.id"]),
-      adset_id: nested(payload, ["adset_id", "adset.id"]),
-      ad_id: nested(payload, ["ad_id", "ad.id"]),
+      meta_lead_id: tracking.meta_lead_id,
+      form_id: tracking.form_id,
+      campaign_id: tracking.campaign_id || nested(payload, ["campaign_id", "campaign.id"]),
+      adset_id: tracking.adset_id || nested(payload, ["adset_id", "adset.id"]),
+      ad_id: tracking.ad_id || nested(payload, ["ad_id", "ad.id"]),
+      campaign_name: tracking.campaign_name,
+      adset_name: tracking.adset_name,
+      ad_name: tracking.ad_name,
+      form_name: tracking.form_name,
+      platform: tracking.platform,
+      placement: tracking.placement,
+      is_organic: tracking.is_organic,
       payload,
       last_received_at: receivedAt,
       updated_at: receivedAt,

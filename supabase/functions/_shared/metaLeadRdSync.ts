@@ -27,7 +27,7 @@ type RdDeal = {
   user_id: string;
   rd_connection_id: string | null;
   rd_deal_id: string;
-  ad_account_id: string;
+  ad_account_id: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   lead_created_at: string | null;
@@ -274,38 +274,27 @@ async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLea
   return data || null;
 }
 
-async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdDeal[]> {
+async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boolean): Promise<RdDeal[]> {
   const candidates: RdDeal[] = [];
   const email = normalizeEmail(lead.email);
   const phone = normalizePhone(lead.phone);
+  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
+  const applyScope = (query: any) => scoped && lead.ad_account_id ? query.eq("ad_account_id", lead.ad_account_id) : query;
   if (email) {
-    const { data, error } = await admin
-      .from("rd_deals")
-      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
-      .eq("ad_account_id", lead.ad_account_id)
+    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
       .ilike("contact_email", email)
       .limit(100);
     if (error) throw error;
     candidates.push(...(data || []));
   }
   if (phone) {
-    const { data, error } = await admin
-      .from("rd_deals")
-      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
-      .eq("ad_account_id", lead.ad_account_id)
+    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
       .eq("contact_phone", phone)
       .limit(100);
     if (error) throw error;
     candidates.push(...(data || []));
     if (!(data || []).length) {
-      // RD commonly returns Brazilian phones with +55, spaces or punctuation.
-      // The expression index protects SQL-side joins, but PostgREST cannot
-      // filter an expression directly, so only use this bounded fallback when
-      // the canonical value lookup found nothing.
-      const { data: formatted, error: formattedError } = await admin
-        .from("rd_deals")
-        .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
-        .eq("ad_account_id", lead.ad_account_id)
+      const { data: formatted, error: formattedError } = await applyScope(admin.from("rd_deals").select(select))
         .not("contact_phone", "is", null)
         .order("lead_created_at", { ascending: false })
         .limit(5000);
@@ -313,6 +302,15 @@ async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdD
       candidates.push(...(formatted || []).filter((deal: RdDeal) => normalizePhone(deal.contact_phone) === phone));
     }
   }
+  return candidates;
+}
+
+async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdDeal[]> {
+  let candidates = await queryDealsForLead(admin, lead, true);
+  // Historical RD rows may not carry the Meta account mapping. Only widen the
+  // query after the strict account scope has produced no candidate; the final
+  // identifier and time-window checks still reject unrelated deals.
+  if (!candidates.length) candidates = await queryDealsForLead(admin, lead, false);
   const unique = [...new Map(candidates.map((deal) => [deal.rd_deal_id, deal])).values()];
   return unique
     .map((deal: RdDeal) => ({ deal, match: dealMatchesLead(deal, lead) }))
@@ -321,34 +319,27 @@ async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdD
     .map((item: any) => item.deal);
 }
 
-async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLead | null> {
+async function queryLeadsForDeal(admin: AdminClient, deal: RdDeal, scoped: boolean): Promise<MetaLead[]> {
   const candidates: MetaLead[] = [];
   const email = normalizeEmail(deal.contact_email);
   const phone = normalizePhone(deal.contact_phone);
+  const select = "meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw";
+  const applyScope = (query: any) => scoped && deal.ad_account_id ? query.eq("ad_account_id", deal.ad_account_id) : query;
   if (email) {
-    const { data, error } = await admin
-      .from("meta_leads")
-      .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
-      .eq("ad_account_id", deal.ad_account_id)
+    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
       .ilike("email", email)
       .limit(100);
     if (error) throw error;
     candidates.push(...(data || []));
   }
   if (phone) {
-    const { data, error } = await admin
-      .from("meta_leads")
-      .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
-      .eq("ad_account_id", deal.ad_account_id)
+    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
       .eq("phone", phone)
       .limit(100);
     if (error) throw error;
     candidates.push(...(data || []));
     if (!(data || []).length) {
-      const { data: formatted, error: formattedError } = await admin
-        .from("meta_leads")
-        .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
-        .eq("ad_account_id", deal.ad_account_id)
+      const { data: formatted, error: formattedError } = await applyScope(admin.from("meta_leads").select(select))
         .not("phone", "is", null)
         .order("created_time", { ascending: false })
         .limit(5000);
@@ -356,6 +347,12 @@ async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLe
       candidates.push(...(formatted || []).filter((lead: MetaLead) => normalizePhone(lead.phone) === phone));
     }
   }
+  return candidates;
+}
+
+async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLead | null> {
+  let candidates = await queryLeadsForDeal(admin, deal, true);
+  if (!candidates.length) candidates = await queryLeadsForDeal(admin, deal, false);
   return [...new Map(candidates.map((lead) => [lead.meta_lead_id, lead])).values()]
     .map((lead: MetaLead) => ({ lead, match: dealMatchesLead(deal, lead) }))
     .filter((item: any) => item.match.match)
