@@ -51,7 +51,7 @@ authorization headers, senhas e query parameters sensíveis são substituídos p
 
 ## CI
 
-`.github/workflows/loop-engineering.yml` executa o modo `detect` a cada três
+`.github/workflows/loop-engineering.yml` executa o modo `detect` a cada duas
 horas e manualmente. O artefato é preservado por 14 dias. O job falha quando o
 gate encontra uma regressão, mas não faz deploy. Publicação exige uma execução
 `release` validada, revisão do diff e os gates de Cloudflare/Supabase descritos

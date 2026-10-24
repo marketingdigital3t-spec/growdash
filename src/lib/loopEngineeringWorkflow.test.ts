@@ -5,6 +5,7 @@ describe("loop engineering workflow", () => {
     const workflow = readFileSync(".github/workflows/loop-engineering.yml", "utf8");
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("schedule:");
+    expect(workflow).toContain('cron: "17 */2 * * *"');
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("npx playwright install --with-deps chromium");
     expect(workflow).toContain("npm run loop-engineering:detect");
