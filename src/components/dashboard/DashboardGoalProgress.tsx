@@ -1,7 +1,7 @@
 import { Award, ArrowUpRight, PartyPopper, Settings2, Target } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { goalColorForPercentage, goalPercentage, goalProgress, goalRevenueDisplayState } from "@/lib/monthlyGoal";
+import { goalColorForPercentage, goalPercentage, goalProgress, goalRevenueDisplayState, shouldAnimateGoalProgress } from "@/lib/monthlyGoal";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -58,6 +58,7 @@ export function TopbarMonthlyGoal({ realized, target, accountLabel, schemaReady,
   const revenuePending = revenueState === "pending";
   const revenueUnavailable = revenueState === "unavailable";
   const revenueVisible = revenueState === "ready" || revenueState === "stale";
+  const animateProgress = shouldAnimateGoalProgress({ target: safeTarget, revenueState });
   return (
     <section className="min-w-0 grow" aria-label={accountLabel}>
       <div className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-0.5">
@@ -67,8 +68,8 @@ export function TopbarMonthlyGoal({ realized, target, accountLabel, schemaReady,
             <span className="truncate font-black uppercase tracking-[.1em] text-primary" title={accountLabel}>{accountLabel}</span>
             {revenueUnavailable ? <span className="shrink-0 font-black text-white/75">Faturamento indisponível</span> : revenuePending ? <span className="shrink-0 font-black text-white/75">Calculando…</span> : safeTarget > 0 ? <span className="shrink-0 font-black text-white">{percentage.toFixed(1)}%</span> : <Link to="/configuracoes#sales-goals" className="shrink-0 font-black text-primary hover:underline" aria-label="Meta não configurada — configurar meta">Meta não configurada · Configurar</Link>}
           </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full border border-white/10 bg-white/[.08] shadow-inner" aria-label={revenueUnavailable ? "Faturamento indisponível" : revenuePending ? "Calculando faturamento" : `Progresso da meta: ${percentage.toFixed(1)}%`}>
-            {safeTarget > 0 && revenueVisible && <div className="h-full rounded-full motion-reduce:transition-none transition-[width,background-color] duration-500 ease-out" style={{ width: `${barProgress}%`, backgroundColor: goalColorForPercentage(percentage) }} />}
+          <div className="topbar-goal-progress-track mt-1.5 h-2 overflow-hidden rounded-full border border-white/10 bg-white/[.08] shadow-inner" data-goal-animation={animateProgress ? "pulse" : "static"} aria-label={revenueUnavailable ? "Faturamento indisponível" : revenuePending ? "Calculando faturamento" : `Progresso da meta: ${percentage.toFixed(1)}%`}>
+            {safeTarget > 0 && revenueVisible && <div className="topbar-goal-progress-fill h-full rounded-full motion-reduce:transition-none transition-[width] duration-500 ease-out" style={{ width: `${barProgress}%` }} />}
           </div>
         </div>
         <div className="hidden shrink-0 text-right text-[9px] sm:block">

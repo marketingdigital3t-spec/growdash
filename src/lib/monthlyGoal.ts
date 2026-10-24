@@ -74,6 +74,10 @@ export function goalColorForPercentage(percentage: number) {
 
 export type GoalRevenueDisplayState = "pending" | "unavailable" | "stale" | "ready";
 
+export function shouldAnimateGoalProgress({ target, revenueState }: { target: number; revenueState: GoalRevenueDisplayState }) {
+  return Number.isFinite(target) && target > 0 && (revenueState === "ready" || revenueState === "stale");
+}
+
 export function goalRevenueDisplayState({ loading, error, snapshot }: { loading: boolean; error: boolean; snapshot: boolean }): GoalRevenueDisplayState {
   if (error) return snapshot ? "stale" : "unavailable";
   if (loading && !snapshot) return "pending";

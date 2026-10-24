@@ -15285,6 +15285,38 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
   color: #fff !important;
 }
 
+/* The monthly goal uses the platform emerald as a stable signal. The pulse
+   changes only light and shadow, so the measured width never jumps and a
+   loading/unavailable state cannot look like a confirmed value. */
+.brand-shell .brand-topbar .topbar-goal-progress-track {
+  background: rgba(16, 185, 129, .14) !important;
+  border-color: rgba(52, 211, 153, .28) !important;
+}
+.brand-shell .brand-topbar .topbar-goal-progress-fill {
+  position: relative;
+  isolation: isolate;
+  background: var(--gd-emerald) !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--gd-emerald-bright) 28%, transparent);
+}
+.brand-shell .brand-topbar .topbar-goal-progress-track[data-goal-animation="pulse"] .topbar-goal-progress-fill {
+  animation: topbar-goal-progress-pulse 2.6s ease-in-out infinite;
+}
+@keyframes topbar-goal-progress-pulse {
+  0%, 100% {
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gd-emerald-bright) 28%, transparent), 0 0 0 0 color-mix(in srgb, var(--gd-emerald-bright) 0%, transparent);
+    filter: saturate(1);
+  }
+  50% {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--gd-emerald-bright) 72%, transparent), 0 0 0 2px color-mix(in srgb, var(--gd-emerald-bright) 16%, transparent);
+    filter: saturate(1.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell .brand-topbar .topbar-goal-progress-track[data-goal-animation="pulse"] .topbar-goal-progress-fill {
+    animation: none !important;
+  }
+}
+
 /* The global button contract is intentionally strong and includes a white
    surface. Commercial controls are a semantic filter group, so give them a
    more specific final rule in both the page and fullscreen portal. Without

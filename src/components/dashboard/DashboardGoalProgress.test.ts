@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { goalColorForPercentage, goalPercentage, goalProgress, goalRevenueDisplayState } from "@/lib/monthlyGoal";
+import { goalColorForPercentage, goalPercentage, goalProgress, goalRevenueDisplayState, shouldAnimateGoalProgress } from "@/lib/monthlyGoal";
 
 describe("monthly goal presentation", () => {
   it("does not present zero while the first revenue snapshot is loading", () => {
@@ -9,6 +9,14 @@ describe("monthly goal presentation", () => {
   it("preserves a previous snapshot when a refresh fails", () => {
     expect(goalRevenueDisplayState({ loading: false, error: true, snapshot: true })).toBe("stale");
     expect(goalRevenueDisplayState({ loading: false, error: true, snapshot: false })).toBe("unavailable");
+  });
+
+  it("animates the topbar only when a real goal snapshot is visible", () => {
+    expect(shouldAnimateGoalProgress({ target: 100, revenueState: "ready" })).toBe(true);
+    expect(shouldAnimateGoalProgress({ target: 100, revenueState: "stale" })).toBe(true);
+    expect(shouldAnimateGoalProgress({ target: 100, revenueState: "pending" })).toBe(false);
+    expect(shouldAnimateGoalProgress({ target: 100, revenueState: "unavailable" })).toBe(false);
+    expect(shouldAnimateGoalProgress({ target: 0, revenueState: "ready" })).toBe(false);
   });
 
   it("clamps a valid progress value to the visible bar", () => {
