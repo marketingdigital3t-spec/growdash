@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { queryMetricAvailability } from "./ExpertDashboard";
+import { hasActionMetricSnapshot, queryMetricAvailability } from "./ExpertDashboard";
 
 describe("Expert dashboard metric availability", () => {
   it("keeps disabled queries in loading while account scope is hydrating", () => {
@@ -42,6 +42,41 @@ describe("Expert dashboard metric availability", () => {
       isFetching: false,
       isError: false,
     })).toEqual({ state: "empty_confirmed" });
+  });
+
+  it("keeps a dependent metric loading when an empty action object arrived before insights", () => {
+    expect(hasActionMetricSnapshot({ hasActionData: true, actionAdCount: 0, insightsDataUpdatedAt: 0 })).toBe(false);
+    expect(queryMetricAvailability({
+      hasSnapshot: false,
+      hasRows: false,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      dependencyPending: true,
+    })).toEqual({ state: "loading" });
+  });
+
+  it("preserves a real action snapshot as stale while its insight dependency refreshes", () => {
+    expect(hasActionMetricSnapshot({ hasActionData: true, actionAdCount: 0, insightsDataUpdatedAt: 123 })).toBe(true);
+    expect(queryMetricAvailability({
+      hasSnapshot: true,
+      hasRows: false,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      dependencyPending: true,
+    })).toEqual({ state: "stale", reason: "Atualizando a fonte de dependência; o último snapshot permanece visível." });
+  });
+
+  it("marks a preserved dependent snapshot partial when its dependency fails", () => {
+    expect(queryMetricAvailability({
+      hasSnapshot: true,
+      hasRows: true,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      dependencyError: "Meta indisponível",
+    })).toEqual({ state: "partial", reason: "Meta indisponível" });
   });
 
   it("preserves a partial snapshot when a refresh fails", () => {

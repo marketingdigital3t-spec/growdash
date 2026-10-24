@@ -41,11 +41,29 @@ export function queryMetricAvailability(input: {
   dependencyPending?: boolean;
   dependencyError?: string;
 }): MetricAvailability {
+  if (input.dependencyError) {
+    return input.hasSnapshot
+      ? { state: "partial", reason: input.reason || input.dependencyError }
+      : { state: "unavailable", reason: input.reason || input.dependencyError };
+  }
+  if (input.dependencyPending) {
+    return input.hasSnapshot
+      ? { state: "stale", reason: "Atualizando a fonte de dependência; o último snapshot permanece visível." }
+      : { state: "loading" };
+  }
   if (!input.hasSnapshot && (input.isLoading || input.isFetching || input.dependencyPending)) return { state: "loading" };
-  if (!input.hasSnapshot && (input.isError || input.dependencyError)) return { state: "unavailable", reason: input.reason || input.dependencyError };
+  if (!input.hasSnapshot && input.isError) return { state: "unavailable", reason: input.reason };
   if (input.isError) return { state: "partial", reason: input.reason || "A fonte falhou; o último snapshot foi preservado." };
   if (input.isFetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
   return input.hasRows === false ? { state: "empty_confirmed" } : { state: "fresh" };
+}
+
+export function hasActionMetricSnapshot(input: {
+  hasActionData: boolean;
+  actionAdCount: number;
+  insightsDataUpdatedAt: number;
+}) {
+  return input.hasActionData && (input.actionAdCount > 0 || input.insightsDataUpdatedAt > 0);
 }
 
 /**
@@ -180,7 +198,11 @@ export default function ExpertDashboard() {
     // When there are no ads, the action query is intentionally disabled. Its
     // absence is only a confirmed zero after the canonical insights scope has
     // settled successfully; before that it is still pending.
-    hasSnapshot: actionQuery.data !== undefined || (insightsQuery.data !== undefined && actionAdIds.length === 0 && !insightsQuery.isError),
+    hasSnapshot: hasActionMetricSnapshot({
+      hasActionData: actionQuery.data !== undefined,
+      actionAdCount: actionAdIds.length,
+      insightsDataUpdatedAt: insightsQuery.dataUpdatedAt,
+    }) || (insightsQuery.data !== undefined && insightsQuery.dataUpdatedAt > 0 && actionAdIds.length === 0 && !insightsQuery.isError),
     hasRows: Number(actionData?.metaLeadActions?.total || 0) > 0,
     isLoading: loadingAccounts || actionQuery.isLoading,
     isFetching: actionQuery.isFetching,
