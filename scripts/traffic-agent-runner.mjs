@@ -41,6 +41,18 @@ async function executeApproved() {
   return postJob("traffic-agent-execute-approved");
 }
 
+async function generateCreativeJobs() {
+  return postJob("growth-creative-generate").catch(() => undefined);
+}
+
+async function runGrowthExperiments() {
+  return postJob("growth-experiment-run").catch(() => undefined);
+}
+
+async function evaluateGrowthExperiments() {
+  return postJob("growth-experiment-evaluate").catch(() => undefined);
+}
+
 function brazilTime() { return new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()); }
 function due(now, target) { return now === target; }
 
@@ -53,7 +65,13 @@ setInterval(async () => {
     if ((due(now, morning) || due(now, afternoon)) && key !== lastScheduled) {
       lastScheduled = key;
       await analyze("scheduled");
+      await generateCreativeJobs();
+      await runGrowthExperiments();
+      await evaluateGrowthExperiments();
     } else {
+      await generateCreativeJobs();
+      await runGrowthExperiments();
+      await evaluateGrowthExperiments();
       await executeApproved();
       await heartbeat();
     }
