@@ -4,7 +4,7 @@ type AdminClient = any;
 
 type MetaLead = {
   meta_lead_id: string;
-  ad_account_id: string;
+  ad_account_id: string | null;
   campaign_id: string | null;
   adset_id: string | null;
   ad_id: string | null;
@@ -203,11 +203,13 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
   if (!connection?.write_enabled) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_write_disabled" };
   if (connection.status !== "connected" || !connection.api_token) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_not_ready" };
 
-  const { data: configs } = await admin
-    .from("rd_field_configs")
-    .select("rd_field_label,rd_field_aliases,rd_source")
-    .eq("ad_account_id", lead.ad_account_id)
-    .eq("rd_source", "deal");
+  const { data: configs } = lead.ad_account_id
+    ? await admin
+      .from("rd_field_configs")
+      .select("rd_field_label,rd_field_aliases,rd_source")
+      .eq("ad_account_id", lead.ad_account_id)
+      .eq("rd_source", "deal")
+    : { data: [] };
   const patchedFields = customFieldPatch(deal.raw, configs || [], lead);
   const fingerprint = trackingFingerprint(lead);
   const noteCorrelation = await stableUuid(`meta-rd-note:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
@@ -364,6 +366,50 @@ export async function syncMetaLeadToRD(admin: AdminClient, metaLeadId: string) {
   try {
     const lead = await loadLead(admin, metaLeadId);
     if (!lead) return { status: "skipped", reason: "meta_lead_not_found" };
+    const deals = await findDealsForLead(admin, lead);
+    if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
+    const results = [];
+    for (const deal of deals.slice(0, 3)) results.push(await writeAttribution(admin, lead, deal));
+    return { status: results.some((item) => item.status === "written") ? "written" : results[0]?.status || "skipped", results };
+  } catch (error) {
+    return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Conversation and CRM webhooks do not have a native Meta Lead ID. They can
+ * still be linked to an RD negotiation when the connector supplies a stable
+ * contact identifier and the attribution came from a Meta referral.
+ */
+export async function syncCrmLeadToRD(admin: AdminClient, crmLeadId: string) {
+  try {
+    const { data: row, error } = await admin.from("crm_leads")
+      .select("id,ad_account_id,meta_lead_id,form_id,campaign_id,adset_id,ad_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,first_received_at,last_received_at,payload")
+      .eq("id", crmLeadId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) return { status: "skipped", reason: "crm_lead_not_found" };
+    if (!row.email && !row.phone) return { status: "skipped", reason: "crm_contact_identifier_missing" };
+    if (!row.campaign_id && !row.ad_id && !row.campaign_name && !row.ad_name) return { status: "skipped", reason: "meta_referral_missing" };
+    const lead: MetaLead = {
+      meta_lead_id: row.meta_lead_id || `crm:${row.id}`,
+      ad_account_id: row.ad_account_id,
+      campaign_id: row.campaign_id || null,
+      adset_id: row.adset_id || null,
+      ad_id: row.ad_id || null,
+      form_id: row.form_id || null,
+      campaign_name: row.campaign_name || null,
+      adset_name: row.adset_name || null,
+      ad_name: row.ad_name || null,
+      form_name: row.form_name || null,
+      platform: row.platform || null,
+      placement: row.placement || null,
+      is_organic: typeof row.is_organic === "boolean" ? row.is_organic : null,
+      email: row.email || null,
+      phone: row.phone || null,
+      created_time: row.first_received_at || row.last_received_at || new Date().toISOString(),
+      raw: row.payload || null,
+    };
     const deals = await findDealsForLead(admin, lead);
     if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
     const results = [];

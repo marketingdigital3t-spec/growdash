@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
+import { syncCrmLeadToRD } from "../_shared/metaLeadRdSync.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
             ...(resolved.tracking || {}),
             platform: referralTracking.platform || "whatsapp",
           };
-          await upsertMetaMessagingCrmLead(admin, {
+          const crmLead = await upsertMetaMessagingCrmLead(admin, {
             workspaceId: number.workspace_id,
             sourceProvider: "meta_whatsapp",
             externalId: `whatsapp:${phoneNumberId}:${message.from}`,
@@ -79,6 +80,7 @@ Deno.serve(async (req) => {
             tracking: mergedTracking,
             payload: { phone_number_id: phoneNumberId, message },
           });
+          await syncCrmLeadToRD(admin, String(crmLead.id));
         }
         const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: new Date(Number(message.timestamp || 0) * 1000).toISOString(), updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
         if (!conversation) continue;

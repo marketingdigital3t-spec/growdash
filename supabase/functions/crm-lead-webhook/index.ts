@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { extractCrmLeadTracking } from "../_shared/crmLeadTracking.ts";
+import { syncCrmLeadToRD } from "../_shared/metaLeadRdSync.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,8 +146,9 @@ Deno.serve(async (req) => {
       .select("id,workspace_id,source_provider,external_id,status,created_at,last_received_at")
       .single();
     if (leadError) throw leadError;
+    const rdTracking = await syncCrmLeadToRD(admin, String(lead.id));
     await admin.from("crm_webhook_endpoints").update({ last_received_at: receivedAt, received_count: Number(endpoint.received_count || 0) + 1, last_error: null, updated_at: receivedAt }).eq("id", endpoint.id);
-    return json({ ok: true, deduplicated: Boolean(suppliedId), lead });
+    return json({ ok: true, deduplicated: Boolean(suppliedId), lead, rd_tracking: rdTracking });
   } catch (error) {
     console.error("crm-lead-webhook", error);
     return json({ error: "Falha ao registrar o lead." }, 500);

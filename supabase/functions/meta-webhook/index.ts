@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
+import { syncCrmLeadToRD, syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 
 const corsHeaders = {
@@ -325,7 +325,7 @@ Deno.serve(async (req) => {
         if (messageAttribution?.ad_id && account?.workspace_id) {
           const sender = String(messagePayload?.sender?.id || messagePayload?.from || "").trim();
           const externalId = `meta:${event.payload?.entry_id || "unknown"}:${sender || event.provider_event_id}`;
-          await upsertMetaMessagingCrmLead(admin, {
+          const crmLead = await upsertMetaMessagingCrmLead(admin, {
             workspaceId: account.workspace_id,
             sourceProvider: "meta_messaging",
             externalId,
@@ -334,6 +334,7 @@ Deno.serve(async (req) => {
             tracking: messageAttribution,
             payload: event.payload,
           });
+          rdTracking.push(await syncCrmLeadToRD(admin, String(crmLead.id)));
         }
         await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
       }
