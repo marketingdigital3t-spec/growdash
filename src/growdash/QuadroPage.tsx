@@ -14,6 +14,12 @@ import { Download, Check, AlertCircle } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
 import { cn } from "@/lib/utils";
 
+// Use the same self-hosted font base as Growdash Flow. This page can mount
+// Excalidraw directly, without going through the flow editor module.
+if (typeof window !== "undefined") {
+  window.EXCALIDRAW_ASSET_PATH ??= "/excalidraw/";
+}
+
 const STORAGE_KEY = "growdash.quadro.v1";
 
 type PersistedAppState = Pick<AppState, "viewBackgroundColor" | "scrollX" | "scrollY" | "zoom" | "theme">;
