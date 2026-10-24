@@ -72,7 +72,7 @@ export function CRMLeadWebhookCard() {
       </div>}
       {endpoint?.message && <p className="text-xs text-muted-foreground">{endpoint.message}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <p className="text-[11px] text-muted-foreground">Campos reconhecidos: <code>email</code>, <code>phone</code>, <code>name</code>, <code>status</code>, <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, <code>ttclid</code>, IDs Meta e payload original.</p>
+      <p className="text-[11px] text-muted-foreground">Campos reconhecidos: <code>email</code>, <code>phone</code>, <code>name</code>, <code>status</code>, <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, <code>ttclid</code>, IDs Meta, <code>campaign_name</code>, <code>adset_name</code>, <code>ad_name</code>, <code>form_name</code>, <code>platform</code>, <code>placement</code> e payload original. Os campos também podem vir dentro de <code>meta</code>, <code>tracking</code> ou <code>attribution</code>.</p>
     </div>
   </section>;
 }
