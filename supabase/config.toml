@@ -3,6 +3,15 @@ project_id = "cixnvosxqlacjbpymjha"
 [functions.ask-ai]
 verify_jwt = true
 
+[functions.growth-creative-generate]
+verify_jwt = true
+
+[functions.growth-experiment-run]
+verify_jwt = true
+
+[functions.growth-experiment-evaluate]
+verify_jwt = true
+
 [functions.meta-traffic-mcp]
 verify_jwt = true
 
