@@ -49,11 +49,13 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Unauthorized" }, 401);
     const { data: workspace } = await admin.from("workspaces").select("id").eq("owner_id", user.id).maybeSingle();
     if (!workspace) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
-    const { data: experiments } = await admin.from("growth_experiments").select("*").eq("workspace_id", workspace.id).eq("status", "measuring").limit(20);
+    const { data: experiments, error: experimentsError } = await admin.from("growth_experiments").select("*").eq("workspace_id", workspace.id).eq("status", "measuring").limit(20);
+    if (experimentsError) throw new Error(`EXPERIMENTS_QUERY_FAILED:${experimentsError.message}`);
     const results: Array<Record<string, unknown>> = [];
     for (const experiment of experiments || []) {
       try {
-        const { data: variants } = await admin.from("growth_experiment_variants").select("new_ad_id,new_adset_id").eq("experiment_id", experiment.id);
+        const { data: variants, error: variantsError } = await admin.from("growth_experiment_variants").select("new_ad_id,new_adset_id").eq("experiment_id", experiment.id);
+        if (variantsError) throw new Error(`VARIANTS_QUERY_FAILED:${variantsError.message}`);
         const adIds = (variants || []).map((variant) => variant.new_ad_id).filter(Boolean);
         if (!adIds.length) continue;
         const { data: snapshot } = await admin.from("growth_snapshots").select("quality,freshness_minutes,attribution_coverage,metrics").eq("id", experiment.source_snapshot_id).maybeSingle();
