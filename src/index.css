@@ -15242,6 +15242,27 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
   color: #fff !important;
 }
 
+/* A legacy tab selector includes :has(.campaigns-workspace), which gives it
+   higher specificity than the generic commercial rule above. This scoped
+   selector is deliberately stronger so the active tab cannot fall back to
+   the old blue treatment. */
+html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button {
+  background: var(--gd-surface-control) !important;
+  background-color: var(--gd-surface-control) !important;
+  background-image: none !important;
+  color: var(--gd-content-muted) !important;
+}
+html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button.is-active,
+html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button[aria-selected="true"] {
+  background: var(--gd-emerald) !important;
+  background-color: var(--gd-emerald) !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
+html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button:not(.is-active):not([aria-selected="true"]) {
+  color: #fff !important;
+}
+
 /* The global button contract is intentionally strong and includes a white
    surface. Commercial controls are a semantic filter group, so give them a
    more specific final rule in both the page and fullscreen portal. Without
