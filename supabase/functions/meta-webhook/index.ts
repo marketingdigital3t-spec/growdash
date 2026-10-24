@@ -242,12 +242,24 @@ Deno.serve(async (req) => {
       const value = event.payload?.value ?? {};
       const leadId = event.event_type === "leadgen" ? String(value.leadgen_id ?? "") : "";
       const messagePayload = event.event_type === "messaging" ? event.payload?.message ?? {} : {};
-      const messageAttribution = event.event_type === "messaging"
+      let messageAttribution = event.event_type === "messaging"
         ? extractMetaMessagingAttribution(messagePayload, String(event.payload?.object ?? ""))
         : null;
       const adId = value.ad_id ? String(value.ad_id) : messageAttribution?.ad_id ?? null;
       const formId = value.form_id ? String(value.form_id) : null;
       const account = await resolveAccount(admin, adId, formId);
+      if (messageAttribution?.ad_id && account) {
+        const enriched = await enrichLeadReferences({ id: messageAttribution.ad_id, ...messageAttribution }, account);
+        messageAttribution = {
+          ...messageAttribution,
+          campaign_id: messageAttribution.campaign_id || enriched.campaign_id || null,
+          adset_id: messageAttribution.adset_id || enriched.adset_id || null,
+          ad_id: messageAttribution.ad_id || enriched.ad_id || null,
+          campaign_name: messageAttribution.campaign_name || enriched.campaign_name || null,
+          adset_name: messageAttribution.adset_name || enriched.adset_name || null,
+          ad_name: messageAttribution.ad_name || enriched.ad_name || null,
+        };
+      }
       const { data, error } = await admin.from("meta_webhook_events").insert({
         workspace_id: account?.workspace_id ?? null,
         ad_account_id: account?.id ?? null,
