@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
+import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -240,7 +241,11 @@ Deno.serve(async (req) => {
       const eventPayload = JSON.stringify(event.payload);
       const value = event.payload?.value ?? {};
       const leadId = event.event_type === "leadgen" ? String(value.leadgen_id ?? "") : "";
-      const adId = value.ad_id ? String(value.ad_id) : null;
+      const messagePayload = event.event_type === "messaging" ? event.payload?.message ?? {} : {};
+      const messageAttribution = event.event_type === "messaging"
+        ? extractMetaMessagingAttribution(messagePayload, String(event.payload?.object ?? ""))
+        : null;
+      const adId = value.ad_id ? String(value.ad_id) : messageAttribution?.ad_id ?? null;
       const formId = value.form_id ? String(value.form_id) : null;
       const account = await resolveAccount(admin, adId, formId);
       const { data, error } = await admin.from("meta_webhook_events").insert({
@@ -302,10 +307,22 @@ Deno.serve(async (req) => {
           await admin.from("meta_webhook_events").update({ error_message: message }).eq("id", data.id);
         }
       } else if (!leadId) {
-        // Conversation/message webhooks do not expose a Meta Lead ID. Keep the
-        // raw event auditable and mark ingestion complete; individual CRM
-        // attribution still requires the downstream connector to send the
-        // contact identifier plus the referral fields into crm-lead-webhook.
+        // Click-to-message webhooks do not expose a Meta Lead ID, but their
+        // referral carries the originating ad. Preserve that attribution in
+        // the CRM inbox; placement remains null unless Meta sends it.
+        if (messageAttribution?.ad_id && account?.workspace_id) {
+          const sender = String(messagePayload?.sender?.id || messagePayload?.from || "").trim();
+          const externalId = `meta:${event.payload?.entry_id || "unknown"}:${sender || event.provider_event_id}`;
+          await upsertMetaMessagingCrmLead(admin, {
+            workspaceId: account.workspace_id,
+            sourceProvider: "meta_messaging",
+            externalId,
+            fullName: messagePayload?.sender?.name || null,
+            adAccountId: account.id,
+            tracking: messageAttribution,
+            payload: event.payload,
+          });
+        }
         await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
       }
     }

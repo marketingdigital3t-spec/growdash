@@ -97,45 +97,51 @@ Deno.serve(async (req) => {
       adAccountId = account?.id ?? null;
     }
     const receivedAt = new Date().toISOString();
+    const identity = { workspace_id: endpoint.workspace_id, source_provider: sourceProvider, external_id: externalId };
+    const { data: existingLead, error: existingLeadError } = await admin.from("crm_leads")
+      .select("id,full_name,email,phone,lead_city,lead_state,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,fbclid,gclid,ttclid,landing_page,referrer,ad_account_id,meta_lead_id,form_id,campaign_id,adset_id,ad_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,payload,first_received_at")
+      .match(identity)
+      .maybeSingle();
+    if (existingLeadError) throw existingLeadError;
     const values = {
-      workspace_id: endpoint.workspace_id,
-      source_provider: sourceProvider,
-      external_id: externalId,
-      full_name: fullName,
-      email,
-      phone,
-      lead_city: nested(payload, ["city", "cidade", "contact.city"]),
-      lead_state: nested(payload, ["state", "uf", "estado", "contact.state"]),
-      status,
-      utm_source: text(utm.utm_source || payload.utm_source),
-      utm_medium: text(utm.utm_medium || payload.utm_medium),
-      utm_campaign: text(utm.utm_campaign || payload.utm_campaign),
-      utm_content: text(utm.utm_content || payload.utm_content),
-      utm_term: text(utm.utm_term || payload.utm_term),
-      fbclid: nested(payload, ["fbclid", "tracking.fbclid"]),
-      gclid: nested(payload, ["gclid", "tracking.gclid"]),
-      ttclid: nested(payload, ["ttclid", "tracking.ttclid"]),
-      landing_page: nested(payload, ["landing_page", "landingPage", "page_url"]),
-      referrer: nested(payload, ["referrer", "http_referrer"]),
-      ad_account_id: adAccountId,
-      meta_lead_id: tracking.meta_lead_id,
-      form_id: tracking.form_id,
-      campaign_id: tracking.campaign_id || nested(payload, ["campaign_id", "campaign.id"]),
-      adset_id: tracking.adset_id || nested(payload, ["adset_id", "adset.id"]),
-      ad_id: tracking.ad_id || nested(payload, ["ad_id", "ad.id"]),
-      campaign_name: tracking.campaign_name,
-      adset_name: tracking.adset_name,
-      ad_name: tracking.ad_name,
-      form_name: tracking.form_name,
-      platform: tracking.platform,
-      placement: tracking.placement,
-      is_organic: tracking.is_organic,
-      payload,
+      ...identity,
+      full_name: fullName || existingLead?.full_name || null,
+      email: email || existingLead?.email || null,
+      phone: phone || existingLead?.phone || null,
+      lead_city: nested(payload, ["city", "cidade", "contact.city"]) || existingLead?.lead_city || null,
+      lead_state: nested(payload, ["state", "uf", "estado", "contact.state"]) || existingLead?.lead_state || null,
+      status: statusCandidate === "new" && existingLead?.status ? existingLead.status : status,
+      utm_source: text(utm.utm_source || payload.utm_source) || existingLead?.utm_source || null,
+      utm_medium: text(utm.utm_medium || payload.utm_medium) || existingLead?.utm_medium || null,
+      utm_campaign: text(utm.utm_campaign || payload.utm_campaign) || existingLead?.utm_campaign || null,
+      utm_content: text(utm.utm_content || payload.utm_content) || existingLead?.utm_content || null,
+      utm_term: text(utm.utm_term || payload.utm_term) || existingLead?.utm_term || null,
+      fbclid: nested(payload, ["fbclid", "tracking.fbclid"]) || existingLead?.fbclid || null,
+      gclid: nested(payload, ["gclid", "tracking.gclid"]) || existingLead?.gclid || null,
+      ttclid: nested(payload, ["ttclid", "tracking.ttclid"]) || existingLead?.ttclid || null,
+      landing_page: nested(payload, ["landing_page", "landingPage", "page_url"]) || existingLead?.landing_page || null,
+      referrer: nested(payload, ["referrer", "http_referrer"]) || existingLead?.referrer || null,
+      ad_account_id: adAccountId || existingLead?.ad_account_id || null,
+      meta_lead_id: tracking.meta_lead_id || existingLead?.meta_lead_id || null,
+      form_id: tracking.form_id || existingLead?.form_id || null,
+      campaign_id: tracking.campaign_id || nested(payload, ["campaign_id", "campaign.id"]) || existingLead?.campaign_id || null,
+      adset_id: tracking.adset_id || nested(payload, ["adset_id", "adset.id"]) || existingLead?.adset_id || null,
+      ad_id: tracking.ad_id || nested(payload, ["ad_id", "ad.id"]) || existingLead?.ad_id || null,
+      campaign_name: tracking.campaign_name || existingLead?.campaign_name || null,
+      adset_name: tracking.adset_name || existingLead?.adset_name || null,
+      ad_name: tracking.ad_name || existingLead?.ad_name || null,
+      form_name: tracking.form_name || existingLead?.form_name || null,
+      platform: tracking.platform || existingLead?.platform || null,
+      placement: tracking.placement || existingLead?.placement || null,
+      is_organic: tracking.is_organic ?? existingLead?.is_organic ?? null,
+      payload: { ...(existingLead?.payload && typeof existingLead.payload === "object" ? existingLead.payload : {}), latest: payload },
       last_received_at: receivedAt,
       updated_at: receivedAt,
     };
-    const { data: lead, error: leadError } = await admin.from("crm_leads")
-      .upsert(values, { onConflict: "workspace_id,source_provider,external_id" })
+    const leadQuery = existingLead
+      ? admin.from("crm_leads").update(values).eq("id", existingLead.id)
+      : admin.from("crm_leads").insert({ ...values, first_received_at: receivedAt });
+    const { data: lead, error: leadError } = await leadQuery
       .select("id,workspace_id,source_provider,external_id,status,created_at,last_received_at")
       .single();
     if (leadError) throw leadError;

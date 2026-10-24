@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
+import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -10,6 +11,22 @@ async function validSignature(rawBody: string, header: string | null) {
   const expected = new Uint8Array(header.slice(7).match(/.{2}/g)!.map((pair) => Number.parseInt(pair, 16)));
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
   return await crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(rawBody));
+}
+
+async function resolveReferralAd(admin: any, workspaceId: string, adId: string | null) {
+  if (!adId) return { accountId: null, tracking: null };
+  const { data: ad } = await admin.from("ads").select("id,name,adset_id").eq("id", adId).maybeSingle();
+  if (!ad?.adset_id) return { accountId: null, tracking: { ad_id: adId, ad_name: null, adset_id: null, adset_name: null, campaign_id: null, campaign_name: null } };
+  const { data: adset } = await admin.from("adsets").select("id,name,campaign_id").eq("id", ad.adset_id).maybeSingle();
+  const { data: campaign } = adset?.campaign_id
+    ? await admin.from("campaigns").select("id,name,ad_account_id").eq("id", adset.campaign_id).maybeSingle()
+    : { data: null };
+  if (!campaign?.ad_account_id) return { accountId: null, tracking: { ad_id: adId, ad_name: ad.name || null, adset_id: adset?.id || null, adset_name: adset?.name || null, campaign_id: campaign?.id || null, campaign_name: campaign?.name || null } };
+  const { data: account } = await admin.from("ad_accounts").select("id,workspace_id").eq("id", campaign.ad_account_id).eq("workspace_id", workspaceId).maybeSingle();
+  return {
+    accountId: account?.id || null,
+    tracking: { ad_id: adId, ad_name: ad.name || null, adset_id: adset?.id || null, adset_name: adset?.name || null, campaign_id: campaign.id || null, campaign_name: campaign.name || null },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -44,6 +61,25 @@ Deno.serve(async (req) => {
       for (const message of value.messages || []) {
         const contact = (value.contacts || []).find((item: any) => item.wa_id === message.from);
         const text = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || null;
+        const referralTracking = extractMetaMessagingAttribution(message, "whatsapp");
+        if (referralTracking.referral) {
+          const resolved = await resolveReferralAd(admin, number.workspace_id, referralTracking.ad_id);
+          const mergedTracking = {
+            ...referralTracking,
+            ...(resolved.tracking || {}),
+            platform: referralTracking.platform || "whatsapp",
+          };
+          await upsertMetaMessagingCrmLead(admin, {
+            workspaceId: number.workspace_id,
+            sourceProvider: "meta_whatsapp",
+            externalId: `whatsapp:${phoneNumberId}:${message.from}`,
+            fullName: contact?.profile?.name || null,
+            phone: message.from || null,
+            adAccountId: resolved.accountId,
+            tracking: mergedTracking,
+            payload: { phone_number_id: phoneNumberId, message },
+          });
+        }
         const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: new Date(Number(message.timestamp || 0) * 1000).toISOString(), updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
         if (!conversation) continue;
         await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: new Date(Number(message.timestamp || 0) * 1000).toISOString() }, { onConflict: "wamid" });
