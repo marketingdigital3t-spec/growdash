@@ -13919,6 +13919,14 @@ html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data
   box-shadow: 0 2px 8px rgba(15, 23, 42, .08) !important;
 }
 
+/* Native button styles can leak a white background into the inactive Expert
+   tab when the dark theme is active. Keep only the selected tab on a raised
+   surface so the control remains part of the dark shell. */
+html.dark body .brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="false"] {
+  background: transparent !important;
+  color: var(--gd-content-muted) !important;
+}
+
 /* The legacy shell tab rule carries :has(.campaigns-workspace) specificity;
    keep this explicit authority for the Expert view in both themes. */
 html.dark body .brand-shell:not(:has(.campaigns-workspace)) .growdash-main .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
