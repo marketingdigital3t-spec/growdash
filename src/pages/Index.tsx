@@ -275,13 +275,15 @@ const Index = () => {
   // dashboard never settles permanently on a misleading all-zero snapshot.
   const autoSyncKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (loadingAdAccounts || isLoading || dashboardMeta.isLoading || syncMeta.isPending || scopedAccountIds.length === 0) return;
-    const scopeNeedsSync = !dashboardMeta.data.available || dashboardMeta.data.status === "stale" || dashboardMeta.data.status === "partial";
-    if (!scopeNeedsSync || autoSyncKeyRef.current === dashboardScopeKey) return;
+    if (loadingAdAccounts || syncMeta.isPending || scopedAccountIds.length === 0) return;
+    // Every account/calendar/funnel scope gets one bounded fast refresh. A
+    // cached snapshot is useful for the first paint, but it must not suppress
+    // the scoped Meta/RD reconciliation when the user changes the filters.
+    if (autoSyncKeyRef.current === dashboardScopeKey) return;
     autoSyncKeyRef.current = dashboardScopeKey;
     const timer = window.setTimeout(() => handleSync(), 180);
     return () => window.clearTimeout(timer);
-  }, [dashboardMeta.data.available, dashboardMeta.data.status, dashboardMeta.isLoading, dashboardScopeKey, handleSync, isLoading, loadingAdAccounts, scopedAccountIds.length, syncMeta.isPending]);
+  }, [dashboardScopeKey, handleSync, loadingAdAccounts, scopedAccountIds.length, syncMeta.isPending]);
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({
     ...view,
