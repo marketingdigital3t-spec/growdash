@@ -89,6 +89,7 @@ import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker"
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 import { campaignLoadState } from "@/lib/campaignLoading";
+import { shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -243,7 +244,7 @@ export default function Campaigns() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [columnFiltersOpen, setColumnFiltersOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("campaigns");
+  const [activeTab, setActiveTab] = useState<CampaignHierarchyTab>("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
   const [detailEntity, setDetailEntity] = useState<MetaDetailEntity | null>(null);
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
@@ -707,7 +708,7 @@ export default function Campaigns() {
   // de campanhas. A seleção serve exclusivamente como filtro descendente.
   const { data: accountAdsets = [], isLoading: isLoadingAdsets } = useQuery({
     queryKey: ["meta-adsets-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    enabled: activeTab === "adsets",
+    enabled: shouldLoadCampaignHierarchy(activeTab, analysisPanel),
     queryFn: async ({ signal }) => {
       let query = supabase
         .from("adsets")
@@ -724,7 +725,7 @@ export default function Campaigns() {
 
   const { data: accountAds = [], isLoading: isLoadingAds } = useQuery({
     queryKey: ["meta-ads-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    enabled: activeTab === "ads",
+    enabled: shouldLoadCampaignHierarchy(activeTab, analysisPanel),
     queryFn: async ({ signal }) => {
       let query = supabase
         .from("ads")
