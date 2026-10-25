@@ -15470,6 +15470,41 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: #fff !important;
 }
 
+/* These two controls also inherit a late, high-specificity light contract
+   from their immediate toolbar containers.  Repeat the semantic scope here
+   so the dark surface wins that cascade without touching other comboboxes. */
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top .campaign-account-pill {
+  background: #17241e !important;
+  background-color: #17241e !important;
+  border-color: rgba(52, 211, 153, .62) !important;
+  color: #f2f4f7 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top .campaign-account-pill > * {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top .campaign-account-pill .gd-account-count {
+  background: #10b981 !important;
+  background-color: #10b981 !important;
+  color: #fff !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar .campaign-action-select {
+  background: #252728 !important;
+  background-color: #252728 !important;
+  border-color: rgba(52, 211, 153, .42) !important;
+  color: #f2f4f7 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar .campaign-action-select > * {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
   .meta-toolbar-button-active,
   .campaign-hierarchy-tab[data-state="active"]
