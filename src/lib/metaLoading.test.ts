@@ -29,4 +29,18 @@ describe("meta loading state", () => {
       auxiliaryLoading: false,
     });
   });
+
+  it("does not block the core snapshot on coverage reconciliation", () => {
+    expect(resolveMetaLoadingState({
+      insightsPending: false,
+      accountsPending: false,
+      coveragePending: true,
+      actionsPending: false,
+      breakdownsPending: false,
+      hasUsableSnapshot: true,
+    })).toEqual({
+      isLoading: false,
+      auxiliaryLoading: true,
+    });
+  });
 });

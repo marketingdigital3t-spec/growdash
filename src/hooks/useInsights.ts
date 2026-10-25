@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
 import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -47,6 +50,10 @@ export function buildInsightsQueryKey({
     businessDateKey(startDate),
     businessDateKey(endDate),
   ] as const;
+}
+
+export function buildInsightsSnapshotCacheKey(userId: string | undefined, queryKey: readonly unknown[]) {
+  return userId ? `growdash:insights-snapshot:${userId}:${encodeURIComponent(JSON.stringify(queryKey))}` : "";
 }
 
 export interface InsightRow {
@@ -133,7 +140,20 @@ export function filterInsightsByCampaignScope<T extends { ad_id: string; campaig
 }
 
 export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
+  const { user } = useAuth();
   const queryKey = buildInsightsQueryKey({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow, attributionWindowsByAccount, startDate, endDate });
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = buildInsightsSnapshotCacheKey(user?.id, queryKey);
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<InsightRow[]>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: InsightRow[]) => {
+    if (snapshotCacheKey) {
+      writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    }
+    return value;
+  };
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -156,7 +176,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           .lte("date", end)
           .order("date", { ascending: true });
         for (let page = 0; ; page++) {
-          const { data, error } = await withRequestTimeout(directQuery.range(page * PAGE, page * PAGE + PAGE - 1), 15_000);
+          // The dashboard has a persisted snapshot fallback. Bound the fresh
+          // core read so a slow Supabase request cannot hold the first paint
+          // for 15–20 seconds; the next refresh can retry in the background.
+          const { data, error } = await withRequestTimeout(directQuery.range(page * PAGE, page * PAGE + PAGE - 1), 2_500);
           if (error) {
             // Older deployments without the additive column continue through
             // the legacy catalog path below; the migration makes this branch
@@ -177,7 +200,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           const adCatalog: Record<string, any> = {};
           const adsetIds: string[] = [];
           if (adIds.length) {
-            const { data: ads } = await withRequestTimeout((supabase as any).from("ads").select("id,name,thumbnail_url,adset_id").in("id", adIds), 15_000);
+            const { data: ads } = await withRequestTimeout((supabase as any).from("ads").select("id,name,thumbnail_url,adset_id,status").in("id", adIds), 900).catch(() => ({ data: [] }));
             for (const ad of ads || []) {
               adCatalog[String(ad.id)] = ad;
               if (ad.adset_id) adsetIds.push(String(ad.adset_id));
@@ -186,15 +209,17 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           const adsetCatalog = new Map<string, any>();
           const campaignIdsFromAds: string[] = [];
           if (adsetIds.length) {
-            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id,destination_type").in("id", Array.from(new Set(adsetIds))), 15_000);
+            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id,destination_type,status").in("id", Array.from(new Set(adsetIds))), 900).catch(() => ({ data: [] }));
             for (const adset of adsets || []) {
               adsetCatalog.set(String(adset.id), adset);
               if (adset.campaign_id) campaignIdsFromAds.push(String(adset.campaign_id));
             }
           }
           const campaignCatalog = new Map<string, any>();
-          if (campaignIdsFromAds.length) {
-            const { data: campaigns } = await withRequestTimeout((supabase as any).from("campaigns").select("id,name,objective,ad_account_id,status").in("id", Array.from(new Set(campaignIdsFromAds))), 15_000);
+          const campaignIdsFromFacts = directRows.map((row) => row.campaign_id).filter(Boolean).map(String);
+          const campaignIdsForCatalog = Array.from(new Set([...campaignIdsFromFacts, ...campaignIdsFromAds]));
+          if (campaignIdsForCatalog.length) {
+            const { data: campaigns } = await withRequestTimeout((supabase as any).from("campaigns").select("id,name,objective,ad_account_id,status").in("id", campaignIdsForCatalog), 900).catch(() => ({ data: [] }));
             for (const campaign of campaigns || []) campaignCatalog.set(String(campaign.id), campaign);
           }
           const normalizeWindow = (value: unknown) => String(value || "account_default")
@@ -212,7 +237,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
             return [adId, adset?.campaign_id ?? null];
           }));
           const rowsForDisplay = filterInsightsByCampaignScope(filteredRows, campaignIds, campaignIdByAd);
-          return dedupeDailyInsights(rowsForDisplay
+          return persistSnapshot(dedupeDailyInsights(rowsForDisplay
             .map((row) => {
               const ad = adCatalog[String(row.ad_id)] || {};
               const adset = adsetCatalog.get(String(ad.adset_id)) || {};
@@ -252,7 +277,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
                 campaign_id: row.campaign_id ?? adset.campaign_id ?? null,
                 ad_account_id: row.ad_account_id ?? campaign.ad_account_id ?? null,
               };
-            }) as InsightRow[]);
+            }) as InsightRow[]));
         }
       }
 
@@ -266,7 +291,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       if (campaignId) campaignsQuery = campaignsQuery.eq("id", campaignId);
       if (campaignIds?.length) campaignsQuery = campaignsQuery.in("id", campaignIds);
       if (objectives?.length) campaignsQuery = campaignsQuery.in("objective", objectives);
-      const { data: campaignRows, error: campaignsError } = await withRequestTimeout(campaignsQuery, 15_000);
+      const { data: campaignRows, error: campaignsError } = await withRequestTimeout(campaignsQuery, 2_500);
       if (campaignsError) throw campaignsError;
       const campaigns = (campaignRows || []) as any[];
       const campaignIdSet = new Set(campaigns.map((row) => String(row.id)));
@@ -336,7 +361,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         }
       }
 
-      return dedupeDailyInsights(allRows.map((row: any) => {
+      return persistSnapshot(dedupeDailyInsights(allRows.map((row: any) => {
         const ad = adCatalog[String(row.ad_id)] || {};
         const adset = ad.adsets || {};
         const campaign = adset.campaigns || {};
@@ -375,10 +400,13 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         campaign_id: campaign.id ?? null,
         ad_account_id: campaign.ad_account_id ?? null,
       };
-      }) as InsightRow[]);
+      }) as InsightRow[]));
     },
     enabled,
-    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
+    placeholderData: (previousData, previousQuery) => {
+      if (isSameQueryScope(previousQuery?.queryKey, queryKey)) return previousData;
+      return enabled ? persistedSnapshot : undefined;
+    },
     // The coordinator refreshes on entry/filter events and every five minutes.
     // Keep the previous result during the request so a pending Meta response
     // can never make the selected cards flash to zero.

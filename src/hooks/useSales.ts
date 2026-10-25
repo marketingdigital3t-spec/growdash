@@ -7,6 +7,8 @@ import { canonicalSaleKey, dedupeCanonicalSales } from "@/lib/canonicalSales";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
 
 
 export interface Sale {
@@ -88,14 +90,28 @@ interface UseSalesParams {
 export { canonicalSaleKey, dedupeCanonicalSales };
 
 export function useSales(params?: UseSalesParams) {
+  const { user } = useAuth();
   const rdScope = useResolvedRDAccountFunnelScope({
     adAccountId: params?.adAccountId,
     adAccountIds: params?.adAccountIds,
     funnelIds: params?.funnelIds,
   });
   const selectedAccountIds = Array.from(new Set([...(params?.adAccountIds ?? []), ...(params?.adAccountId ? [params.adAccountId] : [])].filter((id) => id && id !== "all")));
+  const queryKey = ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, selectedAccountIds.slice().sort().join(","), rdScope.funnelIds?.slice().sort().join(",")];
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = user?.id && rdScope.ready
+    ? `growdash:sales-snapshot:${user.id}:${encodeURIComponent(snapshotScopeKey)}`
+    : "";
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<Sale[]>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: Sale[]) => {
+    if (snapshotCacheKey) writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    return value;
+  };
   return useQuery({
-    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, selectedAccountIds.slice().sort().join(","), rdScope.funnelIds?.slice().sort().join(",")],
+    queryKey,
     enabled: params?.enabled !== false && rdScope.ready,
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
@@ -131,7 +147,7 @@ export function useSales(params?: UseSalesParams) {
       for (let page = 0; ; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
+        const { data, error } = await withRequestTimeout(query.range(from, to), 2_500);
         if (error) throw error;
         const batch = (data || []).map((row) => ({ ...row, campaign_ids: row.campaign_ids || [] })) as Sale[];
         all = all.concat(batch);
@@ -140,11 +156,11 @@ export function useSales(params?: UseSalesParams) {
       const scoped = selectedAccountIds.length
         ? all.filter((sale) => isDealInRDAccountOrFunnelScope(sale, selectedAccountIds, resolvedFunnelIds))
         : all;
-      return dedupeCanonicalSales(scoped);
+      return persistSnapshot(dedupeCanonicalSales(scoped));
     },
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData) => previousData ?? persistedSnapshot,
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });

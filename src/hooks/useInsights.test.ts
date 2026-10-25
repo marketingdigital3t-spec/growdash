@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { buildInsightsQueryKey, canonicalInsightLeads, dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
+import { buildInsightsQueryKey, buildInsightsSnapshotCacheKey, canonicalInsightLeads, dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
 import { matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 describe("daily insight scope", () => {
+  it("names persisted snapshots by authenticated user and exact query scope", () => {
+    const key = buildInsightsSnapshotCacheKey("user-1", ["insights", "account-1", "2026-10-25"]);
+    expect(key).toContain("growdash:insights-snapshot:user-1:");
+    expect(buildInsightsSnapshotCacheKey(undefined, ["insights"])).toBe("");
+  });
+
   it("shares the cache between a single-account and equivalent account-list scope", () => {
     expect(buildInsightsQueryKey({ adAccountId: "account-1", startDate: new Date("2026-10-01"), endDate: new Date("2026-10-07") }))
       .toEqual(buildInsightsQueryKey({ adAccountIds: ["account-1"], startDate: new Date("2026-10-01"), endDate: new Date("2026-10-07") }));

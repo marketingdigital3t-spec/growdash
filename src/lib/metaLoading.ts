@@ -13,9 +13,13 @@ export interface MetaLoadingInputs {
  * loading state while their paginated queries finish.
  */
 export function resolveMetaLoadingState(input: MetaLoadingInputs) {
-  const corePending = input.insightsPending || input.accountsPending || input.coveragePending;
+  // Coverage is a reconciliation watermark. It can be unavailable or slow
+  // while the persisted Insights facts are already enough to paint spend and
+  // impressions. Keep it auxiliary so the first useful snapshot is not held
+  // behind a second provider request.
+  const corePending = input.insightsPending || input.accountsPending;
   return {
     isLoading: corePending && !input.hasUsableSnapshot,
-    auxiliaryLoading: input.actionsPending || input.breakdownsPending,
+    auxiliaryLoading: input.coveragePending || input.actionsPending || input.breakdownsPending,
   };
 }

@@ -12,6 +12,7 @@ import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 import { resolveMetaSnapshotDuringRefresh } from "@/lib/metaSnapshot";
 import { resolveMetaLoadingState } from "@/lib/metaLoading";
+import { withRequestTimeout } from "@/lib/resilience";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -29,12 +30,12 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     queryKey: ["meta-action-sync-coverage", effectiveAccountIds.slice().sort(), scope.startDate, scope.endDate, scope.campaignIds?.slice().sort(), attributionWindowsByAccount],
     enabled: enabled && effectiveAccountIds.length > 0 && !accounts.isLoading && !accounts.isError,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await withRequestTimeout((supabase as any)
         .from("meta_sync_scope_state" as any)
         .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
         .in("ad_account_id", effectiveAccountIds)
         .lte("start_date", scope.startDate)
-        .gte("end_date", scope.endDate);
+        .gte("end_date", scope.endDate), 900);
       if (error) throw error;
       const rows = (data || []) as unknown as MetaSyncCoverageRow[];
       const accountScopes = scopedAccounts.map((account) => ({
