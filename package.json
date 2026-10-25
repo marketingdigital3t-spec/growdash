@@ -124,6 +124,9 @@
     "d3-interpolate": "^3.0.1",
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",
-    "source-map-js": "^1.2.2"
+    "source-map-js": "^1.2.2",
+    "katex": "^0.19.1",
+    "lodash-es": "^4.18.1",
+    "postcss-selector-parser": "^7.1.7"
   }
 }

@@ -1,6 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { createAutomaticRemediationPlan } from "./loop-engineering-auto-repair.mjs";
@@ -131,6 +131,36 @@ async function writeReportAtomically(path, content) {
   await rename(temporary, path);
 }
 
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+async function readLockOwners(lockPath) {
+  let names = [];
+  try {
+    names = await readdir(lockPath);
+  } catch {
+    return [];
+  }
+  const ownerNames = names.filter((name) => name === "owner" || name.startsWith("owner "));
+  const owners = [];
+  for (const name of ownerNames) {
+    try {
+      const value = JSON.parse(await readFile(`${lockPath}/${name}`, "utf8"));
+      if (value && Number.isInteger(value.pid)) owners.push(value);
+    } catch {
+      // A partially written owner file keeps the lock closed until the stale timeout.
+    }
+  }
+  return owners;
+}
+
 async function acquireReportLock(output) {
   const lockPath = `${output}.lock`;
   try {
@@ -139,13 +169,21 @@ async function acquireReportLock(output) {
     return async () => rm(lockPath, { recursive: true, force: true });
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
+    const owners = await readLockOwners(lockPath);
+    if (owners.some((owner) => isProcessAlive(owner.pid))) return null;
     try {
-      const owner = await stat(`${lockPath}/owner`);
-      if (Date.now() - owner.mtimeMs > 30 * 60_000) {
+      const lockStat = await stat(lockPath);
+      const stale = Date.now() - lockStat.mtimeMs > 30 * 60_000;
+      // A recorded owner that is no longer alive is an orphan immediately. If
+      // metadata is missing or malformed, wait for the normal stale timeout so
+      // a concurrently starting process cannot be interrupted.
+      if (owners.length > 0 || stale) {
         await rm(lockPath, { recursive: true, force: true });
         return acquireReportLock(output);
       }
-    } catch { /* lock owner is still being written; keep the gate closed */ }
+    } catch {
+      // The lock owner is still being written; keep the gate closed.
+    }
     return null;
   }
 }

@@ -1,4 +1,5 @@
 import { detectBackendSourceRegressions, parseArgs, runLoop, sanitizeText } from "../../scripts/loop-engineering.mjs";
+import { mkdir, writeFile } from "node:fs/promises";
 
 describe("loop engineering CLI", () => {
   it("defaults to detect and writes a sanitized report", async () => {
@@ -27,6 +28,22 @@ describe("loop engineering CLI", () => {
 
   it("runs backend scanning only when explicitly enabled", async () => {
     const report = await runLoop({ mode: "detect", output: "reports/loop-engineering-cli-backend-opt-in.json", commands: [], backendScan: false, runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }) });
+    expect(report.findings).toEqual([]);
+  });
+
+  it("recovers a report lock left by a dead process", async () => {
+    const output = "reports/loop-engineering-cli-orphan-lock.json";
+    await mkdir(`${output}.lock`, { recursive: true });
+    await writeFile(`${output}.lock/owner 3`, JSON.stringify({ pid: 99999999, startedAt: new Date().toISOString() }), "utf8");
+
+    const report = await runLoop({
+      mode: "detect",
+      output,
+      commands: [],
+      runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }),
+    });
+
+    expect(report.status).toBe("detected");
     expect(report.findings).toEqual([]);
   });
 

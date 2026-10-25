@@ -8,7 +8,11 @@ import { createAuthStorage, createMemoryStorage, type AuthPersistenceMode } from
 // deploy does not inherit build variables. Keeping a safe fallback prevents a
 // malformed manual build from crashing before React can render.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cixnvosxqlacjbpymjha.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_z8AGO0BnFocDtOVyaYMbNQ_JiEYpPIY";
+// This project currently exposes the legacy anon key to the Auth gateway while
+// its newer publishable key can hang on /auth/v1. Both keys are public client
+// identifiers; service-role/secret keys must never be used here. Allow the
+// deployment to override the public key without changing application code.
+const SUPABASE_PUBLIC_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpeG52b3N4cWxhY2picHltamhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ0ODcsImV4cCI6MjA5NjA3MDQ4N30.-pvMgga16zuNfQMkXZS7uR6WY0PlGhDzN4YSQXMyk7g";
 
 const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
 const authStorageKey = `sb-${projectRef}-auth-token`;
@@ -30,7 +34,7 @@ export function setAuthPersistence(remember: boolean) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLIC_KEY, {
   auth: {
     storage: createAuthStorage(browserLocalStorage, browserSessionStorage, () => authPersistenceMode, authStorageKey),
     persistSession: true,
