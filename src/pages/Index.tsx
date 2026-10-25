@@ -226,16 +226,6 @@ const Index = () => {
   // A confirmed Insights snapshot and the lead/action watermark are separate
   // provider blocks. Keep spend visible while actions are still reconciling,
   // but never render a missing lead block as a legitimate zero.
-  const glassMetaAvailability = useMemo(() => {
-    const leadAvailable = dashboardMeta.data.metricAvailability.leads?.available === true;
-    return {
-      spend: hasMetaSnapshot,
-      leads: leadAvailable,
-      conversations: leadAvailable,
-      cpl: leadAvailable,
-      roas: hasMetaSnapshot,
-    };
-  }, [dashboardMeta.data.metricAvailability.leads, hasMetaSnapshot]);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
   const revenueAvailability = useMemo<MetricAvailability>(() => {
@@ -413,7 +403,16 @@ const Index = () => {
       </div>}
 
       <div>
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={{ ...glassMetaAvailability, revenue: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable", forecast: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable", sales: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable" }} unavailableReason={dashboardMeta.data.unavailableReason || revenueAvailability.reason} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={{
+          revenue: dashboardMetricAvailability.revenue_gross,
+          spend: dashboardMetricAvailability.spend,
+          leads: dashboardMetricAvailability.leads,
+          conversations: dashboardMetricAvailability.leads,
+          cpl: dashboardMetricAvailability.cpl,
+          roas: dashboardMetricAvailability.roas,
+          forecast: revenueAvailability,
+          sales: dashboardMetricAvailability.sales_count,
+        }} unavailableReason={dashboardMeta.data.unavailableReason || revenueAvailability.reason} />
       </div>
 
       <div>
