@@ -398,9 +398,17 @@ export default function FunnelAnalysis() {
     endDate,
     enabled: visibleAccounts.length > 0,
   });
-  const { data: campaignRows = [], isLoading: loadingCampaigns } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
+  const campaignScopeAccountIds = useMemo(
+    () => selectedAccountIds.length ? selectedAccountIds : Array.from(integratedAccountIds),
+    [integratedAccountIds, selectedAccountIds],
+  );
+  const campaignScopeAccountId = campaignScopeAccountIds.length === 1 ? campaignScopeAccountIds[0] : undefined;
+  const { data: campaignRows = [], isLoading: loadingCampaigns } = useCampaigns(
+    campaignScopeAccountId,
+    campaignScopeAccountIds.length > 1 ? campaignScopeAccountIds : undefined,
+  );
   const { data: hierarchyRows = [] } = useQuery({
-    queryKey: ["funnel-attribution-hierarchy", effectiveAdAccountId, effectiveAdAccountIds?.slice().sort().join(","), selectedMetaCampaignIds.slice().sort().join(",")],
+    queryKey: ["funnel-attribution-hierarchy", campaignScopeAccountIds.slice().sort().join(","), selectedMetaCampaignIds.slice().sort().join(",")],
     enabled: visibleAccounts.length > 0,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -408,8 +416,8 @@ export default function FunnelAnalysis() {
         .from("ads")
         .select("id,name,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
         .limit(10000);
-      if (effectiveAdAccountIds?.length) query = query.in("adsets.campaigns.ad_account_id", effectiveAdAccountIds);
-      else if (effectiveAdAccountId) query = query.eq("adsets.campaigns.ad_account_id", effectiveAdAccountId);
+      if (campaignScopeAccountIds.length > 1) query = query.in("adsets.campaigns.ad_account_id", campaignScopeAccountIds);
+      else if (campaignScopeAccountId) query = query.eq("adsets.campaigns.ad_account_id", campaignScopeAccountId);
       if (selectedMetaCampaignIds.length) query = query.in("adsets.campaigns.id", selectedMetaCampaignIds);
       const { data, error } = await query;
       if (error) throw error;
