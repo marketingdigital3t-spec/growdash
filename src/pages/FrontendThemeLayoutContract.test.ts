@@ -104,4 +104,11 @@ describe("frontend theme and responsive contracts", () => {
     expect(css).toContain("html.dark .brand-shell .gd-audience-accordion");
     expect(css).toContain("html:not(.dark) .brand-shell .gd-audience-accordion");
   });
+
+  it("keeps muted light-theme copy and CRM metrics readable on white surfaces", () => {
+    expect(css).toContain("--gd-content-muted: #425248 !important");
+    expect(css).toContain("html:not(.dark) .brand-shell .growdash-main");
+    expect(css).toContain(".gd-crm-metric-card .gd-metric-icon.text-primary");
+    expect(css).toContain(".gd-crm-metric-card > p.text-primary");
+  });
 });

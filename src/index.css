@@ -15554,3 +15554,47 @@ html.dark body .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-a
     transition: none !important;
   }
 }
+
+/* Light theme contrast authority -------------------------------------------
+   Legacy visual layers above this contract intentionally use many muted gray
+   utilities. On a white content surface those values can fall below readable
+   contrast, especially when an unavailable metric also receives
+   `text-muted-foreground`. Keep semantic copy dark enough in the light theme
+   while leaving purpose-built dark visualizations and the black chrome alone. */
+html:not(.dark) .brand-shell {
+  --gd-content-text: #17231d !important;
+  --gd-content-muted: #425248 !important;
+  --gd-content-disabled: #5c6861 !important;
+  --gd-content-border: rgba(16, 74, 45, .24) !important;
+  --muted-foreground: 150 18% 27% !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(
+  .text-muted-foreground,
+  .text-slate-400,
+  .text-slate-500,
+  .text-gray-400,
+  .text-gray-500,
+  .text-zinc-400,
+  .text-zinc-500,
+  .text-neutral-400,
+  .text-neutral-500
+) {
+  color: var(--gd-content-muted) !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(
+  .gd-panel,
+  .gd-metric-card,
+  .dashboard-glass-card,
+  .dashboard-video-glass,
+  .dashboard-terra-card
+) :is(.text-muted-foreground, [class*="text-white/"]) {
+  color: var(--gd-content-muted) !important;
+}
+
+/* CRM metric icons and unavailable values must remain visible on white cards. */
+html:not(.dark) .brand-shell .growdash-main .gd-crm-metric-card .gd-metric-icon.text-primary,
+html:not(.dark) .brand-shell .growdash-main .gd-crm-metric-card > p.text-primary {
+  color: #087443 !important;
+}
