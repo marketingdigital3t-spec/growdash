@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
 import { type MetricAvailability } from "@/lib/metricAvailability";
+import { buildDashboardMetricAvailability } from "@/lib/dashboardMetricAvailability";
 
 
 const Index = () => {
@@ -247,33 +248,15 @@ const Index = () => {
     if (fetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
     return { state: "fresh" };
   }, [fetchingRDDeals, fetchingRDWonDeals, loadingRDDeals, loadingRDWonDeals, rdDealsError, rdWonDealsQuery.data, rdWonDealsError, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
-  const dashboardMetricAvailability = useMemo(() => {
-    const state = (available: boolean, reason?: string | null): MetricAvailability => {
-      if (dashboardMeta.isLoading) return { state: "loading" };
-      if (available) return dashboardMeta.data.status === "syncing"
-        ? { state: "stale", reason: "Atualizando Meta em segundo plano; o último snapshot permanece visível." }
-        : dashboardMeta.data.rowCount === 0 ? { state: "empty_confirmed" } : { state: "fresh" };
-      return { state: "unavailable", reason: reason || dashboardMeta.data.unavailableReason || "Dados Meta indisponíveis para este recorte." };
-    };
-    const leadsAvailable = dashboardMeta.data.metricAvailability.leads?.available === true;
-    return {
-      spend: state(hasMetaSnapshot, dashboardMeta.data.unavailableReason),
-      leads: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
-      cpl: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
-      campaign_leads: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
-      campaign_cpl: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
-      campaign_conversion_rate: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
-      revenue_gross: revenueAvailability,
-      revenue_net: revenueAvailability,
-      sales_count: revenueAvailability,
-      roas: revenueAvailability,
-      roi: revenueAvailability,
-      profit: revenueAvailability,
-      profit_margin: revenueAvailability,
-      receivables: revenueAvailability,
-      average_ticket: revenueAvailability,
-    };
-  }, [dashboardMeta.data.metricAvailability.leads, dashboardMeta.data.rowCount, dashboardMeta.data.status, dashboardMeta.data.unavailableReason, dashboardMeta.isLoading, hasMetaSnapshot, revenueAvailability]);
+  const dashboardMetricAvailability = useMemo(() => buildDashboardMetricAvailability({
+    isLoading: dashboardMeta.isLoading,
+    hasSnapshot: hasMetaSnapshot,
+    rowCount: dashboardMeta.data.rowCount,
+    status: dashboardMeta.data.status,
+    leadAvailable: dashboardMeta.data.metricAvailability.leads?.available === true,
+    reason: dashboardMeta.data.metricAvailability.leads?.reason || dashboardMeta.data.unavailableReason,
+    revenueAvailability,
+  }), [dashboardMeta.data.metricAvailability.leads, dashboardMeta.data.rowCount, dashboardMeta.data.status, dashboardMeta.data.unavailableReason, dashboardMeta.isLoading, hasMetaSnapshot, revenueAvailability]);
 
   const handleSync = useCallback(() => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
