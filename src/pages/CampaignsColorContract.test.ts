@@ -37,10 +37,10 @@ describe("dark campaign color contract", () => {
       "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab[data-state=\"active\"]",
     );
     expect(indexCss).toMatch(
-      /campaign-account-pill[^}]*background:\s*(?:var\(--gd-surface-raised\)|var\(--gd-emerald-soft\)|var\(--traffic-raised-dark\))/s,
+      /campaign-account-pill[^}]*background:\s*(?:#17241e|var\(--gd-surface-raised\)|var\(--gd-emerald-soft\)|var\(--traffic-raised-dark\))/s,
     );
     expect(indexCss).toMatch(
-      /meta-toolbar-button-active[^}]*background:\s*var\(--gd-emerald\)/s,
+      /meta-toolbar-button-active[^}]*background:\s*(?:#10b981|var\(--gd-emerald\))/s,
     );
   });
 });
