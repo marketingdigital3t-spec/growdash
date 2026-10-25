@@ -10,6 +10,9 @@ import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFun
 import { useAuth } from "@/contexts/AuthContext";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
+/** Dashboard RD reads must settle within the same first-paint budget as Meta. */
+const RD_ANALYTICS_TIMEOUT_MS = 2_500;
+
 export interface RDDealLite {
   id: string;
   rd_deal_id: string;
@@ -183,7 +186,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         }
         const from = p * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await withRequestTimeout(q.range(from, to), 15_000);
+        const { data, error } = await withRequestTimeout(q.range(from, to), RD_ANALYTICS_TIMEOUT_MS);
         // Nunca transforme uma página ausente em um resultado aparentemente
         // completo: isso era a causa de contagens parciais no funil.
         if (error) throw error;
@@ -212,8 +215,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    // A retry here would push the selected scope past the three-second budget;
+    // the next scope refresh/reconnect is the recovery path.
+    retry: 0,
   });
   return {
     ...query,
@@ -274,7 +278,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
           } else if (selectedAccountIds.length) {
             query = query.in("ad_account_id", selectedAccountIds);
           }
-          const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
+          const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), RD_ANALYTICS_TIMEOUT_MS);
           if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
             ...deal,
@@ -308,8 +312,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    retry: 0,
   });
   return {
     ...query,
@@ -370,7 +373,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
         else if (usableFunnelIds.length) query = query.in("rd_funnel_id", usableFunnelIds);
         else if (selectedAccountIds.length) query = query.in("ad_account_id", selectedAccountIds);
         const from = page * pageSize;
-        const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);
+        const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), RD_ANALYTICS_TIMEOUT_MS);
         if (error) throw error;
         const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
           ...deal,
@@ -399,8 +402,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    retry: 0,
   });
   return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }

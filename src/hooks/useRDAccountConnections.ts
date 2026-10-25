@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
+const RD_SCOPE_TIMEOUT_MS = 2_500;
+
 export type RDAccountConnection = {
   id: string;
   user_id?: string;
@@ -27,8 +29,8 @@ export function useRDAccountConnections(workspaceId?: string, options?: { enable
   return useQuery<RDAccountConnection[]>({
     queryKey: ["rd_account_connections", user?.id, workspaceId ?? "owner-only"],
     enabled: (options?.enabled ?? true) && !!user,
-    retry: 1,
-    retryDelay: 1_000,
+    retry: 0,
+    refetchInterval: (query) => query.state.error ? 10_000 : false,
     refetchOnWindowFocus: false,
     staleTime: 2 * 60_000,
     placeholderData: readLocalCache<RDAccountConnection[]>(cacheKey),
@@ -36,7 +38,7 @@ export function useRDAccountConnections(workspaceId?: string, options?: { enable
       if (workspaceId) {
         const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
           (supabase as any).rpc("list_workspace_rd_account_connections", { _workspace_id: workspaceId }) as PromiseLike<{ data: RDAccountConnection[] | null; error: Error | null }>,
-          12_000,
+          RD_SCOPE_TIMEOUT_MS,
         );
         if (error) throw error;
         // The workspace RPC deliberately returns only IDs and display metadata;
@@ -49,7 +51,7 @@ export function useRDAccountConnections(workspaceId?: string, options?: { enable
         (supabase as any).from("rd_account_connections")
           .select("id,user_id,workspace_id,external_account_id,account_name,status,last_attempt_at,last_success_at,last_error,permissions,write_enabled,write_updated_at,created_at,updated_at")
           .order("account_name", { ascending: true }) as PromiseLike<{ data: RDAccountConnection[] | null; error: Error | null }>,
-        12_000,
+        RD_SCOPE_TIMEOUT_MS,
       );
       if (error) throw error;
       const result = (data ?? []) as RDAccountConnection[];

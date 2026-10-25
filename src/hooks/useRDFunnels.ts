@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
+const RD_SCOPE_TIMEOUT_MS = 2_500;
+
 export interface RDFunnel {
   id: string;
   user_id: string;
@@ -33,13 +35,14 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     refetchOnReconnect: true,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => query.state.error ? 10_000 : false,
     staleTime: 2 * 60 * 1000,
     placeholderData: cachedFunnels,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
       else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
-      const { data, error } = await withRequestTimeout(q, 15_000);
+      const { data, error } = await withRequestTimeout(q, RD_SCOPE_TIMEOUT_MS);
       if (error) throw error;
       const result = data as RDFunnel[];
       writeLocalCache(cacheKey, result);
