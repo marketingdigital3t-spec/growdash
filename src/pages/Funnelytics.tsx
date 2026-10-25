@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -11,7 +12,7 @@ import {
   Plus, ArrowLeft, Save, Trash2, Clock, GitBranch, Copy, Download,
   Eye, TrendingUp, Percent, MousePointer, Mail,
   CreditCard, Star, Megaphone, GripVertical, PanelLeftClose, PanelLeft, Layers,
-  Link2, FileText, RefreshCw, Calendar, Hand, MousePointer2, Redo2, Undo2, Waypoints
+  Link2, FileText, RefreshCw, Calendar, Hand, MousePointer2, Redo2, Undo2, Waypoints, Workflow
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate, normalizeSqlTrafficFunnelElements } from "@/components/GrowdashFlow/utils/templates";
 
 const ExcalidrawFlowEditor = lazy(() => import("@/components/GrowdashFlow/ExcalidrawFlowEditor").then(({ ExcalidrawFlowEditor: Editor }) => ({ default: Editor })));
+const WorkflowEditor = lazy(() => import("@/growdash/automations/WorkflowEditor").then(({ WorkflowEditor: Editor }) => ({ default: Editor })));
 
 function FlowDataScopeSync() {
   const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
@@ -1812,8 +1814,29 @@ function FreeCanvasEditor({ funnelId, initialNodes, initialConnections, initialN
   );
 }
 
+type FlowMode = "board" | "automation";
+
+function FlowModeSwitcher({ mode, onChange }: { mode: FlowMode; onChange: (next: FlowMode) => void }) {
+  return <section className="gd-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div className="min-w-0">
+      <span className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Growdash Flow</span>
+      <p className="mt-1 text-xs text-muted-foreground">Planeje jornadas no quadro ou publique automações executáveis no mesmo espaço.</p>
+    </div>
+    <div className="flex shrink-0 rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Modo do Growdash Flow">
+      <Button type="button" size="sm" variant={mode === "board" ? "default" : "ghost"} role="tab" aria-selected={mode === "board"} onClick={() => onChange("board")} className="gap-2">
+        <GitBranch className="h-4 w-4" />Quadro
+      </Button>
+      <Button type="button" size="sm" variant={mode === "automation" ? "default" : "ghost"} role="tab" aria-selected={mode === "automation"} onClick={() => onChange("automation")} className="gap-2">
+        <Workflow className="h-4 w-4" />Automação
+      </Button>
+    </div>
+  </section>;
+}
+
 /* ─── Main Page ─── */
 const Funnelytics = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [mode, setMode] = useState<FlowMode>(() => searchParams.get("mode") === "automation" ? "automation" : "board");
   const [view, setView] = useState<"list" | "canvas">("list");
   const [activeFunnelId, setActiveFunnelId] = useState<string | null>(null);
   const [canvasData, setCanvasData] = useState<{
@@ -1862,14 +1885,33 @@ const Funnelytics = () => {
     setCanvasData(null);
   };
 
+  const handleModeChange = (next: FlowMode) => {
+    setMode(next);
+    setSearchParams((current) => {
+      const updated = new URLSearchParams(current);
+      if (next === "automation") updated.set("mode", "automation");
+      else updated.delete("mode");
+      return updated;
+    }, { replace: true });
+    if (next === "automation") handleBack();
+  };
+
+  if (mode === "automation") {
+    return <MotionPage className="space-y-4">
+      <FlowModeSwitcher mode={mode} onChange={handleModeChange} />
+      <Suspense fallback={<div className="gd-panel grid min-h-[560px] place-items-center text-sm text-muted-foreground">Carregando editor de automação…</div>}><WorkflowEditor /></Suspense>
+    </MotionPage>;
+  }
+
   if (view === "canvas" && canvasData) {
     if (canvasData.funnelType === "blank") {
-      return <div className="space-y-4"><FlowDataScopeSync /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
+      return <div className="space-y-4"><FlowModeSwitcher mode={mode} onChange={handleModeChange} /><FlowDataScopeSync /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
     }
     // Linked funnels keep the metrics-aware canvas as a compatibility fallback
     // until their live Meta/RD overlays are mapped into Excalidraw elements.
     return (
       <div className="space-y-4">
+        <FlowModeSwitcher mode={mode} onChange={handleModeChange} />
         <FlowDataScopeSync />
         <FunnelCanvas
           key={activeFunnelId || "new"}
@@ -1887,7 +1929,8 @@ const Funnelytics = () => {
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <FlowModeSwitcher mode={mode} onChange={handleModeChange} />
       <FlowDataScopeSync />
       <FunnelListing onSelect={handleSelectFunnel} onCreate={() => setCreateDialogOpen(true)} />
       <CreateFunnelDialog
@@ -1895,7 +1938,7 @@ const Funnelytics = () => {
         onOpenChange={setCreateDialogOpen}
         onCreated={handleCreated}
       />
-    </>
+    </div>
   );
 };
 

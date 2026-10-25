@@ -145,6 +145,8 @@ export function WorkflowEditor() {
   const selected = workflow.nodes.find((node) => node.id === selectedId) ?? null;
   const validation = useMemo(() => validateWorkflowDefinition(workflow), [workflow]);
   const validationErrors = "errors" in validation ? validation.errors : [];
+  const runnableValidation = useMemo(() => validateWorkflowDefinition(workflow, { requireTrigger: true, requireReachability: true, validateParameters: true }), [workflow]);
+  const runnableValidationErrors = "errors" in runnableValidation ? runnableValidation.errors : [];
   const StatusIcon = workflow.active ? Pause : Play;
 
   const loadRuns = useCallback(async () => {
@@ -228,6 +230,7 @@ export function WorkflowEditor() {
   const removeConnection = (index: number) => setWorkflow((current) => ({ ...current, connections: current.connections.filter((_, itemIndex) => itemIndex !== index) }));
   const save = async (nextStatus?: "draft" | "active" | "paused") => {
     if (!validation.ok) { setMessage(validationErrors.join(" ")); return; }
+    if (nextStatus === "active" && !runnableValidation.ok) { setMessage(runnableValidationErrors.join(" ")); return; }
     localStorage.setItem(storageKey(workspace?.id), JSON.stringify(workflow));
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Rascunho salvo neste navegador; conecte um workspace para persistir na conta."); return; }
     const client = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<{ error: { message: string } | null }> } };
@@ -268,7 +271,7 @@ export function WorkflowEditor() {
 
   const execute = async () => {
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Conecte um workspace para testar o executor."); return; }
-    if (!validation.ok) { setMessage(validationErrors.join(" ")); return; }
+    if (!runnableValidation.ok) { setMessage(runnableValidationErrors.join(" ")); return; }
     setRunning(true); setRunResult(null);
     try {
       // A execução de teste sempre usa a definição atual, mesmo quando o

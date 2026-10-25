@@ -70,6 +70,7 @@ function validate(definition: Definition) {
   const ids = new Set(definition.nodes.map((node) => node.id));
   if (!definition.name?.trim()) errors.push("O workflow precisa de um nome.");
   if (!definition.nodes.length) errors.push("Adicione pelo menos um nó.");
+  if (!definition.nodes.some((node) => node.type.endsWith(".trigger"))) errors.push("O workflow precisa de pelo menos um gatilho.");
   const adjacency = new Map<string, string[]>();
   for (const edge of definition.connections) {
     if (!ids.has(edge.source) || !ids.has(edge.target)) errors.push(`Conexão inválida: ${edge.source} → ${edge.target}`);
@@ -79,6 +80,22 @@ function validate(definition: Definition) {
   const visit = (id: string) => { if (visiting.has(id)) errors.push("O workflow não pode conter ciclos."); if (visited.has(id)) return; visiting.add(id); for (const target of adjacency.get(id) ?? []) visit(target); visiting.delete(id); visited.add(id); };
   for (const id of ids) visit(id);
   return [...new Set(errors)];
+}
+
+function triggerMatches(node: Node, mode: string, input: Record<string, unknown>) {
+  if (!node.type.endsWith(".trigger")) return false;
+  if (mode === "test") return node.type === "manual.trigger";
+  if (mode === "schedule") return node.type === "schedule.trigger";
+  const source = String(input.source || "");
+  const sourceTypes: Record<string, string> = {
+    meta_lead: "lead.trigger",
+    instagram_message: "instagram.message.trigger",
+    instagram_comment: "instagram.trigger",
+    whatsapp_message: "whatsapp.message.trigger",
+    google_drive_file: "google.drive.trigger",
+    google_sheets_row: "google.sheets.trigger",
+  };
+  return sourceTypes[source] ? node.type === sourceTypes[source] : node.type === "webhook.trigger";
 }
 function safeUrl(raw: unknown): string {
   const url = new URL(String(raw || ""));
@@ -338,11 +355,25 @@ Deno.serve(async (req) => {
     }
     const byId = new Map(definition.nodes.map((node) => [node.id, node]));
     const edgesFrom = (nodeId: string) => definition.connections.filter((edge) => edge.source === nodeId);
-    const incoming = new Set(definition.connections.map((edge) => edge.target));
     const resumed = resumeNodeId ? resumeWorkflow(definition.connections, resumeNodeId) : null;
+    const triggerNodes = definition.nodes.filter((node) => node.type.endsWith(".trigger"));
+    const matchingTriggers = triggerNodes.filter((node) => triggerMatches(node, String(body.mode || "test"), input));
+    // A manual test can start a single non-manual trigger when a workflow was
+    // created with only that trigger. This keeps the test button useful while
+    // still preventing disconnected action nodes from running on their own.
+    const startTriggers = matchingTriggers.length
+      ? matchingTriggers
+      : body.mode === "test" && triggerNodes.length === 1
+        ? triggerNodes
+        : [];
+    if (!resumed && !startTriggers.length) {
+      const message = "Nenhum gatilho compatível com este evento foi encontrado.";
+      await admin.from("growdash_automation_runs").update({ status: "error", error_message: message, finished_at: new Date().toISOString() }).eq("id", run.id);
+      return json({ error: message, run_id: run.id, details: { mode: body.mode || "test", source: input.source || null } }, 422);
+    }
     const queue: QueueItem[] = resumed
       ? resumed.queue.map((nodeId) => ({ nodeId, key: nodeId }))
-      : definition.nodes.filter((node) => !incoming.has(node.id)).map((node) => ({ nodeId: node.id, key: node.id }));
+      : startTriggers.map((node) => ({ nodeId: node.id, key: node.id }));
     const visited = new Set<string>(resumed?.visited || []); const outputs: Record<string, unknown> = {}; const executed: unknown[] = Array.isArray(run.actions_executed) ? [...run.actions_executed] : [];
     const log = async (level: string, message: string, details: Record<string, unknown> = {}) => { await admin.from("growdash_workflow_logs").insert({ run_id: run.id, workspace_id: automation.workspace_id, level, message, context: redact(details) }); };
     const mergeInputs = new Map<string, Record<string, unknown>>();
