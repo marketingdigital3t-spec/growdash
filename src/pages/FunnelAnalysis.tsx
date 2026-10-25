@@ -47,6 +47,7 @@ import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudien
 import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
 import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
 import { mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
+import { buildFunnelCampaignOptions, splitFunnelCampaignSelection } from "@/lib/funnelCampaignOptions";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -103,7 +104,10 @@ export default function FunnelAnalysis() {
   const { data: funnels = [], isLoading: loadingFunnels, isFetched: funnelsFetched } = useRDFunnels();
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-  const selectedCampaign = selectedCampaigns.length === 1 ? selectedCampaigns[0] : "all";
+  const { selectedMetaCampaignIds, selectedUtmCampaigns } = useMemo(
+    () => splitFunnelCampaignSelection(selectedCampaigns),
+    [selectedCampaigns],
+  );
   const [selectedState, setSelectedState] = useState<string>("all");
   const [selectedOwner, setSelectedOwner] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");
@@ -146,12 +150,12 @@ export default function FunnelAnalysis() {
   const analyticsScope = useMemo<AnalyticsScope>(() => ({
     adAccountIds: selectedAccountIds,
     funnelIds: funnelScopeIds,
-    campaignIds: selectedCampaigns,
+    campaignIds: selectedMetaCampaignIds,
     startDate: businessDateKey(startDate),
     endDate: businessDateKey(endDate),
     timezoneByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
     attributionWindowByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
-  }), [endDate, funnelScopeIds, selectedAccountIds, selectedCampaigns, startDate, visibleAccounts]);
+  }), [endDate, funnelScopeIds, selectedAccountIds, selectedMetaCampaignIds, startDate, visibleAccounts]);
   const analyticsScopeKey = useMemo(() => analyticsScopeFingerprint(analyticsScope), [analyticsScope]);
 
   const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
@@ -178,7 +182,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaigns: selectedCampaigns,
+    campaigns: selectedUtmCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -192,7 +196,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaigns: selectedCampaigns,
+    campaigns: selectedUtmCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -271,7 +275,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaigns: selectedCampaigns,
+    campaigns: selectedUtmCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -309,11 +313,11 @@ export default function FunnelAnalysis() {
   const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
   const filteredPeriodClosedDeals = useMemo(() => periodClosedDeals.filter((deal) => (
     (selectedSource === "all" || deal.utm_source === selectedSource)
-      && (!selectedCampaigns.length || selectedCampaigns.includes(deal.utm_campaign || ""))
+      && (!selectedUtmCampaigns.length || selectedUtmCampaigns.includes(deal.utm_campaign || ""))
       && (selectedState === "all" || deal.lead_state === selectedState)
       && (selectedOwner === "all" || deal.deal_owner_name === selectedOwner)
       && (selectedProduct === "all" || deal.rd_product_name === selectedProduct)
-  )), [periodClosedDeals, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState]);
+  )), [periodClosedDeals, selectedOwner, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
   const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
   const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodClosedDeals, activeFunnels), [activeFunnels, filteredPeriodClosedDeals]);
   const operationalPeriodFunnelDeals = useMemo(
@@ -332,15 +336,6 @@ export default function FunnelAnalysis() {
   const states = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.lead_state).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const owners = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const products = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
-
-  useEffect(() => {
-    if (loadingFilterDeals) return;
-    if (selectedCampaigns.some((campaign) => !rdCampaigns.includes(campaign))) setSelectedCampaigns([]);
-    if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
-    if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
-    if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
-    if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
-  }, [loadingFilterDeals, owners, products, rdCampaigns, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals, undefined, [], funnelNames), [funnelNames, operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
@@ -370,13 +365,13 @@ export default function FunnelAnalysis() {
     funnelIds: funnelScopeIds,
     scopedDealIds: periodScopedDealIds,
     source: selectedSource,
-    campaigns: selectedCampaigns,
+    campaigns: selectedUtmCampaigns,
     state: selectedState,
     product: selectedProduct,
     allowedDealIds: periodAllowedDealIds,
     stateByDealId: periodStateByDealId,
     excludedDealIds,
-  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaigns, selectedProduct, selectedSource, selectedState]);
+  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
   const periodAnalytics = periodBaseAnalytics;
   const previousAvgDaysToConvert = useMemo(() => {
     const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -398,13 +393,14 @@ export default function FunnelAnalysis() {
     adAccountIds: effectiveAdAccountIds || (selectedAccountIds.length === 0 ? insightScopeAccountIds : undefined),
     attributionWindow: selectedMetaScope.attributionWindow,
     attributionWindowsByAccount: insightAttributionWindowsByAccount,
+    campaignIds: selectedMetaCampaignIds.length ? selectedMetaCampaignIds : undefined,
     startDate,
     endDate,
     enabled: visibleAccounts.length > 0,
   });
-  const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
+  const { data: campaignRows = [], isLoading: loadingCampaigns } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
   const { data: hierarchyRows = [] } = useQuery({
-    queryKey: ["funnel-attribution-hierarchy", effectiveAdAccountId, effectiveAdAccountIds?.slice().sort().join(",")],
+    queryKey: ["funnel-attribution-hierarchy", effectiveAdAccountId, effectiveAdAccountIds?.slice().sort().join(","), selectedMetaCampaignIds.slice().sort().join(",")],
     enabled: visibleAccounts.length > 0,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -414,6 +410,7 @@ export default function FunnelAnalysis() {
         .limit(10000);
       if (effectiveAdAccountIds?.length) query = query.in("adsets.campaigns.ad_account_id", effectiveAdAccountIds);
       else if (effectiveAdAccountId) query = query.eq("adsets.campaigns.ad_account_id", effectiveAdAccountId);
+      if (selectedMetaCampaignIds.length) query = query.in("adsets.campaigns.id", selectedMetaCampaignIds);
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((row: any) => ({
@@ -444,13 +441,26 @@ export default function FunnelAnalysis() {
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
   );
+  const campaignOptions = useMemo(
+    () => buildFunnelCampaignOptions(visibleCampaignRows, rdCampaigns),
+    [rdCampaigns, visibleCampaignRows],
+  );
+  useEffect(() => {
+    if (loadingFilterDeals || loadingCampaigns) return;
+    const availableIds = new Set(campaignOptions.map((campaign) => campaign.id));
+    const validSelection = selectedCampaigns.filter((campaign) => availableIds.has(campaign));
+    if (validSelection.length !== selectedCampaigns.length) setSelectedCampaigns(validSelection);
+    if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
+    if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
+    if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
+    if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
+  }, [campaignOptions, loadingCampaigns, loadingFilterDeals, owners, products, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
   const scopedInsights = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
     // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
-    // O filtro `selectedCampaigns` é uma UTM do RD, não um ID de campanha Meta.
-    // Comparar os nomes aproximados fazia a mídia sumir ou selecionar campanhas
-    // erradas. Sem vínculo canônico salvo, mídia fica no escopo conta + período.
+    // Meta e RD são fontes independentes. A seleção Meta já foi aplicada na
+    // consulta de Insights pelos IDs reais; não compare nomes com UTMs RD.
     return insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
   }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet]);
   const breakdownAttributionByCampaign = useMemo(() => {
@@ -470,26 +480,28 @@ export default function FunnelAnalysis() {
     return result;
   }, [allAccountsSelected, insightAttributionWindowsByAccount, scopedInsights, selectedAccountIdSet, visibleAccounts, visibleCampaignRows, integratedAccountIds]);
 
-  // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
-  // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
-  // Os filtros de campanha nesta tela são UTMs do RD. Não há vínculo canônico
-  // UTM→Meta para inferir IDs comparando nomes; o perfil Meta respeita conta e
-  // período, enquanto o escopo dos fatos RD vem dos funis vinculados.
+  // O perfil de mídia usa os IDs Meta selecionados. Sem seleção, ele mantém
+  // todas as campanhas reais das contas filtradas.
   const audienceCampaignIds = useMemo(() => {
     const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));
     const insightIds = scopedInsights
       .filter((row) => !!row.campaign_id && !!row.ad_account_id && accountIds.has(row.ad_account_id))
       .map((row) => String(row.campaign_id));
-    const ids = candidates.map((campaign: any) => String(campaign.id)).concat(insightIds).filter(Boolean);
+    const ids = (selectedMetaCampaignIds.length
+      ? selectedMetaCampaignIds
+      : candidates.map((campaign: any) => String(campaign.id)))
+      .concat(insightIds)
+      .filter(Boolean);
     return Array.from(new Set(ids));
-  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, visibleCampaignRows]);
+  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedMetaCampaignIds, visibleCampaignRows]);
 
   const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
   const funnelMeta = useMetaTrafficMetrics({
     adAccountIds: actionScopeAccountIds,
     startDate: businessDateKey(startDate),
     endDate: businessDateKey(endDate),
+    campaignIds: selectedMetaCampaignIds.length ? selectedMetaCampaignIds : undefined,
     attributionWindow: selectedMetaScope.attributionWindow,
     timezone: selectedMetaScope.timezone,
   }, visibleAccounts.length > 0);
@@ -651,6 +663,7 @@ export default function FunnelAnalysis() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["insights"] });
+      await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       await queryClient.invalidateQueries({ queryKey: ["funnel-audience-breakdowns"] });
       await queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
       await queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] });
@@ -739,7 +752,7 @@ export default function FunnelAnalysis() {
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
           <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
-          <CampaignMultiSelect campaigns={rdCampaigns.map((name) => ({ id: name, name }))} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Campanhas / UTM RD" className="gd-filter-control w-full bg-background/60 sm:w-[180px]" />
+          <CampaignMultiSelect campaigns={campaignOptions} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Campanhas Meta + UTM RD" className="gd-filter-control w-full bg-background/60 sm:w-[220px]" />
           <FilterSelect label="Estado" value={selectedState} onChange={setSelectedState} options={states} />
           <FilterSelect label="Responsável" value={selectedOwner} onChange={setSelectedOwner} options={owners} />
           <FilterSelect label="Produto" value={selectedProduct} onChange={setSelectedProduct} options={products} />
@@ -783,7 +796,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Escopos separados:</span> a conta e o período selecionados definem a mídia Meta; o filtro Campanhas / UTM RD afeta somente os negócios do CRM e não tenta adivinhar correspondência por nome. {periodAnalytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no período selecionado.
+              <span className="font-semibold text-foreground">Escopos separados:</span> campanhas Meta filtram o tráfego pago pelos IDs reais; UTM RD filtra os negócios do CRM pelos valores persistidos. A seleção não cruza nomes entre fontes. {periodAnalytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no período selecionado.
             </div>
             <FunnelKPIs
               a={periodAnalytics}
