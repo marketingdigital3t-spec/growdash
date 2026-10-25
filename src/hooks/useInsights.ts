@@ -7,6 +7,7 @@ import { isSameQueryScope } from "@/lib/queryScope";
 import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { ANALYTICS_REQUEST_TIMEOUT_MS } from "@/lib/campaignQuery";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -299,7 +300,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
 
       const { data: adsetRows, error: adsetsError } = await withRequestTimeout(
         supabase.from("adsets").select("id,name,status,campaign_id,destination_type").in("campaign_id", Array.from(campaignIdSet)),
-        15_000,
+        ANALYTICS_REQUEST_TIMEOUT_MS,
       );
       if (adsetsError) throw adsetsError;
       const adsets = (adsetRows || []) as any[];
@@ -308,7 +309,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
 
       const { data: adRows, error: adsError } = await withRequestTimeout(
         supabase.from("ads").select("id,name,status,adset_id,thumbnail_url").in("adset_id", Array.from(adsetIdSet)).order("id", { ascending: true }),
-        15_000,
+        ANALYTICS_REQUEST_TIMEOUT_MS,
       );
       if (adsError) throw adsError;
       const adsetCatalog = new Map(adsets.map((row) => [String(row.id), row]));
@@ -353,7 +354,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           const to = from + INSIGHTS_PAGE - 1;
           // A provider delay must surface as a recoverable query failure rather
           // than leaving every Meta KPI in a permanent loading state.
-          const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
+          const { data, error } = await withRequestTimeout(query.range(from, to), ANALYTICS_REQUEST_TIMEOUT_MS);
           if (error) throw error;
           const batch = data || [];
           allRows = allRows.concat(batch);
@@ -414,5 +415,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
     refetchInterval: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: true,
+    // A retry after the 2.5s core timeout would break the first-paint budget.
+    // The five-minute interval and manual refresh provide the retry path while
+    // the persisted snapshot keeps the dashboard useful during an outage.
+    retry: 0,
   });
 }

@@ -5,7 +5,7 @@ import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
 import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
-import { fetchCampaignPages } from "@/lib/campaignQuery";
+import { ANALYTICS_REQUEST_TIMEOUT_MS, MAX_CAMPAIGN_QUERY_PAGES, fetchCampaignPages } from "@/lib/campaignQuery";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -143,6 +143,7 @@ export function useActionTotalsByAds(
             chunk.length || CHUNK_IDS,
             "Os anúncios para calcular as ações",
             2,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
           );
           for (const r of data as any[]) adsetByAd[r.id] = r.adset_id;
         }
@@ -155,6 +156,7 @@ export function useActionTotalsByAds(
             chunk.length || CHUNK_IDS,
             "Os conjuntos para calcular as ações",
             2,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
           );
           for (const r of data as any[]) {
             resolvedDestinationTypeByAdset[r.id] = r.destination_type || null;
@@ -209,6 +211,8 @@ export function useActionTotalsByAds(
             signal,
             PAGE,
             "As ações Meta das campanhas",
+            MAX_CAMPAIGN_QUERY_PAGES,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
           ) as any[];
           for (const r of rows) {
             if (!matchesMetaAttributionWindow(r.attribution_window, group.window)) continue;
@@ -245,6 +249,7 @@ export function useActionTotalsByAds(
           accountIds.length,
           "As configurações de atribuição das contas",
           2,
+          ANALYTICS_REQUEST_TIMEOUT_MS,
         );
         for (const config of configs as Array<{ ad_account_id: string; action_type: string | null }>) {
           if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
@@ -284,5 +289,8 @@ export function useActionTotalsByAds(
     gcTime: 15 * 60_000,
     placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
     refetchOnWindowFocus: false,
+    // Actions enrich the core Insights snapshot. Retrying after the bounded
+    // analytics timeout would delay Leads/CPL beyond the first-paint budget.
+    retry: 0,
   });
 }

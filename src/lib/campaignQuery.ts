@@ -3,6 +3,8 @@ export const RELATION_PAGE_SIZE = 500;
 export const INSIGHT_PAGE_SIZE = 1_000;
 export const MAX_CAMPAIGN_QUERY_PAGES = 200;
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 12_000;
+/** Critical dashboard analytics must settle before the first useful paint. */
+export const ANALYTICS_REQUEST_TIMEOUT_MS = 2_500;
 export const EMPTY_ACCOUNT_SCOPE = "00000000-0000-0000-0000-000000000000";
 
 export function resolveCampaignAccountScope(selectedAccount: string, visibleAccountIds: string[]) {
@@ -28,13 +30,14 @@ export async function fetchCampaignPages(
   pageSize: number,
   label: string,
   maxPages = MAX_CAMPAIGN_QUERY_PAGES,
+  timeoutMs = CAMPAIGN_REQUEST_TIMEOUT_MS,
 ) {
   const rows: any[] = [];
   for (let page = 0; page < maxPages; page += 1) {
     if (signal?.aborted) throw new DOMException("A consulta foi cancelada.", "AbortError");
     const pageController = new AbortController();
     const abortPage = () => pageController.abort();
-    const timeoutId = globalThis.setTimeout(() => pageController.abort(), CAMPAIGN_REQUEST_TIMEOUT_MS);
+    const timeoutId = globalThis.setTimeout(() => pageController.abort(), timeoutMs);
     let raceTimeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
     signal?.addEventListener("abort", abortPage, { once: true });
     try {
@@ -44,7 +47,7 @@ export async function fetchCampaignPages(
       const result: any = await Promise.race([
         Promise.resolve(request),
         new Promise<never>((_, reject) => {
-          raceTimeoutId = globalThis.setTimeout(() => reject(new Error("Tempo de carregamento excedido.")), CAMPAIGN_REQUEST_TIMEOUT_MS);
+          raceTimeoutId = globalThis.setTimeout(() => reject(new Error("Tempo de carregamento excedido.")), timeoutMs);
         }),
       ]);
       if (result.error) throw result.error;
@@ -53,7 +56,7 @@ export async function fetchCampaignPages(
       if (batch.length < pageSize) return rows;
     } catch (error) {
       if (!signal?.aborted && pageController.signal.aborted) {
-        throw new Error(`${label} demorou mais de ${Math.round(CAMPAIGN_REQUEST_TIMEOUT_MS / 1000)} segundos. Tente novamente ou reduza o período.`, { cause: error });
+        throw new Error(`${label} demorou mais de ${Math.ceil(timeoutMs / 1000)} segundos. Tente novamente ou reduza o período.`, { cause: error });
       }
       throw error;
     } finally {

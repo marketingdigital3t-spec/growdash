@@ -49,8 +49,10 @@ export function useAdAccounts(includeDisconnected = false) {
   return useQuery({
     queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],
     enabled: !!user,
-    retry: 1,
-    retryDelay: 1_000,
+    // Account scope is required before analytics queries start. A second
+    // retry would push a cold dashboard past the three-second budget; the
+    // next focus/reconnect or manual refresh remains the recovery path.
+    retry: 0,
     refetchOnReconnect: true,
     refetchOnMount: true,
     refetchOnWindowFocus: false,

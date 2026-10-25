@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CAMPAIGN_REQUEST_TIMEOUT_MS, EMPTY_ACCOUNT_SCOPE, fetchCampaignPages, resolveCampaignAccountScope } from "./campaignQuery";
+import { ANALYTICS_REQUEST_TIMEOUT_MS, CAMPAIGN_REQUEST_TIMEOUT_MS, EMPTY_ACCOUNT_SCOPE, fetchCampaignPages, resolveCampaignAccountScope } from "./campaignQuery";
 
 function queryFactory(rows: unknown[], ranges: Array<[number, number]>) {
   return () => {
@@ -72,6 +72,25 @@ describe("fetchCampaignPages", () => {
       await vi.advanceTimersByTimeAsync(CAMPAIGN_REQUEST_TIMEOUT_MS);
       await rejection;
       expect(aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("supports a short timeout for critical analytics reads", async () => {
+    vi.useFakeTimers();
+    try {
+      const query = () => ({
+        range() { return this; },
+        abortSignal(signal: AbortSignal) {
+          signal.addEventListener("abort", () => undefined);
+          return new Promise(() => undefined);
+        },
+      });
+      const pending = fetchCampaignPages(query, undefined, 100, "Ações Meta", 2, ANALYTICS_REQUEST_TIMEOUT_MS);
+      const rejection = expect(pending).rejects.toThrow("Ações Meta demorou mais de 3 segundos");
+      await vi.advanceTimersByTimeAsync(ANALYTICS_REQUEST_TIMEOUT_MS);
+      await rejection;
     } finally {
       vi.useRealTimers();
     }
