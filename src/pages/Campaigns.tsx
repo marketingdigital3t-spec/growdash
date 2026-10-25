@@ -89,7 +89,7 @@ import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker"
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 import { campaignLoadState } from "@/lib/campaignLoading";
-import { shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
+import { hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -697,48 +697,89 @@ export default function Campaigns() {
     timedOut: campaignLoadTimedOut,
   }) === "loading";
   const campaignsUnavailable = showCampaignLoadError && campaigns.length === 0;
-  const hierarchyCountLabel = (label: string, count: number) => campaignsUnavailable
-    ? `${label} (indisponível)`
-    : campaignsLoading
-      ? `${label} (carregando…)`
-      : `${label} (${count})`;
-
-  // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
-  // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
-  // de campanhas. A seleção serve exclusivamente como filtro descendente.
-  const { data: accountAdsets = [], isLoading: isLoadingAdsets } = useQuery({
-    queryKey: ["meta-adsets-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    enabled: shouldLoadCampaignHierarchy(activeTab, analysisPanel),
+  const hierarchyEnabled = shouldLoadCampaignHierarchy(activeTab, analysisPanel);
+  // Conjuntos e anúncios são carregados em duas etapas, com escopo explícito
+  // por conta. Isso evita joins aninhados lentos do PostgREST e mantém os
+  // descendentes disponíveis mesmo quando a consulta pesada de insights das
+  // campanhas expira.
+  const hierarchyBaseQuery = useQuery({
+    queryKey: ["meta-campaign-hierarchy-base", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
+    enabled: hierarchyEnabled && (visibleAdAccounts.length > 0 || selectedAccountIds.length > 0),
     queryFn: async ({ signal }) => {
-      let query = supabase
-        .from("adsets")
-        .select("id,name,daily_budget,status,campaign_id,destination_type,optimization_goal,campaigns!inner(id,name,objective,ad_account_id)")
-        .order("name", { ascending: true });
-      if (selectedAccount !== "all") query = query.eq("campaigns.ad_account_id", selectedAccount);
-      else {
-        const accountIds = visibleAdAccounts.map((account) => account.id);
-        query = query.in("campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
+      const accountScope = resolveCampaignAccountScope(selectedAccount, visibleAdAccounts.map((account) => account.id));
+      const campaigns = await fetchCampaignPages(
+        () => {
+          const query = (supabase as any)
+            .from("campaigns")
+            .select("id,name,objective,ad_account_id")
+            .order("name", { ascending: true })
+            .order("id", { ascending: true });
+          return accountScope.length === 1
+            ? query.eq("ad_account_id", accountScope[0])
+            : query.in("ad_account_id", accountScope);
+        },
+        signal,
+        1000,
+        "A lista de campanhas para a hierarquia",
+      );
+      const campaignIds = campaigns.map((campaign: any) => String(campaign.id)).filter(Boolean);
+      const adsets: any[] = [];
+      for (const campaignIdChunk of chunkValues(campaignIds, RELATION_PAGE_SIZE)) {
+        adsets.push(...await fetchCampaignPages(
+          () => (supabase as any)
+            .from("adsets")
+            .select("id,name,daily_budget,status,campaign_id,destination_type,optimization_goal")
+            .in("campaign_id", campaignIdChunk)
+            .order("name", { ascending: true })
+            .order("id", { ascending: true }),
+          signal,
+          RELATION_PAGE_SIZE,
+          "A lista de conjuntos de anúncios",
+        ));
       }
-      return fetchCampaignPages(() => query, signal, 1000, "Os conjuntos de anúncios");
+      return { campaigns, adsets: hydrateCampaignHierarchy({ campaigns, adsets, ads: [] }).adsets };
     },
   });
-
-  const { data: accountAds = [], isLoading: isLoadingAds } = useQuery({
-    queryKey: ["meta-ads-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    enabled: shouldLoadCampaignHierarchy(activeTab, analysisPanel),
+  const hierarchyBase = hierarchyBaseQuery.data;
+  const accountAdsets = hierarchyBase?.adsets || [];
+  const adsetIds = useMemo(
+    () => Array.from(new Set(accountAdsets.map((adset: any) => String(adset.id)).filter(Boolean))),
+    [accountAdsets],
+  );
+  const hierarchyAdsQuery = useQuery({
+    queryKey: ["meta-ads-independent", selectedAccount, adsetIds.join(",")],
+    enabled: hierarchyEnabled && hierarchyBase !== undefined,
     queryFn: async ({ signal }) => {
-      let query = supabase
-        .from("ads")
-        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,destination_type,optimization_goal,campaigns!inner(id,name,objective,ad_account_id))")
-        .order("name", { ascending: true });
-      if (selectedAccount !== "all") query = query.eq("adsets.campaigns.ad_account_id", selectedAccount);
-      else {
-        const accountIds = visibleAdAccounts.map((account) => account.id);
-        query = query.in("adsets.campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
+      const ads: any[] = [];
+      for (const adsetIdChunk of chunkValues(adsetIds, RELATION_PAGE_SIZE)) {
+        ads.push(...await fetchCampaignPages(
+          () => (supabase as any)
+            .from("ads")
+            .select("id,name,thumbnail_url,status,adset_id")
+            .in("adset_id", adsetIdChunk)
+            .order("name", { ascending: true })
+            .order("id", { ascending: true }),
+          signal,
+          RELATION_PAGE_SIZE,
+          "A lista de anúncios",
+        ));
       }
-      return fetchCampaignPages(() => query, signal, 1000, "Os anúncios");
+      return hydrateCampaignHierarchy({ campaigns: hierarchyBase?.campaigns || [], adsets: accountAdsets, ads }).ads;
     },
   });
+  const accountAds = hierarchyAdsQuery.data || [];
+  const isLoadingAdsets = hierarchyBaseQuery.isLoading || hierarchyBaseQuery.isFetching;
+  const isLoadingAds = hierarchyBaseQuery.isLoading || hierarchyBaseQuery.isFetching || hierarchyAdsQuery.isLoading || hierarchyAdsQuery.isFetching;
+  const hierarchyAdsetsState = {
+    isLoading: isLoadingAdsets,
+    isError: hierarchyBaseQuery.isError,
+    hasSnapshot: hierarchyBaseQuery.dataUpdatedAt > 0,
+  };
+  const hierarchyAdsState = {
+    isLoading: isLoadingAds,
+    isError: hierarchyBaseQuery.isError || hierarchyAdsQuery.isError,
+    hasSnapshot: hierarchyAdsQuery.dataUpdatedAt > 0,
+  };
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -1213,10 +1254,10 @@ export default function Campaigns() {
                 <FolderKanban className="h-3.5 w-3.5" /> {campaignCountLabel}
               </TabsTrigger>
               <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <Layers3 className="h-3.5 w-3.5" /> {hierarchyCountLabel("Conjuntos de anúncios", selectedAdsets.length)}
+                <Layers3 className="h-3.5 w-3.5" /> {hierarchyCountLabel("Conjuntos de anúncios", selectedAdsets.length, hierarchyAdsetsState)}
               </TabsTrigger>
               <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <RectangleHorizontal className="h-3.5 w-3.5" /> {hierarchyCountLabel("Anúncios", selectedAds.length)}
+                <RectangleHorizontal className="h-3.5 w-3.5" /> {hierarchyCountLabel("Anúncios", selectedAds.length, hierarchyAdsState)}
               </TabsTrigger>
             </TabsList>
             <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5" aria-hidden="true" />
