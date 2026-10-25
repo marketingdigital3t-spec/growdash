@@ -1066,9 +1066,12 @@ export default function Campaigns() {
   // apenas refinamentos opcionais da lista já carregada diretamente do banco.
   const descendantCampaignIds = useMemo(() => {
     if (selectedIds.size > 0) return selectedIds;
-    if (healthFilter !== "all") return new Set(levelCampaigns.map((campaign: any) => campaign.id));
+    // A consulta principal pode estar indisponível enquanto a hierarquia
+    // independente já está disponível. Não transforme esse estado em um
+    // conjunto vazio que esconderia anúncios reais sob um filtro de saúde.
+    if (healthFilter !== "all" && campaigns.length > 0) return new Set(levelCampaigns.map((campaign: any) => campaign.id));
     return null;
-  }, [healthFilter, levelCampaigns, selectedIds]);
+  }, [campaigns, healthFilter, levelCampaigns, selectedIds]);
 
   const selectedAdsets = useMemo(() => {
     const query = search.trim().toLowerCase();
