@@ -22,6 +22,7 @@ function validateNodeParameters(node: WorkflowNode, errors: string[]) {
       try {
         const parsed = new URL(url);
         if (!["http:", "https:"].includes(parsed.protocol)) errors.push(`A URL do nó ${node.id} precisa usar HTTP ou HTTPS.`);
+        if (parsed.protocol === "http:" && parsed.hostname !== "localhost") errors.push(`A URL do nó ${node.id} precisa usar HTTPS fora do localhost.`);
       } catch {
         errors.push(`A URL do nó ${node.id} é inválida.`);
       }
