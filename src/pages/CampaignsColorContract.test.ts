@@ -22,4 +22,25 @@ describe("dark campaign color contract", () => {
       "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button",
     );
   });
+
+  it("keeps selected campaign controls on the emerald dark-theme contract", () => {
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill",
+    );
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-action-select",
+    );
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .meta-toolbar-button-active",
+    );
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab[data-state=\"active\"]",
+    );
+    expect(indexCss).toMatch(
+      /campaign-account-pill[^}]*background:\s*(?:var\(--gd-surface-raised\)|var\(--gd-emerald-soft\)|var\(--traffic-raised-dark\))/s,
+    );
+    expect(indexCss).toMatch(
+      /meta-toolbar-button-active[^}]*background:\s*var\(--gd-emerald\)/s,
+    );
+  });
 });
