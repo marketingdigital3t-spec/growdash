@@ -263,6 +263,10 @@ const Index = () => {
       breakdownStartDate: syncStart,
       breakdownEndDate: syncEnd,
       force: true,
+      // Libera os KPIs em até poucos segundos usando o snapshot atual; leads
+      // e distribuição horária continuam em segundo plano e invalidam as
+      // consultas quando os dados persistidos estiverem disponíveis.
+      fast: true,
     });
   }, [endDate, scopedAccountIds, selectedAccountIds, startDate, syncMeta]);
 
