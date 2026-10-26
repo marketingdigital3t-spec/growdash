@@ -12,7 +12,10 @@ const corsHeaders = {
 };
 const META_ACCOUNT_BATCH_SIZE = 8;
 const META_ACCOUNT_CONCURRENCY = 4;
-const RD_CONNECTION_CONCURRENCY = 4;
+// The Supabase gateway has a 150s idle limit. Selected funnels belong to
+// independent RD connections, so run the bounded one-per-connection batch in
+// a single wave instead of allowing a second 90s wave to exceed that limit.
+const RD_CONNECTION_CONCURRENCY = 8;
 
 type FunctionResult = {
   ok: boolean;
@@ -536,6 +539,10 @@ Deno.serve(async (req) => {
       serviceKey,
       "rd-reconcile-metrics",
       { run_id: run.id, trigger_source: "five_minute_incremental" },
+      // Metrics reconciliation is auxiliary to the canonical snapshots. A
+      // slow audit must not hold the whole five-minute worker past the
+      // gateway's 150s idle limit; the next cycle can retry it safely.
+      5_000,
     );
     // Insights is the primary KPI snapshot. Leads/forms and hourly remain
     // observable auxiliary blocks and are retried without downgrading valid
