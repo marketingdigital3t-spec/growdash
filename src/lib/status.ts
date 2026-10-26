@@ -26,7 +26,7 @@ export function getStatusBadge(status: EntityStatus): StatusBadge {
     case "PAUSED":
     case "CAMPAIGN_PAUSED":
     case "ADSET_PAUSED":
-      return { label: "Pausada", dotColor: "bg-muted-foreground/60", textColor: "text-muted-foreground" };
+      return { label: "Pausada", dotColor: "bg-[#ff3131] shadow-[0_0_8px_rgba(255,49,49,0.85)]", textColor: "text-red-500" };
     case "ARCHIVED":
       return { label: "Arquivada", dotColor: "bg-amber-500", textColor: "text-amber-600" };
     case "DELETED":
