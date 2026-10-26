@@ -51,5 +51,10 @@ describe("sync reliability policy", () => {
       refreshSubscriptions: true,
       deliveryFields: "isolated",
     });
+    expect(leadSyncExecutionPolicy(false, "five_minute_incremental")).toEqual({
+      catalogMaxPages: 1,
+      refreshSubscriptions: false,
+      deliveryFields: "combined",
+    });
   });
 });

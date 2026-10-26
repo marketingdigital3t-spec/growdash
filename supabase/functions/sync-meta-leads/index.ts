@@ -199,6 +199,13 @@ function usableAttributionText(value: unknown): string | null {
   return text;
 }
 
+function leadAttributionFingerprint(row: Partial<LeadRow>): string {
+  return [
+    "campaign_id", "campaign_name", "adset_id", "adset_name", "ad_id", "ad_name",
+    "form_id", "form_name", "platform", "placement", "is_organic",
+  ].map((key) => `${key}=${String((row as any)[key] ?? "")}`).join("|");
+}
+
 async function hydrateMissingAttribution(
   rows: LeadRow[],
   token: string,
@@ -244,8 +251,8 @@ async function hydrateMissingAttribution(
     return value;
   };
   const runBatches = async (ids: string[], task: (id: string) => Promise<void>) => {
-    for (let i = 0; i < ids.length; i += 8) {
-      await Promise.all(ids.slice(i, i + 8).map(task));
+    for (let i = 0; i < ids.length; i += 4) {
+      await Promise.all(ids.slice(i, i + 4).map(task));
     }
   };
   for (const row of rows) {
@@ -262,16 +269,29 @@ async function hydrateMissingAttribution(
     row.form_name = usableAttributionText(row.form_name);
     row.platform = usableAttributionText(row.platform);
     row.placement = usableAttributionText(row.placement);
-    if (row.meta_lead_id && (!row.platform || !row.placement || row.is_organic == null)) {
-      // Some Graph API versions reject delivery fields when combined with the
-      // lead identity fields. Retry them separately so an optional field never
-      // removes the lead or its campaign hierarchy.
-      const delivery = await getLeadDelivery(String(row.meta_lead_id));
+  }
+  // Delivery enrichment is independent per lead. Keep a small bounded
+  // concurrency so a form with hundreds of leads does not spend the entire
+  // worker budget on sequential Graph requests or trigger a request burst.
+  const deliveryRowsById = new Map<string, LeadRow[]>();
+  for (const row of rows) {
+    if (!row.meta_lead_id || (row.platform && row.placement && row.is_organic != null)) continue;
+    const key = String(row.meta_lead_id);
+    const list = deliveryRowsById.get(key) || [];
+    list.push(row);
+    deliveryRowsById.set(key, list);
+  }
+  await runBatches([...deliveryRowsById.keys()], async (id) => {
+    // Some Graph API versions reject delivery fields when combined with the
+    // lead identity fields. Retry them separately so an optional field never
+    // removes the lead or its campaign hierarchy.
+    const delivery = await getLeadDelivery(id);
+    for (const row of deliveryRowsById.get(id) || []) {
       row.platform ||= usableAttributionText(delivery?.platform || delivery?.site_source_name || delivery?.publisher_platform);
       row.placement ||= usableAttributionText(delivery?.placement || delivery?.platform_position);
       if (row.is_organic == null && typeof delivery?.is_organic === "boolean") row.is_organic = delivery.is_organic;
     }
-  }
+  });
   const adIds = [...new Set(rows.filter((row) => row.ad_id && !usableAttributionText(row.ad_name)).map((row) => String(row.ad_id)))];
   await runBatches(adIds, async (id) => {
     const ad = await getObject(id, "name,adset{id,name},campaign{id,name}");
@@ -326,20 +346,28 @@ async function fetchAll(
       return { data: all, pages, lastCursor, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
     }
     seen.add(next);
-    let r: Response;
-    try {
-      r = await fetchWithTimeout(next, {}, Math.min(GRAPH_REQUEST_TIMEOUT_MS, Math.max(1, deadlineAt - Date.now())));
-    } catch (error) {
-      return { data: all, pages, lastCursor, error: error instanceof DOMException && error.name === "AbortError" ? `Meta excedeu ${Math.round(GRAPH_REQUEST_TIMEOUT_MS / 1000)}s; snapshot anterior preservado.` : String(error) };
+    let r: Response | null = null;
+    let json: any = {};
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        r = await fetchWithTimeout(next, {}, Math.min(GRAPH_REQUEST_TIMEOUT_MS, Math.max(1, deadlineAt - Date.now())));
+        json = await r.json().catch(() => ({}));
+        if (r.ok) break;
+        const retryable = [429, 500, 502, 503, 504].includes(r.status);
+        lastError = json?.error?.message || `Meta respondeu HTTP ${r.status}`;
+        if (!retryable || attempt === 2 || hasExceededSyncDeadline(deadlineAt)) break;
+        const retryAfter = Number(r.headers.get("retry-after") || 0);
+        const delay = Math.min(4_000, Math.max(350, retryAfter > 0 ? retryAfter * 1000 : 500 * (2 ** attempt)));
+        await new Promise((resolve) => setTimeout(resolve, Math.min(delay, Math.max(1, deadlineAt - Date.now()))));
+      } catch (error) {
+        lastError = error;
+        if (attempt === 2 || hasExceededSyncDeadline(deadlineAt)) break;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(400 * (2 ** attempt), Math.max(1, deadlineAt - Date.now()))));
+      }
     }
-    const json: any = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      return {
-        data: all,
-        pages,
-        lastCursor,
-        error: json?.error?.message || `Meta respondeu HTTP ${r.status}`,
-      };
+    if (!r?.ok) {
+      return { data: all, pages, lastCursor, error: lastError instanceof DOMException && lastError.name === "AbortError" ? `Meta excedeu ${Math.round(GRAPH_REQUEST_TIMEOUT_MS / 1000)}s; snapshot anterior preservado.` : String(lastError || "Meta não respondeu") };
     }
     if (json.error) {
       return { data: all, pages, lastCursor, error: json.error.message || String(json.error) };
@@ -455,7 +483,9 @@ Deno.serve(async (req) => {
       : [];
     const exactRange = parseExactDateRange(body);
     const recentRange = exactRange ? null : parseRecentTimestampRange(body);
-    const executionPolicy = leadSyncExecutionPolicy(Boolean(recentRange));
+    const triggerSource = String(body.triggerSource || body.trigger_source || "manual");
+    const latencySensitive = Boolean(recentRange) || triggerSource === "five_minute_incremental";
+    const executionPolicy = leadSyncExecutionPolicy(latencySensitive, triggerSource);
     const permissionAudit = body?.permission_audit === true;
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
     const since = exactRange?.startEpoch ?? recentRange?.startEpoch ??
@@ -464,7 +494,7 @@ Deno.serve(async (req) => {
     syncRunId = await startSyncExecution(admin, {
       userId,
       provider: "meta_leads",
-      triggerSource: String(body.triggerSource || body.trigger_source || "manual"),
+      triggerSource,
       scopeKey,
       scope: {
         ad_account_ids: adAccountIds.length ? adAccountIds : adAccountId ? [adAccountId] : [],
@@ -684,8 +714,8 @@ Deno.serve(async (req) => {
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
           `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id,adset{name},campaign{name},creative{object_story_spec}&limit=${META_AD_CATALOG_PAGE_SIZE}&access_token=${token}`;
-        const needsRecentDiscovery = Boolean(recentRange) && formIds.size === 0;
-        let adsRes = (recentRange && !needsRecentDiscovery)
+        const needsRecentDiscovery = latencySensitive && formIds.size === 0;
+        let adsRes = (latencySensitive && !needsRecentDiscovery)
           ? { data: [], pages: 0 }
           : await fetchAll(adsUrl, executionPolicy.catalogMaxPages, deadlineAt);
         if (adsRes.error) {
@@ -734,7 +764,7 @@ Deno.serve(async (req) => {
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id,name&limit=200&access_token=${token}`;
         const canReadLeadForms = !grantedPermissions || grantedPermissions.has("leads_retrieval");
-        const formsRes = (recentRange && !needsRecentDiscovery)
+        const formsRes = (latencySensitive && !needsRecentDiscovery)
           ? { data: [], pages: 0 }
           : canReadLeadForms
           ? await fetchAll(formsUrl, executionPolicy.catalogMaxPages, deadlineAt)
@@ -825,6 +855,9 @@ Deno.serve(async (req) => {
           );
         }
         const { data: existingLeads, error: existingLeadsError } = await existingQuery;
+        const existingTrackingById = new Map<string, string>(
+          (existingLeads || []).map((row: any) => [String(row.meta_lead_id), leadAttributionFingerprint(row)]),
+        );
         if (existingLeadsError) {
           formErrors.push(`catalog repair: ${existingLeadsError.message}`);
         } else if (existingLeads?.length) {
@@ -1021,6 +1054,11 @@ Deno.serve(async (req) => {
               if (hasExceededSyncDeadline(deadlineAt)) {
                 throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
               }
+              // The scheduled worker rereads an attribution lookback. Do not
+              // repeat the expensive RD lookup/write when the lead's tracking
+              // fingerprint is unchanged; webhooks and explicit reconciliation
+              // still handle newly arrived or repaired attribution.
+              if (existingTrackingById.get(String(row.meta_lead_id)) === leadAttributionFingerprint(row)) continue;
               await syncMetaLeadToRD(admin, String(row.meta_lead_id));
             }
           }

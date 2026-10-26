@@ -16,8 +16,13 @@ export type LeadSyncExecutionPolicy = {
  * catalog and must not refresh page/app subscriptions or walk every catalog
  * page in the request that persists the lead snapshot.
  */
-export function leadSyncExecutionPolicy(recent: boolean): LeadSyncExecutionPolicy {
-  return recent
+export function leadSyncExecutionPolicy(recent: boolean, triggerSource = ""): LeadSyncExecutionPolicy {
+  // The five-minute worker sends an explicit civil-date window so late
+  // conversions remain covered. That window is still latency-sensitive: it
+  // must reuse the catalog and leave webhook subscriptions to the durable
+  // maintenance path instead of behaving like a historical backfill.
+  const latencySensitive = recent || triggerSource === "five_minute_incremental";
+  return latencySensitive
     ? { catalogMaxPages: 1, refreshSubscriptions: false, deliveryFields: "combined" }
     : { catalogMaxPages: Number.POSITIVE_INFINITY, refreshSubscriptions: true, deliveryFields: "isolated" };
 }
