@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { businessDateKey } from "@/lib/businessDate";
 import { Button } from "@/components/ui/button";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { cn } from "@/lib/utils";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import type { InsightRow } from "@/hooks/useInsights";
