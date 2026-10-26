@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   SYNC_EXECUTION_MAX_AGE_MS,
+  META_AD_CATALOG_PAGE_SIZE,
+  SYNC_LEAD_RUN_BUDGET_MS,
+  hasExceededSyncDeadline,
   classifyAbandonedExecution,
   fetchWithTimeout,
 } from "./syncReliabilityPolicy";
@@ -16,6 +19,10 @@ describe("sync reliability policy", () => {
       errorCode: "PROVIDER_TIMEOUT",
     });
     expect(SYNC_EXECUTION_MAX_AGE_MS).toBeGreaterThanOrEqual(5 * 60_000);
+    expect(META_AD_CATALOG_PAGE_SIZE).toBeGreaterThanOrEqual(500);
+    expect(SYNC_LEAD_RUN_BUDGET_MS).toBeLessThanOrEqual(120_000);
+    expect(hasExceededSyncDeadline(Date.now() - 1)).toBe(true);
+    expect(hasExceededSyncDeadline(Date.now() + 60_000)).toBe(false);
   });
 
   it("aborts a provider request that exceeds its deadline", async () => {

@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { attributionStatus, normalizeAttribution } from "../../../src/lib/syncContract.ts";
-import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { fetchWithTimeout, hasExceededSyncDeadline, META_AD_CATALOG_PAGE_SIZE, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -307,6 +307,7 @@ async function hydrateMissingAttribution(
 async function fetchAll(
   url: string,
   maxPages = Number.POSITIVE_INFINITY,
+  deadlineAt = Number.POSITIVE_INFINITY,
 ): Promise<{ data: any[]; pages: number; lastCursor?: string; repeatedCursor?: boolean; error?: string }> {
   const all: any[] = [];
   let next: string | undefined = url;
@@ -314,13 +315,16 @@ async function fetchAll(
   const seen = new Set<string>();
   let lastCursor: string | undefined;
   while (next && pages < maxPages) {
+    if (hasExceededSyncDeadline(deadlineAt)) {
+      return { data: all, pages, lastCursor, error: `Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.` };
+    }
     if (seen.has(next)) {
       return { data: all, pages, lastCursor, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
     }
     seen.add(next);
     let r: Response;
     try {
-      r = await fetchWithTimeout(next, {}, GRAPH_REQUEST_TIMEOUT_MS);
+      r = await fetchWithTimeout(next, {}, Math.min(GRAPH_REQUEST_TIMEOUT_MS, Math.max(1, deadlineAt - Date.now())));
     } catch (error) {
       return { data: all, pages, lastCursor, error: error instanceof DOMException && error.name === "AbortError" ? `Meta excedeu ${Math.round(GRAPH_REQUEST_TIMEOUT_MS / 1000)}s; snapshot anterior preservado.` : String(error) };
     }
@@ -411,6 +415,7 @@ Deno.serve(async (req) => {
   let syncRunId: string | null = null;
   try {
     const body = await req.json().catch(() => ({}));
+    const deadlineAt = Date.now() + SYNC_LEAD_RUN_BUDGET_MS;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     admin = createClient(SUPABASE_URL, SERVICE);
@@ -595,6 +600,8 @@ Deno.serve(async (req) => {
       const names = formNamesByToken.get(token) || new Map<string, string>();
       const pagesRes = await fetchAll(
         `${GRAPH}/me/accounts?fields=id,name,access_token,leadgen_forms.limit(200){id,name,account_id}&limit=100&access_token=${token}`,
+        Number.POSITIVE_INFINITY,
+        deadlineAt,
       );
       if (!pagesRes.error) {
         for (const page of pagesRes.data || []) {
@@ -628,6 +635,7 @@ Deno.serve(async (req) => {
 
     for (const acc of accounts ?? []) {
       try {
+        if (hasExceededSyncDeadline(deadlineAt)) throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
         const token = acc.access_token as string;
         const raw = acc.account_id as string;
         const actId = raw.startsWith("act_") ? raw : `act_${raw}`;
@@ -636,16 +644,18 @@ Deno.serve(async (req) => {
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
-          `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id,adset{name},campaign{name},creative{object_story_spec}&limit=50&access_token=${token}`;
+          `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id,adset{name},campaign{name},creative{object_story_spec}&limit=${META_AD_CATALOG_PAGE_SIZE}&access_token=${token}`;
         // Follow every ads page. Discovering only the first page silently
         // omitted forms from larger accounts and made lead KPIs look partial.
-        let adsRes = await fetchAll(adsUrl);
+        let adsRes = await fetchAll(adsUrl, Number.POSITIVE_INFINITY, deadlineAt);
         if (adsRes.error) {
           // Older tokens/API versions may reject nested creative fields. Keep
           // lead synchronization alive with the minimal ad listing, while
           // retaining the error only if the fallback also fails.
           const fallbackAds = await fetchAll(
-            `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id&limit=200&access_token=${token}`,
+            `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id&limit=${META_AD_CATALOG_PAGE_SIZE}&access_token=${token}`,
+            Number.POSITIVE_INFINITY,
+            deadlineAt,
           );
           if (!fallbackAds.error) adsRes = fallbackAds;
           else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };
@@ -684,7 +694,7 @@ Deno.serve(async (req) => {
           `${GRAPH}/${actId}/leadgen_forms?fields=id,name&limit=200&access_token=${token}`;
         const canReadLeadForms = !grantedPermissions || grantedPermissions.has("leads_retrieval");
         const formsRes = canReadLeadForms
-          ? await fetchAll(formsUrl)
+          ? await fetchAll(formsUrl, Number.POSITIVE_INFINITY, deadlineAt)
           : { data: [], pages: 0, error: "leads_retrieval ausente" };
         const formNames = formNamesByToken.get(token) || new Map<string, string>();
         for (const form of formsRes.data || []) {
@@ -815,6 +825,7 @@ Deno.serve(async (req) => {
         }
 
         for (const formId of formIds) {
+          if (hasExceededSyncDeadline(deadlineAt)) throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
           const filters: Array<Record<string, string | number>> = [
             {
               field: "time_created",
@@ -832,14 +843,14 @@ Deno.serve(async (req) => {
           const filtering = encodeURIComponent(JSON.stringify(filters));
           const leadsUrl =
             `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,form_name,platform,site_source_name,placement,platform_position,is_organic,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
-          let r = await fetchAll(leadsUrl);
+          let r = await fetchAll(leadsUrl, Number.POSITIVE_INFINITY, deadlineAt);
           if (r.error) {
             // Some Graph API versions reject optional name/placement fields
             // on /leads. Retry with the stable lead fields so one unsupported
             // field cannot make the whole form disappear from the mirror.
             const fallbackLeadsUrl =
               `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
-            const fallback = await fetchAll(fallbackLeadsUrl);
+            const fallback = await fetchAll(fallbackLeadsUrl, Number.POSITIVE_INFINITY, deadlineAt);
             if (!fallback.error) r = fallback;
           }
           totalPages += r.pages;

@@ -1,4 +1,13 @@
 export const SYNC_EXECUTION_MAX_AGE_MS = 10 * 60_000;
+// Keep large ad catalogs resumable without turning a lead sync into dozens of
+// sequential Graph requests. The response remains authoritative for the
+// fields returned by Meta; missing pages stay partial and are retried later.
+export const META_AD_CATALOG_PAGE_SIZE = 500;
+export const SYNC_LEAD_RUN_BUDGET_MS = 90_000;
+
+export function hasExceededSyncDeadline(deadlineAt: number, now = Date.now()) {
+  return now >= deadlineAt;
+}
 
 export function classifyAbandonedExecution(lastValidSnapshotAt: string | null | undefined) {
   return {
