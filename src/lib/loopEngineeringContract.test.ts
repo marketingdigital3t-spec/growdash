@@ -9,8 +9,8 @@ import {
 describe("loop engineering contract", () => {
   it("promotes main pushes through the protected workflow and closes the Edge smoke loop", () => {
     const workflow = fs.readFileSync(".github/workflows/loop-engineering.yml", "utf8");
-    expect(workflow).toMatch(/^  push:\n    branches:\n      - main/m);
-    expect(workflow).toMatch(/for fn in controlled-realtime-sync[\s\S]*?\n\s+done\n\n      - name: Smoke authenticated production browser/);
+    expect(workflow).toMatch(/^\x20{2}push:\n\x20{4}branches:\n\x20{6}- main/m);
+    expect(workflow).toMatch(/for fn in controlled-realtime-sync[\s\S]*?\n\s+done\n\n\x20{6}- name: Smoke authenticated production browser/);
     expect(workflow).not.toMatch(/run: npx playwright test[^\n]*\n\s+done/);
   });
 
