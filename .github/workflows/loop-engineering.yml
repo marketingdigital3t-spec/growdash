@@ -1,6 +1,9 @@
 name: Growdash Loop Engineering
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     # GitHub Actions cron usa UTC: executa no minuto 17 a cada 3 horas.
@@ -8,6 +11,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: growdash-promotion-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   detect:
