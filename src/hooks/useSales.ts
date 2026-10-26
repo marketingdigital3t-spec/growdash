@@ -9,6 +9,7 @@ import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 
 export interface Sale {
@@ -159,10 +160,12 @@ export function useSales(params?: UseSalesParams) {
       return persistSnapshot(dedupeCanonicalSales(scoped));
     },
     staleTime: 2 * 60 * 1000,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData ?? persistedSnapshot,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    // The near-realtime coordinator and the next invalidation are the recovery
+    // path. Retrying a 2.5s RD read here made every route wait up to 15s.
+    retry: 0,
   });
 }
 

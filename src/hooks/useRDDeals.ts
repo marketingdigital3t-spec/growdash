@@ -200,8 +200,8 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
       return (data || []) as RDDealStageHistory[];
     },
     staleTime: 5 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -319,11 +319,10 @@ export function useRDDeals(params: Params) {
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    retry: 0,
   });
 }
 
@@ -391,11 +390,10 @@ export function useRDClosedDeals(params: Params) {
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    retry: 0,
   });
 }
 
@@ -418,8 +416,8 @@ export function useFunnelStagesForIds(funnelIds: string[]) {
       if (error) throw error;
       return (data || []) as unknown as FunnelStage[];
     },
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
 

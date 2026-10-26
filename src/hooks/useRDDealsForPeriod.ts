@@ -9,6 +9,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import { useAuth } from "@/contexts/AuthContext";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 /** Dashboard RD reads must settle within the same first-paint budget as Meta. */
 const RD_ANALYTICS_TIMEOUT_MS = 2_500;
@@ -214,8 +215,8 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     initialDataUpdatedAt: cachedPeriodDeals ? 0 : undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedPeriodDeals)),
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     // A retry here would push the selected scope past the three-second budget;
     // the next scope refresh/reconnect is the recovery path.
@@ -311,8 +312,8 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     initialDataUpdatedAt: cachedWonDeals ? 0 : undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedWonDeals)),
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     retry: 0,
   });
@@ -402,8 +403,8 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
     },
     staleTime: 5 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     retry: 0,
   });

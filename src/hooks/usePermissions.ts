@@ -50,6 +50,9 @@ export function usePermissions() {
     // authorization is still fail-closed after all attempts are exhausted.
     retry: 1,
     retryDelay: 1_000,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     queryFn: async () => withRequestTimeout((async () => {
       setBootstrapStep("permissions");
       const scopedPermPromise =

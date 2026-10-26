@@ -45,5 +45,7 @@ export function useAccountAdsets(adAccountId?: string) {
       }
       return all;
     },
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }

@@ -8,6 +8,7 @@ import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/met
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
 import { ANALYTICS_REQUEST_TIMEOUT_MS } from "@/lib/campaignQuery";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -416,6 +417,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     gcTime: 24 * 60 * 60 * 1000,
+    // A persisted snapshot already paints the selected scope. The global
+    // realtime coordinator invalidates this active query after its next sync.
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
     refetchOnWindowFocus: false,
     // A retry after the 2.5s core timeout would break the first-paint budget.
     // The five-minute interval and manual refresh provide the retry path while

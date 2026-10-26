@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 const fallbackPlans = [
   {
@@ -116,6 +117,7 @@ export function useWorkspace() {
     // A fundação do workspace não muda durante a navegação normal. Cachear evita
     // reexecutar o bootstrap e três consultas a cada troca de módulo.
     staleTime: 5 * 60_000,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedWorkspace)),
     refetchOnWindowFocus: false,
     // Paint the last known workspace immediately while the authenticated
     // request revalidates. Cached data is never used as authorization.

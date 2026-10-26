@@ -9,6 +9,7 @@ import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
 import { ANALYTICS_REQUEST_TIMEOUT_MS, MAX_CAMPAIGN_QUERY_PAGES, fetchCampaignPages } from "@/lib/campaignQuery";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -308,6 +309,7 @@ export function useActionTotalsByAds(
     placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : persistedSnapshot,
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
     refetchOnWindowFocus: false,
     // Actions enrich the core Insights snapshot. Retrying after the bounded
     // analytics timeout would delay Leads/CPL beyond the first-paint budget.

@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMetaTrafficMetrics, resolveCanonicalMetaLeadBreakdown } from "./metaTraffic";
+import { aggregateMetaTrafficMetrics, buildCanonicalInsightLeadFallback, resolveCanonicalMetaLeadBreakdown } from "./metaTraffic";
 
 describe("Meta traffic metrics", () => {
+  it("constrói um snapshot canônico de leads enquanto ações Meta revalidam", () => {
+    expect(buildCanonicalInsightLeadFallback([
+      { ad_id: "ad-1", ad_account_id: "acc-1", date: "2026-10-26", form_leads: 2, site_leads: 1, conversations: 1 },
+      { ad_id: "ad-1", ad_account_id: "acc-1", date: "2026-10-27", form_leads: 1, site_leads: 0, conversations: 0 },
+    ])).toMatchObject({
+      hasCanonicalParts: true,
+      metaLeadActions: { forms: 3, site: 1, conversations: 1, total: 5 },
+      leadBreakdownByAd: { "ad-1": { forms: 3, site: 1, conversations: 1, total: 5 } },
+    });
+  });
+
   it("agrega mídia e ações sem somar aliases duplicados", () => {
     const result = aggregateMetaTrafficMetrics([
       { ad_id: "ad-1", ad_account_id: "act-1", spend: 100, impressions: 1_000, reach: 800, clicks: 100 },

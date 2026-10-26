@@ -10,6 +10,10 @@ describe("live query invalidation", () => {
     expect(shouldInvalidateLiveQuery(["action-totals-by-ads", "ad-1", "account-1"])).toBe(true);
   });
 
+  it("refreshes audience breakdowns after the same Meta snapshot changes", () => {
+    expect(shouldInvalidateLiveQuery(["meta-breakdowns", "campaign-1", "2026-10-26"])).toBe(true);
+  });
+
   it("refreshes RD stage distribution when deal or funnel-stage snapshots change", () => {
     expect(shouldInvalidateLiveQuery(["rd_deals", "funnel-1", "history"])).toBe(true);
     expect(shouldInvalidateLiveQuery(["rd_funnel_stages", "funnel-1"])).toBe(true);

@@ -9,6 +9,10 @@ export function useIsMaster() {
     queryKey: ["is_master", user?.id],
     enabled: !!user,
     retry: false,
+    staleTime: 30 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       try {
         const { data, error } = await withRequestTimeout(

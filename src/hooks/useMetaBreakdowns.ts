@@ -68,5 +68,10 @@ export function useMetaBreakdowns(campaignIds: string[], startDate: string, endD
       return result;
     },
     staleTime: 120_000,
+    // The realtime coordinator invalidates this auxiliary query after a Meta
+    // snapshot write; focus changes should not start another heavy breakdown
+    // read while the last result is still usable.
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }

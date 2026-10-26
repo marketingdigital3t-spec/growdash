@@ -38,6 +38,8 @@ export function useCampaigns(adAccountId?: string, adAccountIds?: string[]) {
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    // Realtime invalidation refreshes active campaign catalogs after a sync;
+    // returning to the tab must not duplicate that paginated request.
+    refetchOnWindowFocus: false,
   });
 }

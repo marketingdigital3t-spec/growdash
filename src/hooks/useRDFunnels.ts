@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 const RD_SCOPE_TIMEOUT_MS = 2_500;
 
@@ -33,7 +34,7 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     // manual action and reconnect listener remain available for recovery.
     retry: false,
     refetchOnReconnect: true,
-    refetchOnMount: true,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedFunnels)),
     refetchOnWindowFocus: false,
     refetchInterval: (query) => query.state.error ? 10_000 : false,
     staleTime: 2 * 60 * 1000,

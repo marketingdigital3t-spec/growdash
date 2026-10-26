@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useInsights } from "@/hooks/useInsights";
-import { aggregateMetaTrafficMetrics, type MetaTrafficMetrics, type MetaTrafficScope } from "@/lib/metaTraffic";
+import { aggregateMetaTrafficMetrics, buildCanonicalInsightLeadFallback, type MetaTrafficMetrics, type MetaTrafficScope } from "@/lib/metaTraffic";
 import { useMetaBreakdowns } from "@/hooks/useMetaBreakdowns";
 import { parseBusinessDate } from "@/lib/businessDate";
 import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsContract";
@@ -85,6 +85,15 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   const adsetIdByAdId = useMemo(() => Object.fromEntries(rows.map((row) => [row.ad_id, row.adset_id || null])), [rows]);
   const destinationTypeByAdset = useMemo(() => Object.fromEntries(rows.filter((row) => row.adset_id).map((row) => [String(row.adset_id), row.adset_destination_type || null])), [rows]);
   const actions = useActionTotalsByAds(adIds, parseBusinessDate(scope.startDate, scope.timezone), parseBusinessDate(scope.endDate, scope.timezone), adAccountByAdId, { adAccountIds: accountIds, campaignIds: scope.campaignIds, attributionWindow, attributionWindowsByAccount, adsetIdByAdId, destinationTypeByAdset });
+  const canonicalInsightLeads = useMemo(() => buildCanonicalInsightLeadFallback(rows), [rows]);
+  // Insights already stores the disjoint canonical lead facts. Use them for
+  // the first paint while the heavier paginated action query is revalidating;
+  // once that query has facts, its account/site-event resolution remains the
+  // source of truth for the enriched snapshot.
+  const effectiveActions = useMemo(() => {
+    if (!canonicalInsightLeads.hasCanonicalParts || (actions.data?.leadActionFactCount || 0) > 0) return actions.data;
+    return { ...actions.data, ...canonicalInsightLeads };
+  }, [actions.data, canonicalInsightLeads]);
   const campaignIds = useMemo(() => Array.from(new Set((scope.campaignIds?.length ? scope.campaignIds : rows.map((row) => row.campaign_id).filter(Boolean)) as string[])), [rows, scope.campaignIds]);
   const attributionWindowByCampaign = useMemo(() => {
     const windowByAccount = Object.fromEntries(scopedAccounts.map((account) => [account.id, attributionWindowsByAccount[account.id] || "account_default"]));
@@ -135,6 +144,7 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   // aggregate or hiding valid data on only one sidebar route.
   const persistedCanonicalScope = rows.length > 0 && (actions.data?.leadActionFactCount || 0) > 0;
   const effectiveInsightScopeConfirmed = insightCoverageComplete || persistedCanonicalScope;
+  const canonicalLeadScopeAvailable = canonicalInsightLeads.hasCanonicalParts && effectiveInsightScopeConfirmed;
   const actionCoverageReason = syncCoverage.isError
     ? (syncCoverage.error instanceof Error ? syncCoverage.error.message : String(syncCoverage.error))
     : syncCoverage.data?.actionGaps.length
@@ -148,16 +158,16 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   const coverageReason = [insightCoverageReason, actionCoverageReason].filter(Boolean).join(" ") || null;
   const computedData = useMemo(() => {
     const base = aggregateMetaTrafficMetrics(rows, {
-      ...actions.data,
+      ...effectiveActions,
       // Persisted canonical lead actions from this exact account/date scope
       // remain useful while a refresh watermark is partial. A real zero still
       // requires confirmed coverage or an actual lead-action fact.
-      actionsAvailable: !actions.isLoading && !actions.isError && (coverageComplete || (actions.data?.leadActionFactCount || 0) > 0),
+      actionsAvailable: coverageComplete || persistedCanonicalScope || canonicalLeadScopeAvailable,
       actionsErrorReason: actions.error instanceof Error ? actions.error.message : actions.error ? String(actions.error) : actionCoverageReason,
       breakdowns: breakdowns.data,
     }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null, scopeConfirmed: effectiveInsightScopeConfirmed, coverageReason });
     return isLoading ? { ...base, status: "syncing" as const } : base;
-  }, [actionCoverageReason, actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, coverageComplete, coverageReason, effectiveInsightScopeConfirmed, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
+  }, [actionCoverageReason, actions.error, attributionWindow, breakdowns.data, canonicalLeadScopeAvailable, coverageComplete, coverageReason, effectiveActions, effectiveInsightScopeConfirmed, errors, isLoading, persistedCanonicalScope, rows, scope.timezone, scopedAccounts, syncedAt]);
   const snapshotScopeKey = useMemo(() => JSON.stringify({
     accounts: effectiveAccountIds.slice().sort(),
     campaigns: (scope.campaignIds || []).slice().sort(),

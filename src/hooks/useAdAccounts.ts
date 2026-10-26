@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 function canonicalMetaAccountId(value: unknown) {
   const normalized = String(value ?? "").trim().replace(/^act_/i, "");
@@ -54,7 +55,7 @@ export function useAdAccounts(includeDisconnected = false) {
     // next focus/reconnect or manual refresh remains the recovery path.
     retry: 0,
     refetchOnReconnect: true,
-    refetchOnMount: true,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedAccounts)),
     refetchOnWindowFocus: false,
     // Keep the Integrations status aligned with the server-side health/sync
     // worker without requiring a manual page reload.

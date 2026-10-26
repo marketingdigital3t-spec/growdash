@@ -102,6 +102,9 @@ type InsightRow = {
   impressions?: number | null;
   reach?: number | null;
   clicks?: number | null;
+  form_leads?: number | null;
+  site_leads?: number | null;
+  conversations?: number | null;
 };
 
 type ActionData = {
@@ -120,6 +123,67 @@ type ActionData = {
 const EMPTY_BREAKDOWNS: MetaBreakdowns = {
   age: [], gender: [], region: [], country: [], platform: [], placement: [], device: [],
 };
+
+/**
+ * The persisted Insights snapshot already contains the three disjoint
+ * canonical lead parts written by the Meta sync. Reuse those facts for the
+ * first paint when the heavier per-ad action read is still revalidating.
+ * This never reads the legacy `insights.leads` aggregate and is only promoted
+ * by the hook when the selected scope watermark is confirmed.
+ */
+export function buildCanonicalInsightLeadFallback(rows: InsightRow[]) {
+  const leadBreakdownByAd: Record<string, { forms: number; site: number; conversations: number; total: number }> = {};
+  const dailyMetaLeadByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }>> = {};
+  let hasCanonicalParts = false;
+  let forms = 0;
+  let site = 0;
+  let conversations = 0;
+
+  for (const row of rows) {
+    const hasParts = row.form_leads != null || row.site_leads != null || row.conversations != null;
+    if (!hasParts) continue;
+    hasCanonicalParts = true;
+    const current = {
+      forms: Math.max(0, Number(row.form_leads || 0)),
+      site: Math.max(0, Number(row.site_leads || 0)),
+      conversations: Math.max(0, Number(row.conversations || 0)),
+    };
+    forms += current.forms;
+    site += current.site;
+    conversations += current.conversations;
+
+    const adId = String(row.ad_id || "");
+    if (adId) {
+      const ad = leadBreakdownByAd[adId] || { forms: 0, site: 0, conversations: 0, total: 0 };
+      ad.forms += current.forms;
+      ad.site += current.site;
+      ad.conversations += current.conversations;
+      ad.total = ad.forms + ad.site + ad.conversations;
+      leadBreakdownByAd[adId] = ad;
+    }
+
+    const accountId = String(row.ad_account_id || "");
+    const date = String(row.date || "");
+    if (accountId && date) {
+      const byDate = dailyMetaLeadByAccount[accountId] || {};
+      const day = byDate[date] || { forms: 0, site: 0, conversations: 0, total: 0 };
+      day.forms += current.forms;
+      day.site += current.site;
+      day.conversations += current.conversations;
+      day.total = day.forms + day.site + day.conversations;
+      byDate[date] = day;
+      dailyMetaLeadByAccount[accountId] = byDate;
+    }
+  }
+
+  return {
+    hasCanonicalParts,
+    metaLeadActions: { forms, site, conversations, total: forms + site + conversations },
+    leadBreakdownByAd,
+    dailyMetaLeadByAccount,
+    leadActionFactCount: hasCanonicalParts ? rows.length : 0,
+  };
+}
 
 export function aggregateMetaTrafficMetrics(
   rows: InsightRow[],

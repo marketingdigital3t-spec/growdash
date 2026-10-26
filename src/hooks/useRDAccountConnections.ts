@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 const RD_SCOPE_TIMEOUT_MS = 2_500;
 
@@ -26,14 +27,16 @@ export type RDAccountConnection = {
 export function useRDAccountConnections(workspaceId?: string, options?: { enabled?: boolean }) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:rd-connections:${user.id}:${workspaceId ?? "owner-only"}` : "";
+  const cachedConnections = readLocalCache<RDAccountConnection[]>(cacheKey);
   return useQuery<RDAccountConnection[]>({
     queryKey: ["rd_account_connections", user?.id, workspaceId ?? "owner-only"],
     enabled: (options?.enabled ?? true) && !!user,
     retry: 0,
     refetchInterval: (query) => query.state.error ? 10_000 : false,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedConnections)),
     refetchOnWindowFocus: false,
     staleTime: 2 * 60_000,
-    placeholderData: readLocalCache<RDAccountConnection[]>(cacheKey),
+    placeholderData: cachedConnections,
     queryFn: async () => {
       if (workspaceId) {
         const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
