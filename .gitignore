@@ -42,3 +42,5 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 *.njsproj
 *.sln
 *.sw?
+
+.auth/

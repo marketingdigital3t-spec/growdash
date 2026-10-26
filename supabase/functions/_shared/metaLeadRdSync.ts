@@ -28,6 +28,20 @@ type RdDeal = {
   rd_connection_id: string | null;
   rd_deal_id: string;
   ad_account_id: string | null;
+  meta_lead_id?: string | null;
+  meta_form_id?: string | null;
+  meta_campaign_id?: string | null;
+  meta_adset_id?: string | null;
+  meta_ad_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_adset_name?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_name?: string | null;
+  meta_platform?: string | null;
+  meta_placement?: string | null;
+  meta_is_organic?: boolean | null;
+  meta_attribution_method?: string | null;
+  meta_attribution_status?: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   lead_created_at: string | null;
@@ -97,6 +111,57 @@ function trackingFingerprint(lead: MetaLead): string {
     `form_id=${clean(lead.form_id) || ""}`,
     ...TRACKING_FIELDS.map((field) => `${field.key}=${clean(lead[field.key]) || ""}`),
   ].join("|");
+}
+
+function attributionMethod(deal: RdDeal, lead: MetaLead) {
+  const emailMatches = Boolean(normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email));
+  const phoneMatches = Boolean(normalizePhone(lead.phone) && normalizePhone(lead.phone) === normalizePhone(deal.contact_phone));
+  if (emailMatches && phoneMatches) return "meta_form_email_phone_exact";
+  if (emailMatches) return "meta_form_email_exact";
+  if (phoneMatches) return "meta_form_phone_exact";
+  return deal.meta_attribution_method || "meta_lead_webhook";
+}
+
+/**
+ * Keep the Growdash mirror usable even when RD field writes are disabled or
+ * the provider rejects an optional custom field. The CRM reads these columns,
+ * while the RD write remains separately governed and audited below.
+ */
+async function mirrorAttribution(admin: AdminClient, deal: RdDeal, lead: MetaLead) {
+  const value = (incoming: unknown, existing: unknown) => clean(incoming) || clean(existing) || null;
+  const meta_campaign_id = value(lead.campaign_id, deal.meta_campaign_id);
+  const meta_adset_id = value(lead.adset_id, deal.meta_adset_id);
+  const meta_ad_id = value(lead.ad_id, deal.meta_ad_id);
+  const meta_form_id = value(lead.form_id, deal.meta_form_id);
+  const meta_campaign_name = value(lead.campaign_name, deal.meta_campaign_name);
+  const meta_adset_name = value(lead.adset_name, deal.meta_adset_name);
+  const meta_ad_name = value(lead.ad_name, deal.meta_ad_name);
+  const meta_form_name = value(lead.form_name, deal.meta_form_name);
+  const meta_platform = value(lead.platform, deal.meta_platform);
+  const meta_placement = value(lead.placement, deal.meta_placement);
+  const meta_is_organic = typeof lead.is_organic === "boolean" ? lead.is_organic : deal.meta_is_organic ?? null;
+  const hasAny = Boolean(meta_campaign_id || meta_adset_id || meta_ad_id || meta_form_id || meta_campaign_name || meta_adset_name || meta_ad_name || meta_form_name || meta_platform || meta_placement);
+  const complete = Boolean(meta_campaign_id && meta_adset_id && meta_ad_id && meta_form_id && meta_campaign_name && meta_adset_name && meta_ad_name && meta_form_name && meta_platform && meta_placement);
+  const { error } = await admin.from("rd_deals").update({
+    meta_lead_id: clean(lead.meta_lead_id) || deal.meta_lead_id || null,
+    meta_form_id,
+    meta_campaign_id,
+    meta_adset_id,
+    meta_ad_id,
+    meta_campaign_name,
+    meta_adset_name,
+    meta_ad_name,
+    meta_form_name,
+    meta_platform,
+    meta_placement,
+    meta_is_organic,
+    meta_attribution_method: attributionMethod(deal, lead),
+    meta_attribution_status: complete ? "exact" : hasAny ? "partial" : "unavailable",
+    meta_attributed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", deal.id).eq("rd_connection_id", deal.rd_connection_id);
+  if (error) throw error;
+  return { complete, status: complete ? "exact" : hasAny ? "partial" : "unavailable" } as const;
 }
 
 async function stableUuid(value: string): Promise<string> {
@@ -180,6 +245,8 @@ async function providerDealReadback(token: string, rdDealId: string, expectedFie
 }
 
 function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score: number } {
+  const metaIdMatches = Boolean(clean(lead.meta_lead_id) && clean(lead.meta_lead_id) === clean(deal.meta_lead_id));
+  if (metaIdMatches) return { match: true, score: 100 };
   const emailMatches = !!normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email);
   const phoneMatches = !!normalizePhone(lead.phone) && normalizePhone(lead.phone) === normalizePhone(deal.contact_phone);
   if (!emailMatches && !phoneMatches) return { match: false, score: 0 };
@@ -193,6 +260,15 @@ function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score:
 async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal): Promise<TrackingResult> {
   if (!deal.rd_connection_id) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_missing" };
   const trackingComplete = leadHasCompleteTracking(lead);
+
+  // Persist the attribution in the local mirror before checking RD write
+  // permission. A disabled RD write must not make a real Meta lead disappear
+  // from the CRM details view.
+  try {
+    await mirrorAttribution(admin, deal, lead);
+  } catch (error) {
+    return { status: "failed", rd_deal_id: deal.rd_deal_id, error: error instanceof Error ? error.message : String(error) };
+  }
 
   const { data: connection, error: connectionError } = await admin
     .from("rd_account_connections")
@@ -280,8 +356,15 @@ async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boo
   const candidates: RdDeal[] = [];
   const email = normalizeEmail(lead.email);
   const phone = normalizePhone(lead.phone);
-  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
+  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
   const applyScope = (query: any) => scoped && lead.ad_account_id ? query.eq("ad_account_id", lead.ad_account_id) : query;
+  if (lead.meta_lead_id) {
+    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
+      .eq("meta_lead_id", lead.meta_lead_id)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
   if (email) {
     const { data, error } = await applyScope(admin.from("rd_deals").select(select))
       .ilike("contact_email", email)
@@ -327,6 +410,13 @@ async function queryLeadsForDeal(admin: AdminClient, deal: RdDeal, scoped: boole
   const phone = normalizePhone(deal.contact_phone);
   const select = "meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw";
   const applyScope = (query: any) => scoped && deal.ad_account_id ? query.eq("ad_account_id", deal.ad_account_id) : query;
+  if (deal.meta_lead_id) {
+    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
+      .eq("meta_lead_id", deal.meta_lead_id)
+      .limit(1);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
   if (email) {
     const { data, error } = await applyScope(admin.from("meta_leads").select(select))
       .ilike("email", email)
@@ -424,7 +514,7 @@ export async function syncRDDealToMeta(admin: AdminClient, connectionId: string,
   try {
     const { data: deal, error } = await admin
       .from("rd_deals")
-      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
+      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
       .eq("rd_connection_id", connectionId)
       .eq("rd_deal_id", rdDealId)
       .maybeSingle();

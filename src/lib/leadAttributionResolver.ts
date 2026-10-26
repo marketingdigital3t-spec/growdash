@@ -23,6 +23,9 @@ export interface LeadAttribution {
 
 type AttributionDeal = {
   ad_account_id?: string | null;
+  source?: string | null;
+  campaign?: string | null;
+  rd_campaign_name?: string | null;
   utm_source?: string | null;
   utm_campaign?: string | null;
   utm_term?: string | null;
@@ -65,7 +68,8 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
   const campaign = text(deal.utm_campaign);
   const adset = text(deal.utm_term);
   const creative = text(deal.utm_content);
-  const source = text(deal.utm_source) || null;
+  const source = text(deal.utm_source) || text(deal.source) || null;
+  const rdCampaign = text(deal.campaign) || text(deal.rd_campaign_name) || null;
   const byNames = campaign && adset && creative
     ? rows.find((row) => same(row.campaign_name, campaign) && same(row.adset_name, adset) && same(row.ad_name, creative))
     : undefined;
@@ -76,7 +80,7 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
     ? rows.find((row) => same(row.campaign_name, campaign) || same(row.campaign_id, campaign))
     : undefined;
   const hit = byAd || byIds || byNames || byCampaignCreative || byCampaign;
-  const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId);
+  const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId || source || rdCampaign);
   const manual = deal.manual_tracking && typeof deal.manual_tracking === "object" ? deal.manual_tracking : null;
   const hasManual = !!manual && Object.keys(manual).length > 0;
   const applyManual = (automatic: LeadAttribution): LeadAttribution => {
@@ -115,7 +119,7 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
       formName: text(deal.meta_form_name) || null,
       isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
       campaignId,
-      campaignName: text(deal.meta_campaign_name) || campaign || null,
+      campaignName: text(deal.meta_campaign_name) || campaign || rdCampaign || null,
       adsetId,
       adsetName: text(deal.meta_adset_name) || adset || null,
       adId,

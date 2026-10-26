@@ -68,4 +68,18 @@ describe("resolveLeadAttribution", () => {
       status: "partial",
     });
   });
+
+  it("mostra origem e campanha do RD sem inventar vínculo Meta", () => {
+    const result = resolveLeadAttribution({
+      source: "Busca Paga | Facebook Ads",
+      campaign: "[DRA RANNIELY] [HARMONIZAÇÃO] [ALUNA] BR",
+    }, []);
+    expect(result).toMatchObject({
+      source: "Busca Paga | Facebook Ads",
+      campaignName: "[DRA RANNIELY] [HARMONIZAÇÃO] [ALUNA] BR",
+      method: "unmatched",
+      status: "partial",
+    });
+    expect(result.adId).toBeNull();
+  });
 });

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
-import { summarizeMetaSyncBlocks } from "@/lib/syncStatus";
+import { isTerminalAuxiliarySyncFailure, summarizeMetaSyncBlocks } from "@/lib/syncStatus";
 import { shouldRefreshStoredMetaToken } from "@/lib/syncRequestPlan";
 
 interface SyncParams {
@@ -39,7 +39,7 @@ type SyncResponse = {
   coverage?: Record<string, unknown>;
 };
 
-async function invokeSyncFunction(name: string, body: Record<string, unknown>): Promise<SyncResponse> {
+async function invokeSyncFunction(name: string, body: Record<string, unknown>, options: { allowPartial?: boolean } = {}): Promise<SyncResponse> {
   let result = await supabase.functions.invoke(name, { body });
   if (result.error) {
     const first = await edgeFunctionErrorDetails(result.error);
@@ -63,7 +63,8 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>): 
     throw Object.assign(new Error(formatEdgeFunctionError(details)), { details });
   }
   const data = (result.data ?? {}) as SyncResponse;
-  if (data.error || data.success === false || data.status === "failed" || data.status === "blocked") {
+  const terminalFailure = isTerminalAuxiliarySyncFailure(data);
+  if (data.error || terminalFailure || (!options.allowPartial && data.success === false)) {
     throw Object.assign(new Error(data.error || data.errors?.join(" · ") || "A Meta recusou a sincronização."), {
       details: { needsReauth: Boolean(data.needs_reauth) },
     });
@@ -73,14 +74,14 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>): 
 
 async function invokeAuxiliaryWithRetry(name: string, body: Record<string, unknown>): Promise<SyncResponse> {
   try {
-    return await invokeSyncFunction(name, body);
+    return await invokeSyncFunction(name, body, { allowPartial: true });
   } catch (firstError) {
     // Auxiliary resources are frequently rate-limited independently from
     // Insights. One bounded retry avoids turning a transient warning into a
     // permanent partial state while keeping the manual action responsive.
     await new Promise((resolve) => window.setTimeout(resolve, 500));
     try {
-      return await invokeSyncFunction(name, body);
+      return await invokeSyncFunction(name, body, { allowPartial: true });
     } catch {
       throw firstError;
     }

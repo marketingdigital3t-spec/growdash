@@ -5,6 +5,16 @@ export type SyncBlock = {
   errors?: string[];
 };
 
+/**
+ * Auxiliary resources (leads/forms and hourly facts) may return `success: false`
+ * together with a partial snapshot and actionable warnings. Only an explicit
+ * error or a terminal provider status should reject the background task; the
+ * primary Insights snapshot remains valid in the partial case.
+ */
+export function isTerminalAuxiliarySyncFailure(block: SyncBlock) {
+  return Boolean(block.error) || ["failed", "blocked"].includes(String(block.status || ""));
+}
+
 export function summarizeMetaSyncBlocks(blocks: {
   insights: SyncBlock;
   leads?: SyncBlock;

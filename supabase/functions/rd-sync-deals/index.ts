@@ -324,6 +324,26 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
+function contactEmailFrom(value: any): string | null {
+  if (!value || typeof value !== "object") return null;
+  const emails = Array.isArray(value.emails) ? value.emails : [];
+  return firstString(
+    value.email,
+    value.contact?.email,
+    ...emails.flatMap((item: any) => [item?.email, item?.value, item?.address]),
+  );
+}
+
+function contactPhoneFrom(value: any): string | null {
+  if (!value || typeof value !== "object") return null;
+  const phones = Array.isArray(value.phones) ? value.phones : [];
+  return firstString(
+    value.phone,
+    value.contact?.phone,
+    ...phones.flatMap((item: any) => [item?.phone, item?.value, item?.number]),
+  );
+}
+
 function asArray(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
 }
@@ -1177,14 +1197,22 @@ Deno.serve(async (req) => {
         d.name,
       );
       const contactName = cleanContactName(rawName);
-      const contactPhone =
-        phones.length > 0
-          ? phones[0]?.phone || phones[0] || null
-          : baseContact.phone || firstContact.phone || nestedContact.phone || null;
-      const contactEmail =
-        emails.length > 0
-          ? emails[0]?.email || emails[0] || null
-          : baseContact.email || firstContact.email || nestedContact.email || inline.email || null;
+      const contactPhone = firstString(
+        contactPhoneFrom(baseContact),
+        contactPhoneFrom(firstContact),
+        contactPhoneFrom(nestedContact),
+        contactPhoneFrom(inline),
+        phones[0]?.phone,
+        phones[0],
+      );
+      const contactEmail = firstString(
+        contactEmailFrom(baseContact),
+        contactEmailFrom(firstContact),
+        contactEmailFrom(nestedContact),
+        contactEmailFrom(inline),
+        emails[0]?.email,
+        emails[0],
+      );
 
       const contactCustomFields =
         firstContact?.contact_custom_fields || baseContact?.contact_custom_fields || [];
@@ -1238,6 +1266,12 @@ Deno.serve(async (req) => {
         (typeof d.campaign === "string" ? d.campaign : null) ||
         d.deal_source?.name ||
         null;
+      const rdSourceName =
+        d.deal_source?.name ||
+        (typeof d.deal_source === "string" ? d.deal_source : null) ||
+        d.source?.name ||
+        (typeof d.source === "string" ? d.source : null) ||
+        null;
 
       const cfSources = [dealCustomFields, contactCustomFields];
       const trackingSources = mergeUtmSources([d.utms, d.utm, baseContact?.utms, firstContact?.utms, d.deal_source, d.lead_origin]);
@@ -1290,6 +1324,8 @@ Deno.serve(async (req) => {
               stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
             deal_owner_name: dealOwnerName,
             rd_product_name: rdProductName,
+            source: rdSourceName,
+            campaign: rdCampaignName,
             stage_bucket: bucket,
             win: won,
             lost_reason: lostReason,
@@ -1471,7 +1507,12 @@ Deno.serve(async (req) => {
           const resolved = await Promise.all(batch.map((item) => {
             const id = String(item?.id || item?._id || "");
             const profile = existingProfiles.get(id);
-            const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.contact_phone || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
+            // A profile with only a name/custom fields is not complete for
+            // attribution: RD may expose the contact e-mail/phone only on the
+            // authoritative detail/contacts response. Rehydrate those rows
+            // so a Meta lead can be matched instead of being left blank.
+            const hasContactIdentity = Boolean(profile?.contact_email || profile?.contact_phone);
+            const complete = Boolean(profile?.raw) && hasContactIdentity && Boolean(profile.contact_name || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
             // A list snapshot with the same provider timestamp/stage/value is
             // already authoritative for the mirror. Rehydrating every won
             // deal on every historical pass made two otherwise harmless
@@ -1540,22 +1581,16 @@ Deno.serve(async (req) => {
         const baseContact = d.contact || d.deal_contact || {};
         const storedProfile = d._storedProfile || {};
         const contactEmail = firstString(
-          baseContact.email,
-          firstContact.email,
-          firstContact.contact?.email,
-          inline.email,
+          contactEmailFrom(baseContact),
+          contactEmailFrom(firstContact),
+          contactEmailFrom(inline),
           d.contact_email,
           storedProfile.contact_email,
         );
         const contactPhone = firstString(
-          baseContact.phones?.[0]?.phone,
-          firstContact.phones?.[0]?.phone,
-          firstContact.contact?.phones?.[0]?.phone,
-          inline.phones?.[0]?.phone,
-          baseContact.phone,
-          firstContact.phone,
-          firstContact.contact?.phone,
-          inline.phone,
+          contactPhoneFrom(baseContact),
+          contactPhoneFrom(firstContact),
+          contactPhoneFrom(inline),
           d.contact_phone,
           storedProfile.contact_phone,
         );

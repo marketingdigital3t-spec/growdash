@@ -1893,7 +1893,12 @@ type MetaFetchResult = Record<string, any> & {
 
 async function fetchMeta(url: string, maxAttempts = 4, fastMode = false): Promise<MetaFetchResult> {
   const attempts = fastMode ? 1 : maxAttempts;
-  const requestTimeoutMs = fastMode ? 6_000 : 10_000;
+  // A fast snapshot skips the expensive catalog work, but the Graph API can
+  // still need several seconds to answer a busy account. Six seconds caused
+  // valid accounts to be marked failed before their snapshot could be read.
+  // Keep the same bounded deadline as the regular request while the client
+  // remains stale-while-revalidate.
+  const requestTimeoutMs = 10_000;
   let lastMessage = "Falha ao consultar a Graph API";
   for (let attempt = 0; attempt < attempts; attempt++) {
     const controller = new AbortController();
