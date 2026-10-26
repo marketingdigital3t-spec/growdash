@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, startOfWeek, subMonths } from "date-fns";
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, Check, ChevronDown, Copy, ExternalLink, ImageUp, Lightbulb, Link2, Presentation, Sparkles, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, Check, CheckCheck, ChevronDown, Copy, ExternalLink, ImageUp, Lightbulb, Link2, Presentation, Sparkles, Trash2, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, type Sale } from "@/hooks/useSales";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,7 +20,7 @@ import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficR
 import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { buildLeadQualitySummary, type LeadQualitySummary } from "@/lib/leadQualityReport";
 
-export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
+export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "costPerOpportunity" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
 export type ReportSnapshot = {
   title: string;
@@ -51,10 +51,11 @@ const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
   { id: "ctr", label: "CTR", description: "Percentual de cliques sobre as impressões." },
   { id: "cpm", label: "CPM", description: "Custo médio para mil impressões." },
   { id: "conversionRate", label: "Taxa de conversão", description: "Percentual de leads gerados sobre os cliques." },
-  { id: "rd", label: "Negócios RD", description: "Negociações criadas no RD Station no mesmo período e conta." },
+  { id: "rd", label: "Oportunidades RD", description: "Negociações criadas no RD Station no mesmo período e conta." },
+  { id: "costPerOpportunity", label: "Custo por oportunidade", description: "Investimento dividido pelas oportunidades registradas no RD Station." },
   { id: "sales", label: "Vendas", description: "Quantidade de vendas confirmadas e atribuídas." },
   { id: "revenue", label: "Receita", description: "Receita líquida confirmada no período." },
-  { id: "cac", label: "CAC", description: "Investimento dividido pelas vendas confirmadas." },
+  { id: "cac", label: "Custo por venda", description: "Investimento dividido pelas vendas confirmadas." },
   { id: "roas", label: "ROAS", description: "Receita atribuída dividida pelo investimento." },
   { id: "profit", label: "Resultado", description: "Receita menos investimento em mídia." },
   { id: "coverage", label: "Cobertura RD/Meta", description: "Relação percentual entre negócios RD e leads Meta." },
@@ -67,7 +68,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "conversations", "cpl", "impressions", "clicks", "rd", "sales", "revenue"]);
+  const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "conversations", "cpl", "impressions", "clicks", "rd", "costPerOpportunity", "sales", "revenue", "cac", "roas"]);
   const [presenting, setPresenting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -136,6 +137,8 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   });
 
   function toggle(id: MetricId) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
+  function selectAll() { setSelected(METRICS.map((metric) => metric.id)); }
+  function clearSelection() { setSelected([]); }
   function upload(file?: File) {
     if (!file) return;
     if (file.size > 2_000_000) { toast({ title: "Imagem muito grande", description: "Use um banner de até 2 MB.", variant: "destructive" }); return; }
@@ -145,7 +148,6 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   }
   async function generate() {
     if (accountId === "all") { toast({ title: "Selecione uma conta", description: "O relatório compartilhável precisa manter uma origem única para não misturar métricas." }); return; }
-    if (analysisLoading) { toast({ title: "Análise de dois meses carregando", description: "Aguarde a conclusão da consulta Meta, RD e vendas para publicar o relatório completo." }); return; }
     setPresenting(true);
     if (!workspace?.id || workspace.id.startsWith("legacy-") || !user) return;
     setSaving(true);
@@ -169,23 +171,26 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   }
 
   return <>
-    <section className="gd-panel overflow-hidden">
-      <header className="flex flex-col gap-3 border-b border-border p-4 2xl:flex-row 2xl:items-center">
-        <div><h2 className="flex items-center gap-2 font-black"><Presentation className="h-4 w-4 text-primary" />Estúdio do relatório de leads</h2><p className="mt-1 text-[10px] text-muted-foreground">Escolha período e métricas, gere uma página premium e compartilhe um link independente.</p></div>
-        <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,320px)_minmax(280px,auto)_auto_auto] 2xl:ml-auto">
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(event) => upload(event.target.files?.[0])} />
-          <Button variant="outline" className="h-10" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />Banner</Button>
-          <Button className="gold-action h-10" disabled={saving || loadingActions || analysisLoading || audienceLoading || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : loadingActions ? "Carregando leads…" : analysisLoading ? "Analisando 2 meses…" : audienceLoading ? "Carregando público…" : "Gerar página"}</Button>
+    <section className="gd-panel w-full overflow-hidden">
+      <header className="border-b border-border p-4 sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0"><h2 className="flex items-center gap-2 font-black"><Presentation className="h-4 w-4 text-primary" />Estúdio do relatório de leads</h2><p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">Escolha a conta, o período e as métricas. Gere uma página completa com banner, análise e link para compartilhar.</p></div>
+          <div className="flex shrink-0 items-center gap-2"><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-[10px] font-black text-primary">{selected.length} métrica(s) selecionada(s)</span>{banner ? <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-300">Banner pronto</span> : null}</div>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0"><MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} applyPresetOnClick className="h-10 min-w-0 w-full" /></div>
+          <div className="flex min-w-0 gap-2 sm:col-span-2 lg:col-span-1"><input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => { upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /><Button variant="outline" className="h-10 flex-1" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />{banner ? "Trocar banner" : "Adicionar banner"}</Button>{banner ? <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" title="Remover banner" aria-label="Remover banner" onClick={() => { setBanner(""); window.localStorage.removeItem(`growdash:report-banner:${accountId}`); }}><X className="h-4 w-4" /></Button> : null}</div>
         </div>
       </header>
-      <div className="p-4">
-        <h3 className="mb-2 text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Métricas do relatório</h3>
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground"><BarChart3 className="h-4 w-4 text-primary" />{analysisLoading ? "Consolidando os dois últimos meses com Meta, conversas, RD e vendas…" : analysis ? `Análise executiva pronta: ${format(new Date(`${analysis.analysisFrom}T12:00:00`), "dd/MM/yyyy")} a ${format(new Date(`${analysis.analysisTo}T12:00:00`), "dd/MM/yyyy")}.` : "Selecione uma conta para comparar os dois últimos meses."}{audienceLoading ? " Perfil do público carregando…" : audience ? " O perfil do público será incluído na página." : ""}</div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{METRICS.map((metric) => <button key={metric.id} type="button" title={metric.description} onClick={() => toggle(metric.id)} className={cn("flex min-h-12 min-w-0 items-center gap-2 rounded-xl border p-3 text-left text-xs font-bold transition", selected.includes(metric.id) ? "border-primary/55 bg-primary/10 text-foreground shadow-[0_0_22px_-15px_hsl(var(--primary))]" : "border-border text-muted-foreground hover:bg-muted/35")}><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded border", selected.includes(metric.id) ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{selected.includes(metric.id) && <Check className="h-3 w-3" />}</span><span className="truncate">{metric.label}</span></button>)}</div>
-        <div className="mt-4 grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{selected.map((id) => <div key={id} className="h-full"><PreviewMetric id={id} totals={totals} /></div>)}</div>
+      <div className="space-y-5 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3 text-[11px] text-muted-foreground"><BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><b className="block text-foreground">Dados do relatório</b><span>{loadingActions ? "Os dados de leads estão sendo atualizados em segundo plano; você já pode gerar o relatório." : analysisLoading ? "A análise executiva está sendo atualizada em segundo plano; você já pode gerar o relatório." : analysis ? `Análise executiva pronta: ${format(new Date(`${analysis.analysisFrom}T12:00:00`), "dd/MM/yyyy")} a ${format(new Date(`${analysis.analysisTo}T12:00:00`), "dd/MM/yyyy")}.` : "Selecione uma conta para comparar os dois últimos meses."}{audienceLoading ? " Perfil do público carregando em segundo plano." : audience ? " O perfil do público será incluído na página." : ""}</span></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" className="h-9" onClick={clearSelection} disabled={!selected.length}><X className="mr-1.5 h-3.5 w-3.5" />Limpar</Button><Button type="button" size="sm" variant="outline" className="h-9" onClick={selectAll} disabled={selected.length === METRICS.length}><CheckCheck className="mr-1.5 h-3.5 w-3.5" />Selecionar todas</Button><Button type="button" className="gold-action h-9" disabled={saving || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : "Gerar relatório"}</Button></div></div>
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.55fr)]">
+          <section className="min-w-0"><div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Escolha as métricas</h3><p className="mt-1 text-[11px] text-muted-foreground">Clique em qualquer indicador para incluir ou remover da página final.</p></div><span className="text-[10px] font-bold text-muted-foreground">{METRICS.length} disponíveis</span></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{METRICS.map((metric) => { const active = selected.includes(metric.id); return <button key={metric.id} type="button" title={metric.description} aria-pressed={active} onClick={() => toggle(metric.id)} className={cn("flex min-w-0 items-center gap-2 rounded-xl border p-3 text-left text-xs font-bold transition", active ? "border-primary/55 bg-primary/10 text-foreground shadow-[0_0_22px_-15px_hsl(var(--primary))]" : "border-border text-muted-foreground hover:bg-muted/35")}><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded border", active ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{active && <Check className="h-3 w-3" />}</span><span className="min-w-0 truncate">{metric.label}</span></button>; })}</div></section>
+          <aside className="min-w-0 rounded-2xl border border-border bg-background/45 p-4"><div className="flex items-center justify-between gap-2"><div><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Prévia do relatório</h3><p className="mt-1 text-[11px] text-muted-foreground">Assim os dados aparecerão na página final.</p></div><Presentation className="h-4 w-4 text-primary" /></div>{selected.length ? <div className="mt-4 grid grid-cols-2 gap-2">{selected.map((id) => <div key={id} className="h-full"><PreviewMetric id={id} totals={totals} /></div>)}</div> : <div className="mt-4 rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">Nenhuma métrica selecionada. Use “Selecionar todas” ou escolha os indicadores ao lado.</div>}</aside>
+        </div>
         <QualitySummarySection quality={quality} />
-        {shareUrl && <div className="mt-4 flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center"><div className="min-w-0 grow"><p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Link gerado agora</p><p className="truncate text-xs text-muted-foreground" title={shareUrl}>{shareUrl}</p></div><Button size="sm" className="shrink-0" onClick={() => copy()}><Copy className="mr-1.5 h-3.5 w-3.5" />Copiar link</Button></div>}
-        {history.data?.length ? <div className="mt-5 border-t border-border pt-4"><h3 className="mb-2 text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Histórico compartilhável · {accountName}</h3><div className="grid gap-2 sm:grid-cols-2">{history.data.map((item) => { const url = `${window.location.origin}/relatorios/${item.share_token}`; return <div key={item.id} className="min-w-0 rounded-xl border border-border bg-background/45 p-3"><b className="block truncate text-xs" title={item.title}>{item.title}</b><small className="mt-1 block text-muted-foreground">{format(new Date(`${item.date_from}T12:00:00`), "dd/MM")}–{format(new Date(`${item.date_to}T12:00:00`), "dd/MM/yyyy")}</small><p className="mt-2 truncate text-[10px] text-muted-foreground" title={url}>{url}</p><div className="mt-3 flex gap-1"><Button size="sm" variant="outline" className="h-7" title="Copiar link" onClick={() => copy(url)}><Copy className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7" title="Abrir relatório" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><ExternalLink className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 text-destructive hover:text-destructive" title="Excluir relatório" disabled={deletingId === item.id} onClick={() => removeReport(item.id)}><Trash2 className="h-3 w-3" /></Button></div></div>; })}</div></div> : null}
+        {shareUrl && <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center"><div className="min-w-0 grow"><p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Link gerado agora</p><p className="truncate text-xs text-muted-foreground" title={shareUrl}>{shareUrl}</p></div><Button size="sm" className="shrink-0" onClick={() => copy()}><Copy className="mr-1.5 h-3.5 w-3.5" />Copiar link</Button></div>}
+        {history.data?.length ? <div className="border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Histórico de relatórios · {accountName}</h3><span className="text-[10px] text-muted-foreground">{history.data.length} relatório(s) salvo(s)</span></div><div className="grid gap-2 sm:grid-cols-2">{history.data.map((item) => { const url = `${window.location.origin}/relatorios/${item.share_token}`; return <div key={item.id} className="min-w-0 rounded-xl border border-border bg-background/45 p-3"><b className="block truncate text-xs" title={item.title}>{item.title}</b><small className="mt-1 block text-muted-foreground">{format(new Date(`${item.date_from}T12:00:00`), "dd/MM")}–{format(new Date(`${item.date_to}T12:00:00`), "dd/MM/yyyy")}</small><p className="mt-2 truncate text-[10px] text-muted-foreground" title={url}>{url}</p><div className="mt-3 flex gap-1"><Button size="sm" variant="outline" className="h-7" title="Copiar link" aria-label="Copiar link" onClick={() => copy(url)}><Copy className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7" title="Abrir relatório" aria-label="Abrir relatório" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><ExternalLink className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 text-destructive hover:text-destructive" title="Excluir relatório" aria-label="Excluir relatório" disabled={deletingId === item.id} onClick={() => removeReport(item.id)}><Trash2 className="h-3 w-3" /></Button></div></div>; })}</div></div> : null}
       </div>
     </section>
     {presenting && <ReportPresentation report={snapshot} onClose={() => setPresenting(false)} shareUrl={shareUrl} onCopy={() => copy()} />}
@@ -196,12 +201,12 @@ export function ReportPresentation({ report, onClose, shareUrl, onCopy }: { repo
   const { totals, daily, weekly, metrics } = report;
   const analysis = report.analysis;
   const brandName = report.branding?.name || "Growdash";
-  return <div className={cn(onClose && "fixed inset-0 z-[200]", "min-h-screen overflow-y-auto bg-[#050505] text-white")}>
+  return <div role={onClose ? "dialog" : undefined} aria-label={onClose ? "Relatório de performance" : undefined} className={cn(onClose && "fixed inset-0 z-[200]", "min-h-screen overflow-y-auto bg-[#050505] text-white")}>
     <div className="relative min-h-[380px] overflow-hidden border-b border-white/10 bg-gradient-to-br from-[#181105] via-black to-[#2b1f08]">
       {report.banner && <img src={report.banner} alt="Banner da marca" className="absolute inset-0 h-full w-full object-cover opacity-60" />}
       <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-black/45 to-black/15" />
       <div className="absolute left-4 top-4 z-10 flex gap-2">{onClose && <Button variant="outline" className="border-white/20 bg-black/45 text-white hover:bg-black/65" onClick={onClose}><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button>}{shareUrl && onCopy && <Button variant="outline" className="border-white/20 bg-black/45 text-white hover:bg-black/65" onClick={onCopy}><Link2 className="mr-2 h-4 w-4" />Copiar link</Button>}</div>
-      <div className="relative z-[1] mx-auto flex min-h-[380px] max-w-[1800px] items-end px-5 pb-12 sm:px-10"><div><span className="text-[10px] font-black uppercase tracking-[.3em] text-[#d8b65c]">{brandName} · Pouso confirmado</span><h1 className="mt-3 max-w-5xl text-3xl font-black sm:text-5xl">{report.accountName}</h1><p className="mt-3 text-sm text-white/65">Meta Ads × RD Station · {format(new Date(`${report.dateFrom}T12:00:00`), "dd/MM/yyyy")} a {format(new Date(`${report.dateTo}T12:00:00`), "dd/MM/yyyy")}</p></div></div>
+      <div className="relative z-[1] mx-auto flex min-h-[380px] max-w-[1800px] items-end px-5 pb-12 sm:px-10"><div><span className="text-[10px] font-black uppercase tracking-[.3em] text-[#d8b65c]">{brandName} · Relatório executivo</span><h1 className="mt-3 max-w-5xl text-3xl font-black sm:text-5xl">{report.accountName}</h1><p className="mt-3 text-sm text-white/65">Meta Ads × RD Station · {format(new Date(`${report.dateFrom}T12:00:00`), "dd/MM/yyyy")} a {format(new Date(`${report.dateTo}T12:00:00`), "dd/MM/yyyy")}</p></div></div>
     </div>
     <main className="mx-auto max-w-[1800px] space-y-8 px-5 py-10 sm:px-10">
       <section><div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="text-lg font-black">Resumo executivo</h2><p className="mt-1 text-xs text-white/45">Métricas do intervalo publicado, com leads e conversas separadas no detalhamento.</p></div>{analysis && <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold text-emerald-300">Dados reais · 2 meses</span>}</div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">{metrics.map((id) => <ReportMetric key={id} id={id} totals={totals} />)}</div></section>
@@ -380,6 +385,7 @@ function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[]
     cpm: impressions ? spend / impressions * 1000 : 0,
     conversionRate: clicks ? leads / clicks * 100 : 0,
     rd: deals.length,
+    costPerOpportunity: deals.length ? spend / deals.length : 0,
     sales,
     revenue,
     cac: sales ? spend / sales : 0,
@@ -391,7 +397,7 @@ function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[]
 function dailyRows(insights: InsightRow[], canonicalLeadsByDate: Record<string, number>) { const map = new Map<string, { date: string; leads: number; spend: number }>(); insights.forEach((r) => { if (!r.date) return; const row = map.get(r.date) || { date: r.date, leads: 0, spend: 0 }; row.spend += Number(r.spend || 0); map.set(r.date, row); }); for (const [date, leads] of Object.entries(canonicalLeadsByDate)) { const row = map.get(date) || { date, leads: 0, spend: 0 }; row.leads = leads; map.set(date, row); } return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)); }
 function weeklyRows(daily: ReturnType<typeof dailyRows>) { const map = new Map<string, { week: string; leads: number; spend: number; days: number }>(); daily.forEach((day) => { const week = format(startOfWeek(new Date(`${day.date}T12:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd"); const row = map.get(week) || { week, leads: 0, spend: 0, days: 0 }; row.leads += day.leads; row.spend += day.spend; row.days += 1; map.set(week, row); }); return Array.from(map.values()).sort((a, b) => a.week.localeCompare(b.week)); }
 function formatMetricValue(id: MetricId, value: number) {
-  if (["spend", "cpl", "cpc", "cpm", "revenue", "cac", "profit"].includes(id)) return currency.format(value);
+  if (["spend", "cpl", "cpc", "cpm", "revenue", "costPerOpportunity", "cac", "profit"].includes(id)) return currency.format(value);
   if (["ctr", "conversionRate", "coverage"].includes(id)) return `${value.toFixed(2)}%`;
   if (["roas", "frequency"].includes(id)) return `${value.toFixed(2)}x`;
   return integer.format(value);
