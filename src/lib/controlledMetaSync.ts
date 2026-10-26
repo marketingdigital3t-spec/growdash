@@ -1,4 +1,4 @@
-import { classifySyncErrorCode, type SyncErrorCode } from "./syncContract";
+import { classifySyncErrorCode, type SyncErrorCode } from "./syncContract.ts";
 
 type MetaSyncResult = {
   error?: unknown;
