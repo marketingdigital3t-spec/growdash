@@ -39,6 +39,145 @@ export type Database = {
   }
   public: {
     Tables: {
+      sync_event_dead_letters: {
+        Row: {
+          account_id: string | null
+          attempts: number
+          error_code: string
+          error_message: string
+          event_id: string | null
+          event_type: string
+          first_failed_at: string
+          id: string
+          idempotency_key: string
+          last_failed_at: string
+          object_id: string | null
+          payload_sha256: string
+          provider: string
+          resolved_at: string | null
+          scope_key: string
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          attempts?: number
+          error_code: string
+          error_message: string
+          event_id?: string | null
+          event_type: string
+          first_failed_at?: string
+          id?: string
+          idempotency_key: string
+          last_failed_at?: string
+          object_id?: string | null
+          payload_sha256: string
+          provider: string
+          resolved_at?: string | null
+          scope_key: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          attempts?: number
+          error_code?: string
+          error_message?: string
+          event_id?: string | null
+          event_type?: string
+          first_failed_at?: string
+          id?: string
+          idempotency_key?: string
+          last_failed_at?: string
+          object_id?: string | null
+          payload_sha256?: string
+          provider?: string
+          resolved_at?: string | null
+          scope_key?: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_event_dead_letters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_event_outbox: {
+        Row: {
+          account_id: string | null
+          attempts: number
+          created_at: string
+          event_id: string | null
+          event_type: string
+          id: string
+          idempotency_key: string
+          last_error_code: string | null
+          last_error_message: string | null
+          next_attempt_at: string
+          object_id: string | null
+          payload: Json
+          payload_sha256: string
+          provider: string
+          scope_key: string
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          attempts?: number
+          created_at?: string
+          event_id?: string | null
+          event_type: string
+          id?: string
+          idempotency_key: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          next_attempt_at?: string
+          object_id?: string | null
+          payload?: Json
+          payload_sha256: string
+          provider: string
+          scope_key: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          attempts?: number
+          created_at?: string
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          next_attempt_at?: string
+          object_id?: string | null
+          payload?: Json
+          payload_sha256?: string
+          provider?: string
+          scope_key?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_event_outbox_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_execution_runs: {
         Row: {
           attempt: number

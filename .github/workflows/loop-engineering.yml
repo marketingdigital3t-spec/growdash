@@ -44,6 +44,9 @@ jobs:
           chmod 600 .auth/growdash.json
           echo "GROWDASH_AUTH_STATE=$GITHUB_WORKSPACE/.auth/growdash.json" >> "$GITHUB_ENV"
 
+      - name: Run Meta/RD replay and contract harness
+        run: npm run test:sync
+
       - name: Run loop engineering detection
         id: loop
         continue-on-error: true
@@ -126,6 +129,20 @@ jobs:
         with:
           version: latest
 
+      - name: Validate migrations without applying them
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase migration list --linked
+          supabase db push --linked --dry-run
+
+      - name: Run Supabase advisors and retain evidence
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          mkdir -p reports
+          supabase db advisors --linked > reports/supabase-advisors.json
+
       - name: Apply compatible Supabase migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -176,10 +193,17 @@ jobs:
           for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
             code="$(curl -sS -o "/tmp/growdash-${fn}.json" -w '%{http_code}' -X POST "https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/${fn}" -H 'content-type: application/json' --data '{}')"
             test "$code" = "401" || { echo "$fn retornou HTTP $code; smoke bloqueado."; exit 2; }
+
+      - name: Smoke authenticated production browser
+        id: browser_smoke
+        continue-on-error: true
+        env:
+          GROWDASH_BASE_URL: https://growdash.com.br
+        run: npx playwright test tests/visual/route-health.spec.ts --project=desktop --workers=1
           done
 
       - name: Roll back Cloudflare canary after failed smoke
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -191,5 +215,5 @@ jobs:
           echo "Rollback Cloudflare solicitado para ${PREVIOUS_DEPLOYMENT_ID}."
 
       - name: Fail closed after smoke or rollback failure
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'
         run: exit 2

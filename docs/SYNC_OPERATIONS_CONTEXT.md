@@ -1,5 +1,9 @@
 # Contexto operacional de sincronização
 
+Versão do contexto: `sync-context-v1`
+Contrato de dados: `sync-v1`
+Fuso padrão operacional: `America/Sao_Paulo` (o fuso efetivo acompanha o escopo da conta).
+
 ## Grafo atual
 
 ```text
@@ -15,6 +19,28 @@ Supabase snapshots + sync_execution_runs
   -> Growdash / CRM / Campanhas / Saúde dos Dados
 Cloudflare Pages
 ```
+
+## Identidade de execução
+
+Toda execução começa com `sync_run_id`, provedor, conta/escopo, período, timezone,
+versão do código e versão do contrato. O registro em `sync_execution_runs` é a
+fonte de auditoria; cursores e watermarks são ligados ao mesmo escopo. O snapshot
+anterior continua sendo a resposta visível quando a fonte falha, com estado `stale`
+e código de erro; nenhuma falha vira zero.
+
+| Nó | Entrada/saída | Timeout/retry | Fallback | Evidência |
+|---|---|---|---|---|
+| Meta Graph | token + conta + janela → páginas de leads/catalogo/insights | 12s por chamada; backoff limitado | cursor e snapshot anterior | resposta HTTP, página, cursor |
+| Edge Functions | payload validado → upsert idempotente | orçamento por execução | `partial`, `stale` ou `blocked` | `sync_run_id`, `error_code` |
+| Postgres | registros/cursor → snapshot auditável | transação + RLS | não apagar snapshot válido | contagem lida/upsertada |
+| RD Station | lead/deal → CRM espelho | retry limitado e outbox | fila para retomada | ID RD e readback |
+| Growdash | snapshots/estados → telas | refetch por escopo | mostrar estado e idade | painel Data Health |
+| Cloudflare Pages | artefato com SHA → produção | canário + rollback | deployment anterior | HTTP, asset e smoke |
+
+O estado corrente, último snapshot válido, cursor, watermark, tentativas e erro
+devem ser consultados nessa ordem: `sync_execution_runs`,
+`realtime_sync_state`, `meta_sync_scope_state`, `rd_sync_cursors`, inbox/outbox
+e dead-letter. Payload bruto não entra em logs de agente, Sentry ou dead-letter.
 
 ## Operação
 

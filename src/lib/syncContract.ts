@@ -49,6 +49,40 @@ export const SYNC_ERROR_CODES = {
 
 export type SyncErrorCode = (typeof SYNC_ERROR_CODES)[keyof typeof SYNC_ERROR_CODES];
 
+export type SyncFailurePolicy = {
+  severity: "low" | "medium" | "high" | "critical";
+  owner: "provider" | "integration" | "database" | "contract" | "platform";
+  automaticAction: "retry" | "preserve_snapshot" | "dead_letter" | "block_until_reauth" | "block_promotion" | "ignore_duplicate";
+  blocksPromotion: boolean;
+};
+
+/**
+ * Versioned operating policy shared by the agent, replay harness and release
+ * loop. A new provider error must be added here before it can be emitted by an
+ * Edge Function; this prevents an unclassified failure from being treated as a
+ * successful sync.
+ */
+export const SYNC_FAILURE_POLICIES: Record<SyncErrorCode, SyncFailurePolicy> = {
+  AUTH_REQUIRED: { severity: "high", owner: "integration", automaticAction: "block_until_reauth", blocksPromotion: true },
+  TOKEN_EXPIRED: { severity: "high", owner: "provider", automaticAction: "block_until_reauth", blocksPromotion: true },
+  PERMISSION_DENIED: { severity: "high", owner: "provider", automaticAction: "block_until_reauth", blocksPromotion: true },
+  RATE_LIMITED: { severity: "medium", owner: "provider", automaticAction: "retry", blocksPromotion: false },
+  PROVIDER_TIMEOUT: { severity: "medium", owner: "provider", automaticAction: "preserve_snapshot", blocksPromotion: false },
+  PROVIDER_UNAVAILABLE: { severity: "high", owner: "provider", automaticAction: "preserve_snapshot", blocksPromotion: false },
+  CONTRACT_INVALID: { severity: "critical", owner: "contract", automaticAction: "block_promotion", blocksPromotion: true },
+  DUPLICATE_EVENT: { severity: "low", owner: "integration", automaticAction: "ignore_duplicate", blocksPromotion: false },
+  SNAPSHOT_PRESERVED: { severity: "medium", owner: "database", automaticAction: "preserve_snapshot", blocksPromotion: false },
+  UNKNOWN: { severity: "high", owner: "platform", automaticAction: "dead_letter", blocksPromotion: true },
+};
+
+export function syncFailurePolicy(errorCode: SyncErrorCode): SyncFailurePolicy {
+  return SYNC_FAILURE_POLICIES[errorCode] || SYNC_FAILURE_POLICIES.UNKNOWN;
+}
+
+export function isTerminalSyncFailure(status: string | null | undefined): boolean {
+  return status === "failed" || status === "blocked";
+}
+
 export function normalizeSyncText(value: unknown): string | null {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text || /^\{\{[^{}]+\}\}$/.test(text)) return null;

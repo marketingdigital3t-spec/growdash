@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { syncCrmLeadToRD, syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
+import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,45 @@ function pickField(fields: unknown, names: string[]) {
     if (value != null && String(value).trim()) return String(value);
   }
   return null;
+}
+
+async function enqueueFailedEvent(admin: any, event: { provider_event_id: string; event_type: string; payload: any }, account: MetaAccount | null, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const errorCode = classifySyncErrorCode(message);
+  const payloadSha256 = await sha256(JSON.stringify(event.payload));
+  const leadId = event.event_type === "leadgen" ? String(event.payload?.value?.leadgen_id || "") : "";
+  const idempotencyKey = ["meta", account?.id || "-", leadId || event.provider_event_id, event.provider_event_id, event.event_type].join(":");
+  const common = {
+    workspace_id: account?.workspace_id ?? null,
+    provider: "meta",
+    account_id: account?.id ?? null,
+    object_id: leadId || null,
+    event_id: event.provider_event_id,
+    scope_key: `webhook:${event.provider_event_id}`,
+    event_type: event.event_type,
+    idempotency_key: idempotencyKey,
+    payload_sha256: payloadSha256,
+  };
+  const retryable = !["TOKEN_EXPIRED", "PERMISSION_DENIED", "CONTRACT_INVALID", "UNKNOWN"].includes(errorCode);
+  if (retryable) {
+    await admin.from("sync_event_outbox").upsert({
+      ...common,
+      payload: event.payload,
+      status: "pending",
+      attempts: 1,
+      last_error_code: errorCode,
+      last_error_message: message.slice(0, 2_000),
+      next_attempt_at: new Date(Date.now() + 60_000).toISOString(),
+    }, { onConflict: "idempotency_key" });
+  } else {
+    await admin.from("sync_event_dead_letters").upsert({
+      ...common,
+      error_code: errorCode,
+      error_message: message.slice(0, 2_000),
+      attempts: 1,
+    }, { onConflict: "idempotency_key" });
+  }
+  return { errorCode, retryable };
 }
 
 async function resolveAccount(admin: any, adId: string | null, formId: string | null): Promise<MetaAccount | null> {
@@ -329,6 +369,7 @@ Deno.serve(async (req) => {
           const message = error instanceof Error ? error.message : String(error);
           errors.push(`${event.provider_event_id}: ${message}`);
           await admin.from("meta_webhook_events").update({ error_message: message }).eq("id", data.id);
+          await enqueueFailedEvent(admin, event, account, error);
         }
       } else if (!leadId) {
         // Click-to-message webhooks do not expose a Meta Lead ID, but their

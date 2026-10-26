@@ -7,6 +7,8 @@ import {
   classifySyncStatus,
   hasCompleteAttribution,
   normalizeAttribution,
+  isTerminalSyncFailure,
+  syncFailurePolicy,
 } from "./syncContract";
 
 describe("sync contract", () => {
@@ -39,5 +41,14 @@ describe("sync contract", () => {
     expect(classifySyncErrorCode("HTTP 429 rate limit")).toBe("RATE_LIMITED");
     expect(classifySyncErrorCode("HTTP 403 permission denied")).toBe("PERMISSION_DENIED");
     expect(classifySyncErrorCode("AbortError: timeout")).toBe("PROVIDER_TIMEOUT");
+  });
+
+  it("keeps the automatic repair policy explicit and fail-closed", () => {
+    expect(syncFailurePolicy("RATE_LIMITED")).toMatchObject({ automaticAction: "retry", blocksPromotion: false });
+    expect(syncFailurePolicy("CONTRACT_INVALID")).toMatchObject({ severity: "critical", automaticAction: "block_promotion", blocksPromotion: true });
+    expect(syncFailurePolicy("UNKNOWN")).toMatchObject({ automaticAction: "dead_letter", blocksPromotion: true });
+    expect(isTerminalSyncFailure("failed")).toBe(true);
+    expect(isTerminalSyncFailure("blocked")).toBe(true);
+    expect(isTerminalSyncFailure("partial")).toBe(false);
   });
 });

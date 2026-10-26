@@ -8,7 +8,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
-    baseURL: "http://127.0.0.1:4174",
+    baseURL: process.env.GROWDASH_BASE_URL || "http://127.0.0.1:4174",
     colorScheme: "dark",
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
@@ -16,12 +16,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
     ...(process.env.GROWDASH_AUTH_STATE ? { storageState: process.env.GROWDASH_AUTH_STATE } : {}),
   },
-  webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4174",
-    url: "http://127.0.0.1:4174/auth",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ...(process.env.GROWDASH_BASE_URL ? {} : {
+    webServer: {
+      command: "npm run dev -- --host 127.0.0.1 --port 4174",
+      url: "http://127.0.0.1:4174/auth",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  }),
   projects: [
     { name: "mobile", use: { viewport: { width: 390, height: 844 } } },
     { name: "tablet", use: { viewport: { width: 820, height: 1180 } } },
