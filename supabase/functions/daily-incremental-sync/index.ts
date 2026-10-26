@@ -3,6 +3,7 @@ import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 import { resolveMetaLookbackDateRange } from "../_shared/metaLookbackWindow.ts";
 import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../_shared/metaSyncBatch.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
+import { buildLeadSyncWindow } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -379,8 +380,7 @@ Deno.serve(async (req) => {
       const leads = insights.ok
         ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
           ...accountScope,
-          startDate: accountDateRange.startDate,
-          endDate: accountDateRange.endDate,
+          ...buildLeadSyncWindow(syncWindow),
           triggerSource: "five_minute_incremental",
         }), false)
         : { ok: false, status: 0, durationMs: 0, body: { error: "Insights parcial; leads preservados do último snapshot válido." } };

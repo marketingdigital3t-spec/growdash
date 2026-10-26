@@ -6,6 +6,7 @@ import {
   hasExceededSyncDeadline,
   classifyAbandonedExecution,
   fetchWithTimeout,
+  buildLeadSyncWindow,
   leadSyncExecutionPolicy,
 } from "./syncReliabilityPolicy";
 
@@ -55,6 +56,31 @@ describe("sync reliability policy", () => {
       catalogMaxPages: 1,
       refreshSubscriptions: false,
       deliveryFields: "combined",
+    });
+  });
+
+  it("uses the short watermark for incremental lead polling", () => {
+    const start = new Date("2026-10-26T18:55:00.000Z");
+    const end = new Date("2026-10-26T19:00:00.000Z");
+    expect(buildLeadSyncWindow({
+      mode: "incremental",
+      start,
+      end,
+      startDate: "2026-10-26",
+      endDate: "2026-10-26",
+    })).toEqual({
+      recentStartAt: start.toISOString(),
+      recentEndAt: end.toISOString(),
+    });
+    expect(buildLeadSyncWindow({
+      mode: "historical",
+      start,
+      end,
+      startDate: "2026-10-26",
+      endDate: "2026-10-26",
+    })).toEqual({
+      startDate: "2026-10-26",
+      endDate: "2026-10-26",
     });
   });
 });

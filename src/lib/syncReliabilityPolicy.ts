@@ -11,6 +11,31 @@ export type LeadSyncExecutionPolicy = {
   deliveryFields: "combined" | "isolated";
 };
 
+export type LeadSyncWindow = {
+  mode: "incremental" | "historical" | "manual";
+  start: Date;
+  end: Date;
+  startDate: string;
+  endDate: string;
+};
+
+/**
+ * Incremental workers keep a short watermark for lead polling. The wider
+ * civil-day lookback belongs to insights and must never be passed to the
+ * per-form lead endpoint, otherwise every five-minute cycle rereads the day.
+ */
+export function buildLeadSyncWindow(window: LeadSyncWindow) {
+  return window.mode === "incremental"
+    ? {
+      recentStartAt: window.start.toISOString(),
+      recentEndAt: window.end.toISOString(),
+    }
+    : {
+      startDate: window.startDate,
+      endDate: window.endDate,
+    };
+}
+
 /**
  * Recent lead windows are latency-sensitive. They reuse the local form
  * catalog and must not refresh page/app subscriptions or walk every catalog
