@@ -26,7 +26,7 @@ export async function startSyncExecution(admin: any, context: SyncExecutionConte
     return data?.id ? String(data.id) : null;
   } catch (error) {
     console.error("sync_execution_start_failed", { provider: context.provider, scope_key: context.scopeKey, error: String(error).slice(0, 500) });
-    void captureSyncSentryEvent({
+    await captureSyncSentryEvent({
       provider: context.provider,
       status: "failed",
       errorCode: classifySyncErrorCode(error),
@@ -85,7 +85,7 @@ export async function finishSyncExecution(admin: any, syncRunId: string | null, 
     console.error("sync_execution_finish_failed", { sync_run_id: syncRunId, error: String(error).slice(0, 500) });
   }
   if (status !== "success") {
-    void captureSyncSentryEvent({
+    await captureSyncSentryEvent({
       syncRunId,
       provider: executionContext?.provider || "unknown",
       status,

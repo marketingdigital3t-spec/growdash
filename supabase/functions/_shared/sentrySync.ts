@@ -70,7 +70,7 @@ export async function captureSyncSentryEvent(context: SentryContext): Promise<vo
   };
   const body = `${JSON.stringify(header)}\n${JSON.stringify({ type: "event" })}\n${JSON.stringify(event)}\n`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1_500);
+  const timeout = setTimeout(() => controller.abort(), 800);
   try {
     const response = await fetch(`${dsn.endpoint}?sentry_version=7&sentry_key=${encodeURIComponent(dsn.publicKey)}&sentry_client=growdash-sync`, {
       method: "POST",
