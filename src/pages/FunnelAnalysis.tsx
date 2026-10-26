@@ -207,6 +207,7 @@ export default function FunnelAnalysis() {
     if (!funnelScopeIds.length) return;
     let disposed = false;
     let debounceTimer: number | null = null;
+    let initialRefreshTimer: number | null = null;
     const refreshDistribution = async () => {
       if (disposed || document.visibilityState === "hidden") return;
       setRdLiveState("refreshing");
@@ -242,16 +243,17 @@ export default function FunnelAnalysis() {
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
       .subscribe();
-    // Realtime events already trigger the refresh immediately. The interval is
-    // only a safety net for missed events, so it must not compete with the
-    // external Meta/RD synchronization every few seconds.
+    // Realtime events already trigger the refresh. Delay the first explicit
+    // reconciliation so an existing RD snapshot can paint before the broad
+    // period/history reads start competing for the connection.
     const interval = window.setInterval(() => void refreshDistribution(), 60_000);
     const onVisibility = () => { if (document.visibilityState === "visible") void refreshDistribution(); };
     document.addEventListener("visibilitychange", onVisibility);
-    void refreshDistribution();
+    initialRefreshTimer = window.setTimeout(() => void refreshDistribution(), 2_000);
     return () => {
       disposed = true;
       if (debounceTimer) window.clearTimeout(debounceTimer);
+      if (initialRefreshTimer) window.clearTimeout(initialRefreshTimer);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
