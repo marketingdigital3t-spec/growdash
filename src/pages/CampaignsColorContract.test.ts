@@ -21,6 +21,8 @@ describe("dark campaign color contract", () => {
     expect(indexCss).toContain(
       "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button",
     );
+    expect(indexCss).toContain(".campaigns-workspace .campaign-result-cell");
+    expect(indexCss).toContain(".campaigns-workspace .campaign-date-pill > svg");
   });
 
   it("keeps selected campaign controls on the emerald dark-theme contract", () => {

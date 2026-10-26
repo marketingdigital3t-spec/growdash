@@ -15628,3 +15628,29 @@ html:not(.dark) .brand-shell .growdash-main .gd-crm-metric-card .gd-metric-icon.
 html:not(.dark) .brand-shell .growdash-main .gd-crm-metric-card > p.text-primary {
   color: #087443 !important;
 }
+
+/* Campaign result cells follow the same surface as their row. Older Meta
+   layers painted a white strip behind the button and let the muted label
+   hide the primary result. Keep the result readable in the emerald contract. */
+.campaigns-workspace .campaign-result-cell {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--gd-emerald-bright) !important;
+}
+.campaigns-workspace .campaign-result-cell .campaign-result-value,
+.campaigns-workspace .campaign-result-cell .campaign-result-label {
+  color: inherit !important;
+}
+html:not(.dark) .campaigns-workspace .campaign-result-cell {
+  color: #087f5b !important;
+}
+
+/* The date control is part of the campaign chrome, so its icon uses the
+   emerald action color instead of inheriting the neutral text token. */
+.campaigns-workspace .campaign-date-pill > svg,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-date-pill > svg {
+  color: var(--gd-emerald-bright) !important;
+  stroke: currentColor !important;
+}

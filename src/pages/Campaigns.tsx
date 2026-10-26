@@ -949,6 +949,15 @@ export default function Campaigns() {
     }),
     { budget: 0, spend: 0, leads: 0, formLeads: 0, conversations: 0, results: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
   ), [filtered]);
+  // A coluna "Resultados" mostra o resultado principal de cada campanha
+  // (definido pelo objetivo/evento oficial). O total fixo precisa usar a
+  // mesma regra; somar o agregado de leads aqui mistura eventos secundários
+  // e fazia o número de baixo divergir das linhas visíveis.
+  const primaryResultTotal = useMemo(
+    () => filtered.reduce((sum, campaign: any) => sum + campaignPrimaryResult(campaign).value, 0),
+    [filtered],
+  );
+  const primaryResultCpl = primaryResultTotal > 0 ? totals.spend / primaryResultTotal : 0;
   const hasUnavailableBudgets = filtered.some((campaign: any) => campaign.catalogMissing);
   const hasCampaignMetricFilters = Boolean(search.trim()) || statusFilter !== "all" || healthFilter !== "all"
     || Object.values(columnFilters).some((value) => value.trim().length > 0);
@@ -1547,8 +1556,8 @@ export default function Campaigns() {
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
                         {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label={hasUnavailableBudgets ? "Orçamentos disponíveis · alguns indisponíveis" : "Orçamento somado"} />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={displayedTotals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}
-                        {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={primaryResultTotal.toLocaleString("pt-BR")} label="Soma do resultado principal" />}
+                        {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={primaryResultCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado principal" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
                         {showColumn("costPerLandingPageView") && <CampaignTotalCell width={camp.colWidths.costPerLandingPageView} value={totalCostPerLandingPageView.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por visualização" />}
@@ -2004,9 +2013,9 @@ function CampaignResultCell({ campaign, onOpen }: { campaign: any; onOpen: () =>
   const events = (campaign.actionEvents ?? []).slice(0, 8);
   return <Tooltip>
     <TooltipTrigger asChild>
-      <button type="button" className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={onOpen} aria-label={`Abrir resultado e eventos de ${campaign.name}`}>
-        <AnimatedNumber value={primary.value} decimals={0} />
-        <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
+      <button type="button" className="campaign-result-cell ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={onOpen} aria-label={`Abrir resultado e eventos de ${campaign.name}`}>
+        <AnimatedNumber className="campaign-result-value" value={primary.value} decimals={0} />
+        <span className="campaign-result-label block text-[11px] font-medium leading-tight">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
       </button>
     </TooltipTrigger>
     <TooltipContent side="left" align="end" className="campaign-result-tooltip max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">
