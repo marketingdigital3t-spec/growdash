@@ -1,4 +1,5 @@
 import { classifySyncErrorCode, classifySyncStatus, SYNC_CONTRACT_VERSION, type SyncProvider, type SyncStatus } from "../../../src/lib/syncContract.ts";
+import { SYNC_EXECUTION_MAX_AGE_MS, classifyAbandonedExecution } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { captureSyncSentryEvent } from "./sentrySync.ts";
 
 export type SyncExecutionContext = {
@@ -10,8 +11,34 @@ export type SyncExecutionContext = {
   codeVersion?: string | null;
 };
 
+async function closeAbandonedSyncExecutions(admin: any) {
+  const cutoff = new Date(Date.now() - SYNC_EXECUTION_MAX_AGE_MS).toISOString();
+  const { data: abandoned, error } = await admin
+    .from("sync_execution_runs")
+    .select("id,last_valid_snapshot_at,started_at")
+    .eq("status", "running")
+    .lt("started_at", cutoff)
+    .limit(100);
+  if (error) throw error;
+  for (const run of abandoned || []) {
+    const outcome = classifyAbandonedExecution(run.last_valid_snapshot_at);
+    await admin
+      .from("sync_execution_runs")
+      .update({
+        status: outcome.status,
+        finished_at: new Date().toISOString(),
+        error_code: outcome.errorCode,
+        error_message: "Execução excedeu o prazo máximo; snapshot anterior preservado quando disponível.",
+        warnings: ["Execução encerrada automaticamente após exceder o prazo máximo."],
+      })
+      .eq("id", run.id)
+      .eq("status", "running");
+  }
+}
+
 export async function startSyncExecution(admin: any, context: SyncExecutionContext): Promise<string | null> {
   try {
+    await closeAbandonedSyncExecutions(admin);
     const { data, error } = await admin.from("sync_execution_runs").insert({
       user_id: context.userId || null,
       provider: context.provider,

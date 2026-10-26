@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { attributionStatus, normalizeAttribution } from "../../../src/lib/syncContract.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,7 @@ const corsHeaders = {
 const GRAPH = `https://graph.facebook.com/${
   Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"
 }`;
+const GRAPH_REQUEST_TIMEOUT_MS = 12_000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type LeadRow = {
@@ -209,7 +211,7 @@ async function hydrateMissingAttribution(
   const getObject = async (id: string, fields: string) => {
     const key = `${id}:${fields}`;
     if (cache.has(key)) return cache.get(key);
-    const response = await fetch(`${GRAPH}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(token)}`);
+    const response = await fetchWithTimeout(`${GRAPH}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(token)}`, {}, GRAPH_REQUEST_TIMEOUT_MS);
     const payload = await response.json().catch(() => ({}));
     const value = response.ok && !payload?.error ? payload : null;
     cache.set(key, value);
@@ -316,8 +318,13 @@ async function fetchAll(
       return { data: all, pages, lastCursor, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
     }
     seen.add(next);
-    const r: Response = await fetch(next);
-    const json: any = await r.json();
+    let r: Response;
+    try {
+      r = await fetchWithTimeout(next, {}, GRAPH_REQUEST_TIMEOUT_MS);
+    } catch (error) {
+      return { data: all, pages, lastCursor, error: error instanceof DOMException && error.name === "AbortError" ? `Meta excedeu ${Math.round(GRAPH_REQUEST_TIMEOUT_MS / 1000)}s; snapshot anterior preservado.` : String(error) };
+    }
+    const json: any = await r.json().catch(() => ({}));
     if (!r.ok) {
       return {
         data: all,
@@ -489,8 +496,10 @@ Deno.serve(async (req) => {
     async function inspectPermissions(token: string): Promise<Set<string> | null> {
       if (permissionsByToken.has(token)) return permissionsByToken.get(token) || null;
       try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${GRAPH}/me/permissions?access_token=${encodeURIComponent(token)}`,
+          {},
+          GRAPH_REQUEST_TIMEOUT_MS,
         );
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.error || !Array.isArray(payload?.data)) {
@@ -535,11 +544,11 @@ Deno.serve(async (req) => {
           verify_token: verifyToken,
           access_token: `${appId}|${appSecret}`,
         });
-        const response = await fetch(`${GRAPH}/${encodeURIComponent(appId)}/subscriptions`, {
+        const response = await fetchWithTimeout(`${GRAPH}/${encodeURIComponent(appId)}/subscriptions`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body,
-        });
+        }, GRAPH_REQUEST_TIMEOUT_MS);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.error || payload?.success === false) {
           const message = payload?.error?.message || `HTTP ${response.status}`;
@@ -563,11 +572,11 @@ Deno.serve(async (req) => {
           subscribed_fields: "leadgen,messages",
           access_token: pageAccessToken,
         });
-        const response = await fetch(`${GRAPH}/${encodeURIComponent(pageId)}/subscribed_apps`, {
+        const response = await fetchWithTimeout(`${GRAPH}/${encodeURIComponent(pageId)}/subscribed_apps`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body,
-        });
+        }, GRAPH_REQUEST_TIMEOUT_MS);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.error || payload?.success === false) {
           warnings.push(`Página ${pageId}: assinatura leadgen/mensagens não confirmada (${payload?.error?.message || `HTTP ${response.status}`}).`);
