@@ -941,25 +941,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    const hasErrors = accountResults.some((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0));
+    const hasWarnings = accountResults.some((result: any) => Array.isArray(result.errors) && result.errors.length > 0);
+    const hasFatalErrors = accountResults.some((result: any) => Boolean(result.error));
     const skippedDisconnected = disconnectedAccounts?.length || 0;
-    const failedAccounts = accountResults.filter((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0)).length;
+    const failedAccounts = accountResults.filter((result: any) => Boolean(result.error)).length;
     const status = accounts?.length === 0
       ? "skipped"
-      : failedAccounts === 0
-      ? "success"
-      : failedAccounts >= accounts.length
+      : hasFatalErrors && failedAccounts >= accounts.length
       ? "failed"
-      : "partial";
+      : hasFatalErrors || hasWarnings
+      ? "partial"
+      : "success";
+    const success = !hasFatalErrors && !hasWarnings;
     return new Response(
       JSON.stringify({
-        success: !hasErrors,
+        success,
         status,
         skipped_disconnected: skippedDisconnected,
         disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({ id: account.id, account_id: account.account_id, name: account.name })),
         upserted: totalUpserted,
         pagination: { pages: totalPages, last_cursor: lastCursor },
         accounts: accountResults,
+        warnings: accountResults.flatMap((result: any) => Array.isArray(result.errors) ? result.errors : []),
         range: exactRange
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
           : recentRange
