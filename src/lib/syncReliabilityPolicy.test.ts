@@ -11,6 +11,7 @@ import {
   isMetaApplicationRateLimitError,
   leadSyncCooldownMs,
   shouldThrottleLeadSync,
+  selectRotatingRDSyncTargets,
 } from "./syncReliabilityPolicy";
 
 describe("sync reliability policy", () => {
@@ -98,5 +99,21 @@ describe("sync reliability policy", () => {
     expect(isMetaApplicationRateLimitError("(#4) Application request limit reached")).toBe(true);
     expect(isMetaApplicationRateLimitError("Unsupported get request")).toBe(false);
     expect(leadSyncCooldownMs("form f1: (#4) Application request limit reached")).toBe(15 * 60_000);
+  });
+
+  it("rotates one least-recently-attempted RD funnel per connection", () => {
+    const targets = [
+      { id: "a", rd_connection_id: "connection-1" },
+      { id: "b", rd_connection_id: "connection-1" },
+      { id: "c", rd_connection_id: "connection-2" },
+      { id: "d", rd_connection_id: "connection-2" },
+    ];
+    const attempts = new Map([
+      ["a", "2026-10-26T20:00:00.000Z"],
+      ["b", "2026-10-26T19:00:00.000Z"],
+      ["c", null],
+      ["d", "2026-10-26T18:00:00.000Z"],
+    ]);
+    expect(selectRotatingRDSyncTargets(targets, attempts).map((target) => target.id)).toEqual(["b", "c"]);
   });
 });

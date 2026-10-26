@@ -3,7 +3,7 @@ import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 import { resolveMetaLookbackDateRange } from "../_shared/metaLookbackWindow.ts";
 import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../_shared/metaSyncBatch.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
-import { buildLeadSyncWindow } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { buildLeadSyncWindow, selectRotatingRDSyncTargets } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +12,7 @@ const corsHeaders = {
 };
 const META_ACCOUNT_BATCH_SIZE = 8;
 const META_ACCOUNT_CONCURRENCY = 4;
+const RD_CONNECTION_CONCURRENCY = 4;
 
 type FunctionResult = {
   ok: boolean;
@@ -443,10 +444,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // RD applies a shared rate limit per connection. Serialize funnels within
-    // one connection, while allowing independent connections to progress in
-    // parallel so the five-minute cycle does not get stuck behind one account.
-    const targetsByConnection = Array.from(rdTargets.reduce((groups, target) => {
+    // A connection can own many funnels. Running all of them in one request
+    // made the five-minute worker exceed its gateway budget and caused the
+    // next cycle to mark it failed. Rotate one funnel per connection; the
+    // least-recently-attempted funnel gets the next turn and the cursor inside
+    // rd-sync-deals resumes any unfinished provider page.
+    const scopeStates = rdTargets.length
+      ? await admin
+        .from("rd_sync_scope_state")
+        .select("funnel_id,last_attempt_at")
+        .in("funnel_id", rdTargets.map((target) => target.id))
+        .eq("start_date", syncWindow.startDate)
+        .eq("end_date", syncWindow.endDate)
+      : { data: [], error: null };
+    if (scopeStates.error) throw scopeStates.error;
+    const lastAttemptByFunnel = new Map<string, string | null>();
+    for (const state of (scopeStates.data || []) as Array<{ funnel_id: string; last_attempt_at: string | null }>) {
+      const previous = lastAttemptByFunnel.get(state.funnel_id);
+      if (!previous || (state.last_attempt_at && state.last_attempt_at > previous)) {
+        lastAttemptByFunnel.set(state.funnel_id, state.last_attempt_at);
+      }
+    }
+    const rotatedRdTargets = selectRotatingRDSyncTargets(rdTargets, lastAttemptByFunnel);
+    const deferredRdTargets = rdTargets.length - rotatedRdTargets.length;
+    const targetsByConnection = Array.from(rotatedRdTargets.reduce((groups, target) => {
       const key = target.rd_connection_id || `legacy:${target.user_id}`;
       const group = groups.get(key) || [];
       group.push(target);
@@ -477,14 +498,12 @@ Deno.serve(async (req) => {
         ...result,
       };
     };
-    // RD and PostgREST share the same account-level pressure during a cycle.
-    // Running independent connections in parallel looked faster but caused
-    // statement timeouts when a large funnel was reconciling at the same time.
-    // Keep one funnel at a time; the bounded five-minute window is safer than
-    // overlapping writers and produces a complete, observable run per funnel.
+    // Funnels within one connection stay serialized. Independent RD
+    // connections may progress in bounded parallel batches, keeping the
+    // complete cycle below the pg_net five-minute response budget.
     const groupedResults = await mapWithConcurrency(
       targetsByConnection,
-      1,
+      RD_CONNECTION_CONCURRENCY,
       async (group) => {
         const results = [];
         for (const funnel of group) results.push(await syncTarget(funnel));
@@ -521,7 +540,10 @@ Deno.serve(async (req) => {
     // Insights is the primary KPI snapshot. Leads/forms and hourly remain
     // observable auxiliary blocks and are retried without downgrading valid
     // daily investment/delivery data to a global partial state.
-    const allOk = metaInsightsWithCoverage.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
+    const allSourcesHealthy = metaInsightsWithCoverage.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
+    // A bounded cycle is intentionally partial while another RD funnel waits
+    // its turn. It is observable without counting as a terminal failure.
+    const allOk = allSourcesHealthy && deferredRdTargets === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -529,6 +551,9 @@ Deno.serve(async (req) => {
       requested: rdResults.length,
       succeeded: rdResults.length - rdFailed.length,
       failed: rdFailed.length,
+      deferred: deferredRdTargets,
+      selected: rotatedRdTargets.length,
+      total_active: rdTargets.length,
       duplicate_mappings: duplicateMappingCount,
       results: rdResults,
     };
@@ -545,7 +570,9 @@ Deno.serve(async (req) => {
         rd_resync: rdResync,
         error_message: allOk
           ? null
-          : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
+          : deferredRdTargets > 0 && allSourcesHealthy
+            ? `Ciclo limitado: ${deferredRdTargets} funil(is) RD aguardam a próxima rodada.`
+            : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
       })
       .eq("id", run.id);
     if (runUpdateError) throw runUpdateError;
@@ -553,10 +580,13 @@ Deno.serve(async (req) => {
     await finishSyncExecution(admin, syncRunId, {
       status,
       success: allOk,
-      error: allOk ? null : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
+      error: allOk ? null : deferredRdTargets > 0 && allSourcesHealthy
+        ? `Ciclo limitado: ${deferredRdTargets} funil(is) RD aguardam a próxima rodada.`
+        : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
       warnings: [
         metaLeadsWithCoverage.body?.errors,
         metaHourlyWithCoverage.body?.errors,
+        deferredRdTargets > 0 ? `${deferredRdTargets} funil(is) RD adiados para a próxima rodada.` : null,
         duplicateMappingCount > 0 ? `${duplicateMappingCount} mapeamento(s) RD duplicado(s).` : null,
       ].filter(Boolean),
       recordsUpserted: Number(metaInsightsWithCoverage.body?.upserted || 0) + Number(metaLeadsWithCoverage.body?.upserted || 0),

@@ -6,6 +6,10 @@ export const META_AD_CATALOG_PAGE_SIZE = 500;
 export const SYNC_LEAD_RUN_BUDGET_MS = 90_000;
 export const LEAD_SYNC_COOLDOWN_MS = 5 * 60_000;
 export const LEAD_SYNC_RATE_LIMIT_COOLDOWN_MS = 15 * 60_000;
+// A single five-minute worker must not drain every RD funnel serially. One
+// funnel per connection per cycle keeps the provider token ordered while
+// allowing the next cycle to resume the remaining funnels.
+export const RD_FUNNELS_PER_CONNECTION_PER_CYCLE = 1;
 
 export type LeadSyncExecutionPolicy = {
   catalogMaxPages: number;
@@ -20,6 +24,40 @@ export type LeadSyncWindow = {
   startDate: string;
   endDate: string;
 };
+
+export type RotatingRDSyncTarget = {
+  id: string;
+  rd_connection_id: string | null;
+  user_id?: string | null;
+};
+
+/** Select the least recently attempted funnel for each RD connection. */
+export function selectRotatingRDSyncTargets<T extends RotatingRDSyncTarget>(
+  targets: T[],
+  lastAttemptByFunnel: ReadonlyMap<string, string | null | undefined>,
+  perConnection = RD_FUNNELS_PER_CONNECTION_PER_CYCLE,
+) {
+  const limit = Math.max(1, Math.floor(perConnection));
+  const groups = new Map<string, T[]>();
+  for (const target of targets) {
+    const key = target.rd_connection_id || `legacy:${target.user_id || "unknown"}`;
+    const group = groups.get(key) || [];
+    group.push(target);
+    groups.set(key, group);
+  }
+  const selected: T[] = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => {
+      const aTime = Date.parse(String(lastAttemptByFunnel.get(a.id) || ""));
+      const bTime = Date.parse(String(lastAttemptByFunnel.get(b.id) || ""));
+      const aRank = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY;
+      const bRank = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY;
+      return aRank - bRank || a.id.localeCompare(b.id);
+    });
+    selected.push(...group.slice(0, limit));
+  }
+  return selected;
+}
 
 /**
  * Incremental workers keep a short watermark for lead polling. The wider
