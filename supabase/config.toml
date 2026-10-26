@@ -138,6 +138,20 @@ verify_jwt = true
 verify_jwt = true
 [functions.whatsapp-webhook]
 verify_jwt = false
+[functions.whatsapp-waha-connect]
+verify_jwt = true
+
+[functions.whatsapp-waha-qr]
+verify_jwt = true
+
+[functions.whatsapp-waha-webhook]
+verify_jwt = false
+
+[functions.whatsapp-agent-reply]
+verify_jwt = false
+
+[functions.whatsapp-followup-sweep]
+verify_jwt = false
 [functions.hubspot-oauth-start]
 verify_jwt = true
 [functions.hubspot-oauth-callback]

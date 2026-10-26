@@ -419,9 +419,13 @@ Deno.serve(async (req) => {
         case "crm.contact.upsert": case "crm.deal.create": case "crm.note.create": case "crm.stage.change": return executeRDNode(admin, actorId, node.type, p, context);
         case "whatsapp.send": {
           const phone = String(p.phone || "").replace(/\D/g, ""); const message = String(p.message || ""); if (phone.length < 10 || !message) throw new Error("WhatsApp exige telefone e mensagem.");
-          const { data: number } = await admin.from("whatsapp_numbers").select("id,phone_number_id,access_token").eq("workspace_id", automation.workspace_id).eq("status", "connected").limit(1).maybeSingle();
+          const numberId = String(p.whatsapp_number_id || p.whatsappNumberId || getPath(context, "trigger.whatsapp_number_id") || "").trim();
+          const numberQuery = admin.from("whatsapp_numbers").select("id,provider,phone_number_id,access_token,waha_session_name").eq("workspace_id", automation.workspace_id).eq("status", "connected");
+          const { data: number } = numberId ? await numberQuery.eq("id", numberId).maybeSingle() : await numberQuery.limit(1).maybeSingle();
           if (!number) throw new Error("Nenhum número WhatsApp conectado neste workspace.");
-          const response = await fetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body: message } }) });
+          const response = number.provider === "waha"
+            ? await fetch(`${(Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "")}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${phone}@c.us`, text: message }) })
+            : await fetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body: message } }) });
           const result = await response.json().catch(() => ({})); if (!response.ok || result.error) throw new Error(result.error?.message || "A Meta recusou o envio."); return { message_id: result.messages?.[0]?.id || null, status: "sent" };
         }
         case "agent.run": {

@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 import { syncCrmLeadToRD } from "../_shared/metaLeadRdSync.ts";
+import { scheduleWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -56,7 +57,7 @@ Deno.serve(async (req) => {
       const value = change.value || {};
       const phoneNumberId = value.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
-      const { data: number } = await admin.from("whatsapp_numbers").select("id,workspace_id").eq("phone_number_id", phoneNumberId).maybeSingle();
+      const { data: number } = await admin.from("whatsapp_numbers").select("id,workspace_id,agent_id,mode,ad_account_id").eq("phone_number_id", phoneNumberId).maybeSingle();
       if (!number) continue;
       const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
       for (const message of value.messages || []) {
@@ -85,6 +86,10 @@ Deno.serve(async (req) => {
         const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: new Date(Number(message.timestamp || 0) * 1000).toISOString(), updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
         if (!conversation) continue;
         await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: new Date(Number(message.timestamp || 0) * 1000).toISOString() }, { onConflict: "wamid" });
+        await scheduleWhatsAppFollowups(admin, { workspaceId: number.workspace_id, whatsappNumberId: number.id, conversationId: conversation.id, agentId: number.agent_id, inboundAt: new Date(Number(message.timestamp || 0) * 1000).toISOString() });
+        if (number.mode !== "human" && number.agent_id && internalSecret.length >= 24) {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-agent-reply`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-internal-secret": internalSecret }, body: JSON.stringify({ conversation_id: conversation.id, trigger_message_id: message.id }) });
+        }
         const matching = matchingWorkflowAutomations(automations || [], { type: "whatsapp_message", id: String(message.id || ""), text: text || "", whatsapp_number_id: String(number.id), phone_number_id: String(phoneNumberId) });
         if (matching.length && internalSecret.length < 24) {
           results.push({ event_id: message.id, status: "error", error: "AUTOMATION_INTERNAL_SECRET não configurado" });
