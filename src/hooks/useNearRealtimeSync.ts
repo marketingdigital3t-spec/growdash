@@ -20,6 +20,10 @@ const STORAGE_PREFIX = "growdash:last-background-sync";
 // for a quiet window prevents each write from reloading the same heavy traffic
 // queries and making every tab appear to refresh continuously.
 const REALTIME_UI_BATCH_MS = 1_000;
+// Let the route paint its persisted snapshot before the first provider
+// reconciliation starts. The sync remains automatic, but it no longer
+// competes with the initial campaigns/CRM queries on a cold navigation.
+const INITIAL_SYNC_DELAY_MS = 2_000;
 // The selected Meta snapshot completes in roughly 6–10s in production. Keep
 // enough budget for Edge auth, database writes and the network hop so a valid
 // completed sync is not reported as a client timeout.
@@ -232,7 +236,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     // visível enquanto esta chamada acontece em segundo plano.
     // Cada entrada/recarregamento solicita uma nova tentativa do escopo atual.
     // O lock persistido no backend continua impedindo duplicidade entre abas.
-    const initial = window.setTimeout(() => void refresh(false), 0);
+    const initial = window.setTimeout(() => void refresh(false), INITIAL_SYNC_DELAY_MS);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {
