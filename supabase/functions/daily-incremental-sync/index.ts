@@ -12,10 +12,9 @@ const corsHeaders = {
 };
 const META_ACCOUNT_BATCH_SIZE = 8;
 const META_ACCOUNT_CONCURRENCY = 4;
-// The Supabase gateway has a 150s idle limit. Selected funnels belong to
-// independent RD connections, so run the bounded one-per-connection batch in
-// a single wave instead of allowing a second 90s wave to exceed that limit.
-const RD_CONNECTION_CONCURRENCY = 8;
+// The Supabase gateway has a 150s idle limit. Four independent RD workers
+// balance startup pressure while keeping the bounded batch within that limit.
+const RD_CONNECTION_CONCURRENCY = 4;
 
 type FunctionResult = {
   ok: boolean;
