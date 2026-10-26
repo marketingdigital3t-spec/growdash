@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
-import { fetchWithTimeout, hasExceededSyncDeadline, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { fetchWithTimeout, hasExceededSyncDeadline, isMetaApplicationRateLimitError, leadSyncCooldownMs, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,7 @@ async function acquireLeadSyncGate(admin: any, scopeKey: string, triggerSource: 
   const now = new Date();
   const { data: current, error: stateError } = await admin
     .from("realtime_sync_state")
-    .select("last_started_at,last_finished_at,locked_until")
+    .select("last_started_at,last_finished_at,last_error,locked_until")
     .eq("user_id", LEAD_SYNC_GATE_USER_ID)
     .eq("provider", LEAD_SYNC_GATE_PROVIDER)
     .eq("scope_key", scopeKey)
@@ -45,7 +45,7 @@ async function acquireLeadSyncGate(admin: any, scopeKey: string, triggerSource: 
       return { acquired: false, skipped: true, reason: "Sincronização automática de leads já está em andamento." };
     }
     const lastActivityAt = current?.last_finished_at || current?.last_started_at;
-    if (shouldThrottleLeadSync(lastActivityAt, now.getTime())) {
+    if (shouldThrottleLeadSync(lastActivityAt, now.getTime(), leadSyncCooldownMs(current?.last_error))) {
       return { acquired: false, skipped: true, reason: "Leads já foram consultados recentemente; o próximo ciclo continuará a partir do watermark." };
     }
   }
@@ -1024,6 +1024,11 @@ Deno.serve(async (req) => {
           if (r.lastCursor) lastCursor = r.lastCursor;
           if (r.error) {
             formErrors.push(`form ${formId}: ${r.error}`);
+            // A Meta application quota response is global to the token/app;
+            // continuing through the remaining forms only creates more failed
+            // requests. Preserve the last snapshot and let the gate retry
+            // after the longer rate-limit cooldown.
+            if (isMetaApplicationRateLimitError(r.error)) break;
             continue;
           }
           // Meta may occasionally ignore one of the filtering clauses. Enforce the
@@ -1168,6 +1173,8 @@ Deno.serve(async (req) => {
     }
 
     const hasWarnings = accountResults.some((result: any) => Array.isArray(result.errors) && result.errors.length > 0);
+    const warningMessages = accountResults.flatMap((result: any) => Array.isArray(result.errors) ? result.errors : []);
+    const hasRateLimitWarning = warningMessages.some((warning: unknown) => isMetaApplicationRateLimitError(warning));
     const hasFatalErrors = accountResults.some((result: any) => Boolean(result.error));
     const skippedDisconnected = disconnectedAccounts?.length || 0;
     const failedAccounts = accountResults.filter((result: any) => Boolean(result.error)).length;
@@ -1176,15 +1183,14 @@ Deno.serve(async (req) => {
       .every((result: any) => classifySyncErrorCode(result.error) === SYNC_ERROR_CODES.PROVIDER_TIMEOUT);
     const hasCurrentSnapshot = !hasFatalErrors || totalUpserted > 0 || accountResults.some((result: any) => !result.error);
     const validSnapshotAt = hasCurrentSnapshot ? new Date().toISOString() : previousValidSnapshotAt;
-    const status = accounts?.length === 0
-      ? "skipped"
-      : hasFatalErrors && failedAccounts >= accounts.length
-      ? timeoutOnlyFailure && previousValidSnapshotAt ? "stale" : "failed"
-      : hasFatalErrors || hasWarnings
-      ? "partial"
-      : "success";
     const success = !hasFatalErrors && !hasWarnings;
-    const finalStatus = accounts?.length === 0 ? "stale" : hasFatalErrors && failedAccounts >= accounts.length ? timeoutOnlyFailure && previousValidSnapshotAt ? "stale" : "failed" : hasFatalErrors || hasWarnings ? "partial" : "success";
+    const finalStatus = accounts?.length === 0
+      ? "stale"
+      : hasRateLimitWarning && previousValidSnapshotAt
+        ? "stale"
+        : hasFatalErrors && failedAccounts >= accounts.length
+          ? timeoutOnlyFailure && previousValidSnapshotAt ? "stale" : "failed"
+          : hasFatalErrors || hasWarnings ? "partial" : "success";
     await finishSyncExecution(admin, syncRunId, {
       status: finalStatus,
       success,
@@ -1195,12 +1201,12 @@ Deno.serve(async (req) => {
       recordsUpserted: totalUpserted,
     });
     if (leadGateAcquired && leadGateScopeKey) {
-      await releaseLeadSyncGate(admin, leadGateScopeKey, finalStatus, accountResults.find((result: any) => result.error)?.error);
+      await releaseLeadSyncGate(admin, leadGateScopeKey, finalStatus, warningMessages.join("; ") || accountResults.find((result: any) => result.error)?.error);
     }
     return new Response(
       JSON.stringify({
         success,
-        status,
+        status: finalStatus,
         sync_run_id: syncRunId,
         skipped_disconnected: skippedDisconnected,
         disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({ id: account.id, account_id: account.account_id, name: account.name })),

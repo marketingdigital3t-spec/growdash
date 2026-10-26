@@ -160,7 +160,7 @@ export function classifySyncErrorCode(error: unknown): SyncErrorCode {
   const text = String(error instanceof Error ? error.message : error || "").toLowerCase();
   if (/401|unauthori[sz]|token.*expir|missing auth/.test(text)) return SYNC_ERROR_CODES.TOKEN_EXPIRED;
   if (/403|forbidden|permission|scope/.test(text)) return SYNC_ERROR_CODES.PERMISSION_DENIED;
-  if (/429|rate.?limit|too many/.test(text)) return SYNC_ERROR_CODES.RATE_LIMITED;
+  if (/429|#4\b|rate.?limit|application request limit|too many/.test(text)) return SYNC_ERROR_CODES.RATE_LIMITED;
   if (/abort|timeout|timed out|excedeu/.test(text)) return SYNC_ERROR_CODES.PROVIDER_TIMEOUT;
   if (/5\d\d|unavailable|network|fetch failed/.test(text)) return SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE;
   if (/duplicate|idempot/.test(text)) return SYNC_ERROR_CODES.DUPLICATE_EVENT;

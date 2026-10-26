@@ -8,6 +8,8 @@ import {
   fetchWithTimeout,
   buildLeadSyncWindow,
   leadSyncExecutionPolicy,
+  isMetaApplicationRateLimitError,
+  leadSyncCooldownMs,
   shouldThrottleLeadSync,
 } from "./syncReliabilityPolicy";
 
@@ -90,5 +92,11 @@ describe("sync reliability policy", () => {
     expect(shouldThrottleLeadSync("2026-10-26T18:57:00.000Z", now)).toBe(true);
     expect(shouldThrottleLeadSync("2026-10-26T18:54:59.999Z", now)).toBe(false);
     expect(shouldThrottleLeadSync(null, now)).toBe(false);
+  });
+
+  it("backs off longer after Meta application quota errors", () => {
+    expect(isMetaApplicationRateLimitError("(#4) Application request limit reached")).toBe(true);
+    expect(isMetaApplicationRateLimitError("Unsupported get request")).toBe(false);
+    expect(leadSyncCooldownMs("form f1: (#4) Application request limit reached")).toBe(15 * 60_000);
   });
 });

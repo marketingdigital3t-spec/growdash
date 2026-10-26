@@ -5,6 +5,7 @@ export const SYNC_EXECUTION_MAX_AGE_MS = 10 * 60_000;
 export const META_AD_CATALOG_PAGE_SIZE = 500;
 export const SYNC_LEAD_RUN_BUDGET_MS = 90_000;
 export const LEAD_SYNC_COOLDOWN_MS = 5 * 60_000;
+export const LEAD_SYNC_RATE_LIMIT_COOLDOWN_MS = 15 * 60_000;
 
 export type LeadSyncExecutionPolicy = {
   catalogMaxPages: number;
@@ -70,6 +71,16 @@ export function shouldThrottleLeadSync(
   if (!lastActivityAt) return false;
   const last = Date.parse(lastActivityAt);
   return Number.isFinite(last) && now - last < cooldownMs;
+}
+
+export function isMetaApplicationRateLimitError(value: unknown) {
+  return /#4\b|application request limit|rate.?limit/i.test(String(value ?? ""));
+}
+
+export function leadSyncCooldownMs(lastError: unknown) {
+  return isMetaApplicationRateLimitError(lastError)
+    ? LEAD_SYNC_RATE_LIMIT_COOLDOWN_MS
+    : LEAD_SYNC_COOLDOWN_MS;
 }
 
 export function classifyAbandonedExecution(lastValidSnapshotAt: string | null | undefined) {

@@ -40,6 +40,7 @@ describe("sync contract", () => {
 
   it("maps provider failures to actionable codes", () => {
     expect(classifySyncErrorCode("HTTP 429 rate limit")).toBe("RATE_LIMITED");
+    expect(classifySyncErrorCode("(#4) Application request limit reached")).toBe("RATE_LIMITED");
     expect(classifySyncErrorCode("HTTP 403 permission denied")).toBe("PERMISSION_DENIED");
     expect(classifySyncErrorCode("AbortError: timeout")).toBe("PROVIDER_TIMEOUT");
     expect(classifySyncErrorCode("PROVIDER_TIMEOUT: Meta excedeu o prazo")).toBe("PROVIDER_TIMEOUT");
