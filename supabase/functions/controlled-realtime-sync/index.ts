@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canRunSelectedMetaLeadSync } from "../../../src/lib/controlledMetaSync.ts";
 import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
+import { aggregateSyncStatus, finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
@@ -34,7 +35,7 @@ type SyncBody = {
 
 type RunResult = {
   provider: SyncProvider;
-  status?: "success" | "partial" | "failed";
+  status?: "success" | "partial" | "stale" | "failed" | "blocked";
   scope?: string;
   skipped?: boolean;
   reason?: string;
@@ -57,6 +58,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const startedAt = Date.now();
+  let syncRunId: string | null = null;
+  let executionAdmin: any = null;
 
   try {
     const authHeader = req.headers.get("Authorization") || "";
@@ -66,6 +69,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const admin = createClient(supabaseUrl, serviceRoleKey);
+    executionAdmin = admin;
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -92,6 +96,21 @@ Deno.serve(async (req) => {
     const syncStartDate = recentWindow?.startDate || startDate;
     const syncEndDate = recentWindow?.endDate || endDate;
     const scopeKey = `${accountScope}:${campaignScope}:${syncMode}:${syncStartDate}:${syncEndDate}:${body.attributionWindow || "account_default"}:${body.timezone || "account"}`;
+    syncRunId = await startSyncExecution(admin, {
+      userId: user.id,
+      provider: "controlled",
+      triggerSource: body.fast ? "controlled_fast" : body.realtime === false ? "controlled_manual" : "controlled_realtime",
+      scopeKey,
+      scope: {
+        ad_account_ids: body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : [],
+        campaign_ids: body.campaignIds || [],
+        start_date: syncStartDate,
+        end_date: syncEndDate,
+        attribution_window: body.attributionWindow || "account_default",
+        timezone: body.timezone || "account",
+        sync_mode: syncMode,
+      },
+    });
     const includeMeta = body.includeMeta !== false;
     const includeRD = body.includeRD !== false;
     const includeBalance = body.includeBalance !== false;
@@ -290,11 +309,19 @@ Deno.serve(async (req) => {
       if (result.provider !== "meta" || result.warnings == null) return [];
       return Array.isArray(result.warnings) ? result.warnings : [result.warnings];
     });
+    const aggregateStatus = aggregateSyncStatus(results.map((result) => result.status));
+    await finishSyncExecution(admin, syncRunId, {
+      status: aggregateStatus,
+      success: !["failed", "blocked"].includes(aggregateStatus),
+      error: results.find((result) => result.errors)?.errors,
+      warnings,
+      lastValidSnapshotAt: results.map((result) => result.synced_at).filter(Boolean).sort().at(-1) || null,
+      recordsUpserted: results.reduce((total, result) => total + Number(result.synced || 0), 0),
+    });
     return json({
-      success: results.every((result) => result.skipped || result.status !== "failed"),
-      status: results.some((result) => result.status === "failed")
-        ? "failed"
-        : results.some((result) => result.status === "partial") ? "partial" : "success",
+      success: !["failed", "blocked"].includes(aggregateStatus),
+      status: aggregateStatus,
+      sync_run_id: syncRunId,
       // Consumers that monitor one provider must not infer its health from
       // another provider's pending pages. Keep the aggregate for audit
       // screens, while exposing the per-provider statuses explicitly.
@@ -322,6 +349,7 @@ Deno.serve(async (req) => {
       results,
     });
   } catch (error) {
+    if (syncRunId) await finishSyncExecution(executionAdmin, syncRunId, { status: "failed", error: (error as Error).message });
     return json({ error: (error as Error).message }, 500);
   }
 });
@@ -393,19 +421,21 @@ async function runControlled(args: {
       return { provider, scope: scopeKey, status: "success", skipped: true, reason: payload?.message || "Sincronização já está em andamento." };
     }
     const partial = String(payload?.status || "") === "partial";
-    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["failed", "blocked", "stale_snapshot"].includes(String(payload?.status || "")));
+    const explicitStatus = String(payload?.status || "").toLowerCase();
+    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["failed", "blocked"].includes(explicitStatus));
+    const stale = !hasError && !partial && (explicitStatus === "stale" || explicitStatus === "stale_snapshot");
     const finishedAt = new Date().toISOString();
     const error = hasError
       ? stringifyError(response?.error || payload?.error || payload?.errors || "Falha na sincronização")
       : null;
 
     await admin.from("realtime_sync_state").update({
-      status: hasError ? "failed" : partial ? "partial" : "success",
+      status: hasError ? "failed" : partial ? "partial" : stale ? "stale" : "success",
       last_finished_at: finishedAt,
-      last_success_at: hasError || partial ? current?.last_success_at ?? null : finishedAt,
+      last_success_at: hasError || partial || stale ? current?.last_success_at ?? null : finishedAt,
       last_error: hasError
         ? error
-        : partial
+        : partial || stale
           ? stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado.")
           : null,
       locked_until: null,
@@ -414,10 +444,10 @@ async function runControlled(args: {
 
     return {
       provider,
-      status: hasError ? "failed" : partial ? "partial" : "success",
+      status: hasError ? "failed" : partial ? "partial" : stale ? "stale" : "success",
       scope: scopeKey,
       synced: Number(payload?.synced || payload?.deals || payload?.updated || 0),
-      errors: hasError || partial
+      errors: hasError || partial || stale
         ? (error || stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado."))
         : undefined,
       warnings: payload?.warnings,

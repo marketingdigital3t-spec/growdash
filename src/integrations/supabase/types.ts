@@ -39,6 +39,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      sync_execution_runs: {
+        Row: {
+          attempt: number
+          code_version: string | null
+          contract_version: string
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          last_valid_snapshot_at: string | null
+          provider: string
+          records_read: number
+          records_upserted: number
+          retry_count: number
+          scope: Json
+          scope_key: string
+          started_at: string
+          status: string
+          trigger_source: string
+          user_id: string | null
+          warnings: Json
+        }
+        Insert: {
+          attempt?: number
+          code_version?: string | null
+          contract_version?: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          last_valid_snapshot_at?: string | null
+          provider: string
+          records_read?: number
+          records_upserted?: number
+          retry_count?: number
+          scope?: Json
+          scope_key: string
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          user_id?: string | null
+          warnings?: Json
+        }
+        Update: {
+          attempt?: number
+          code_version?: string | null
+          contract_version?: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          last_valid_snapshot_at?: string | null
+          provider?: string
+          records_read?: number
+          records_upserted?: number
+          retry_count?: number
+          scope?: Json
+          scope_key?: string
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          user_id?: string | null
+          warnings?: Json
+        }
+        Relationships: []
+      }
       platform_performance_events: {
         Row: {
           created_at: string

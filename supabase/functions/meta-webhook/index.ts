@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { syncCrmLeadToRD, syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
+import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,9 +216,11 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
   const raw = await req.text();
   if (!(await validSignature(raw, req.headers.get("x-hub-signature-256")))) return json({ error: "Assinatura Meta inválida" }, 401);
+  let admin: any = null;
+  let syncRunId: string | null = null;
   try {
     const payload = JSON.parse(raw);
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const events: Array<{ provider_event_id: string; event_type: string; payload: any }> = [];
     for (const entry of Array.isArray(payload?.entry) ? payload.entry : []) {
       const entryId = String(entry?.id ?? "unknown");
@@ -232,6 +235,15 @@ Deno.serve(async (req) => {
         events.push({ provider_event_id: providerEventId, event_type: "messaging", payload: { object: payload?.object ?? null, entry_id: entryId, message } });
       }
     }
+    syncRunId = await startSyncExecution(admin, {
+      provider: "meta",
+      triggerSource: "meta_webhook",
+      scopeKey: `webhook:${events.map((event) => event.provider_event_id).slice(0, 100).join(",") || "empty"}`,
+      scope: {
+        event_types: Array.from(new Set(events.map((event) => event.event_type))),
+        event_count: events.length,
+      },
+    });
     let inserted = 0;
     let processed = 0;
     const errors: string[] = [];
@@ -339,8 +351,17 @@ Deno.serve(async (req) => {
         await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
       }
     }
-    return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking, workflow_tracking: workflowTracking }, 200);
+    await finishSyncExecution(admin, syncRunId, {
+      status: errors.length ? "partial" : "success",
+      success: true,
+      error: errors.length ? errors.join("; ") : null,
+      warnings: errors,
+      recordsRead: events.length,
+      recordsUpserted: processed,
+    });
+    return json({ ok: true, sync_run_id: syncRunId, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking, workflow_tracking: workflowTracking }, 200);
   } catch (error) {
+    await finishSyncExecution(admin, syncRunId, { status: "failed", error: error instanceof Error ? error.message : String(error) });
     return json({ error: error instanceof Error ? error.message : "Falha ao processar webhook Meta" }, 500);
   }
 });

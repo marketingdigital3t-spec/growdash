@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
+import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
+import { attributionStatus, normalizeAttribution } from "../../../src/lib/syncContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -398,11 +400,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let admin: any = null;
+  let syncRunId: string | null = null;
   try {
     const body = await req.json().catch(() => ({}));
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(SUPABASE_URL, SERVICE);
+    admin = createClient(SUPABASE_URL, SERVICE);
 
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -438,6 +442,20 @@ Deno.serve(async (req) => {
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
     const since = exactRange?.startEpoch ?? recentRange?.startEpoch ??
       Math.floor((Date.now() - days * 86400000) / 1000);
+    const scopeKey = `${adAccountIds.join(",") || adAccountId || "all"}:${exactRange ? `${exactRange.startDate}:${exactRange.endDate}` : recentRange ? "recent" : `last-${days}d`}`;
+    syncRunId = await startSyncExecution(admin, {
+      userId,
+      provider: "meta_leads",
+      triggerSource: String(body.triggerSource || body.trigger_source || "manual"),
+      scopeKey,
+      scope: {
+        ad_account_ids: adAccountIds.length ? adAccountIds : adAccountId ? [adAccountId] : [],
+        start_date: exactRange?.startDate || null,
+        end_date: exactRange?.endDate || null,
+        recent_start_at: recentRange ? new Date(recentRange.startEpoch * 1000).toISOString() : null,
+        recent_end_at: recentRange ? new Date(recentRange.endExclusiveEpoch * 1000).toISOString() : null,
+      },
+    });
 
     // Explicitly disabled accounts must never be queried or treated as a
     // successful lead sync. They require an authorized reconnection first.
@@ -847,12 +865,25 @@ Deno.serve(async (req) => {
                 source = "ddd";
               }
             }
+            const attribution = normalizeAttribution({
+              campaign_id: l.campaign_id ?? null,
+              campaign_name: String(l.campaign_name || campaignNames.get(String(l.campaign_id || "")) || "") || null,
+              adset_id: l.adset_id ?? null,
+              adset_name: String(l.adset_name || adsetNames.get(String(l.adset_id || "")) || "") || null,
+              ad_id: l.ad_id ?? null,
+              ad_name: String(l.ad_name || adNames.get(String(l.ad_id || "")) || "") || null,
+              form_id: l.form_id ?? formId,
+              form_name: String(l.form_name || formNames.get(String(l.form_id || formId)) || "") || null,
+              source: "form" as const,
+              platform: String(l.platform || l.site_source_name || l.publisher_platform || "") || null,
+              placement: String(l.placement || l.platform_position || "") || null,
+            });
             return {
               ad_account_id: acc.id,
-              campaign_id: l.campaign_id ?? null,
-              adset_id: l.adset_id ?? null,
-              ad_id: l.ad_id ?? null,
-              form_id: l.form_id ?? formId,
+              campaign_id: attribution.campaign_id ?? null,
+              adset_id: attribution.adset_id ?? null,
+              ad_id: attribution.ad_id ?? null,
+              form_id: attribution.form_id ?? formId,
               meta_lead_id: String(l.id),
               created_time: l.created_time,
               field_data: fd,
@@ -862,14 +893,14 @@ Deno.serve(async (req) => {
               lead_state: state,
               lead_state_source: source,
               lead_city: pickField(fd, CITY_KEYS),
-              campaign_name: String(l.campaign_name || campaignNames.get(String(l.campaign_id || "")) || "") || null,
-              adset_name: String(l.adset_name || adsetNames.get(String(l.adset_id || "")) || "") || null,
-              ad_name: String(l.ad_name || adNames.get(String(l.ad_id || "")) || "") || null,
-              form_name: String(l.form_name || formNames.get(String(l.form_id || formId)) || "") || null,
-              platform: String(l.platform || l.site_source_name || l.publisher_platform || "") || null,
-              placement: String(l.placement || l.platform_position || "") || null,
+              campaign_name: attribution.campaign_name,
+              adset_name: attribution.adset_name,
+              ad_name: attribution.ad_name,
+              form_name: attribution.form_name,
+              platform: attribution.platform,
+              placement: attribution.placement,
               is_organic: typeof l.is_organic === "boolean" ? l.is_organic : null,
-              attribution_status: l.campaign_id && l.adset_id && l.ad_id && (l.form_id || formId) ? "captured" : "partial",
+              attribution_status: attributionStatus(attribution),
               raw: l,
             };
           });
@@ -953,10 +984,20 @@ Deno.serve(async (req) => {
       ? "partial"
       : "success";
     const success = !hasFatalErrors && !hasWarnings;
+    const finalStatus = accounts?.length === 0 ? "stale" : hasFatalErrors && failedAccounts >= accounts.length ? "failed" : hasFatalErrors || hasWarnings ? "partial" : "success";
+    await finishSyncExecution(admin, syncRunId, {
+      status: finalStatus,
+      success,
+      error: accountResults.find((result: any) => result.error)?.error,
+      warnings: accountResults.flatMap((result: any) => Array.isArray(result.errors) ? result.errors : []),
+      recordsRead: totalPages,
+      recordsUpserted: totalUpserted,
+    });
     return new Response(
       JSON.stringify({
         success,
         status,
+        sync_run_id: syncRunId,
         skipped_disconnected: skippedDisconnected,
         disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({ id: account.id, account_id: account.account_id, name: account.name })),
         upserted: totalUpserted,
@@ -978,6 +1019,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
+    await finishSyncExecution(admin, syncRunId, { status: "failed", error: (e as Error).message });
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

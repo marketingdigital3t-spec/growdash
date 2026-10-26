@@ -17,6 +17,7 @@ import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsR
 import { SyncAuditCard } from "@/components/data-health/SyncAuditCard";
 import { Inbox } from "lucide-react";
 import { PlatformPerformanceCard } from "@/components/data-health/PlatformPerformanceCard";
+import { SyncExecutionCard } from "@/components/data-health/SyncExecutionCard";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 import { shouldFetchNextPage } from "@/lib/pagination";
@@ -132,7 +133,9 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDat
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });
-      if (workspaceId) oauthQuery = oauthQuery.eq("workspace_id", workspaceId);
+      // Integrations are owned by the authenticated user and do not carry a
+      // workspace_id column. RLS provides the user boundary here; applying a
+      // workspace filter would make the entire data-health query fail.
       const { data: oauthIntegrations, error: oauthError } = await oauthQuery;
       throwOnQueryError(oauthError, "integrations");
       let lpQuery = supabase.from("account_lp_config").select("ad_account_id, action_type");
@@ -318,6 +321,8 @@ export default function DataHealth() {
       </Card>
 
       <PlatformPerformanceCard workspaceId={workspaceId} />
+
+      <SyncExecutionCard />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Auditoria operacional por conta e período</CardTitle></CardHeader>

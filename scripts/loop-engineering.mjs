@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { createAutomaticRemediationPlan } from "./loop-engineering-auto-repair.mjs";
 
 const execFile = promisify(execFileCallback);
-const DEFAULT_COMMANDS = ["npm test", "npm run lint", "npm run build", "npm run test:visual", "git diff --check"];
+const DEFAULT_COMMANDS = ["npm test", "npm run test:sync", "npm run lint", "npm run build", "npm run test:visual", "git diff --check"];
 const ALLOWED_COMMANDS = new Set([...DEFAULT_COMMANDS, "npm run test:visual"]);
 const ALLOWED_PLAN_COMMANDS = new Set([...ALLOWED_COMMANDS, "supabase db advisors", "supabase migration list", "supabase db push --dry-run"]);
 

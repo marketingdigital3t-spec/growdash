@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 import { resolveMetaLookbackDateRange } from "../_shared/metaLookbackWindow.ts";
 import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../_shared/metaSyncBatch.ts";
+import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -305,6 +306,18 @@ Deno.serve(async (req) => {
     });
   }
 
+  const syncRunId = await startSyncExecution(admin, {
+    provider: "daily",
+    triggerSource,
+    scopeKey: `${targetDate}:${syncWindow.mode}`,
+    scope: {
+      target_date: targetDate,
+      window_start: syncWindow.start.toISOString(),
+      window_end: syncWindow.end.toISOString(),
+      sync_mode: syncWindow.mode,
+    },
+  });
+
   try {
     // Process a rotating, bounded batch of authorized live connections. The
     // old all-accounts fan-out retried blocked/read-only rows, hit Edge rate
@@ -537,10 +550,23 @@ Deno.serve(async (req) => {
       .eq("id", run.id);
     if (runUpdateError) throw runUpdateError;
 
+    await finishSyncExecution(admin, syncRunId, {
+      status,
+      success: allOk,
+      error: allOk ? null : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
+      warnings: [
+        metaLeadsWithCoverage.body?.errors,
+        metaHourlyWithCoverage.body?.errors,
+        duplicateMappingCount > 0 ? `${duplicateMappingCount} mapeamento(s) RD duplicado(s).` : null,
+      ].filter(Boolean),
+      recordsUpserted: Number(metaInsightsWithCoverage.body?.upserted || 0) + Number(metaLeadsWithCoverage.body?.upserted || 0),
+    });
+
     return new Response(
       JSON.stringify({
         success: allOk,
         status,
+        sync_run_id: syncRunId,
         targetDate,
         windowStart: syncWindow.start.toISOString(),
         windowEnd: syncWindow.end.toISOString(),
@@ -574,6 +600,7 @@ Deno.serve(async (req) => {
         error_message: message,
       })
       .eq("id", run.id);
+    await finishSyncExecution(admin, syncRunId, { status: "failed", error: message });
 
     return new Response(JSON.stringify({
       error: message,
