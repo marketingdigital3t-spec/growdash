@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableFooter, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSales } from "@/hooks/useSales";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { businessDateKey } from "@/lib/businessDate";
@@ -91,6 +92,8 @@ import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 import { campaignLoadState } from "@/lib/campaignLoading";
 import { buildCampaignActionCatalog } from "@/lib/campaignActionCatalog";
 import { countCampaignHierarchy, hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -237,6 +240,7 @@ function sortLevelRows<T>(rows: T[], key: AdsetColKey | AdColKey, ascending: boo
 export default function Campaigns() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
   const { toast } = useToast();
   const syncMeta = useSyncMeta();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -386,8 +390,17 @@ export default function Campaigns() {
     else { setAdSortKey(key); setAdSortAsc(false); }
   };
 
+  const campaignQueryKey = ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), JSON.stringify(attributionWindowsByAccount), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt] as const;
+  const campaignSnapshotCacheKey = user?.id
+    ? `growdash:campaigns-full-snapshot:${user.id}:${encodeURIComponent(JSON.stringify(campaignQueryKey))}`
+    : "";
+  const persistedCampaignRows = readLocalCache<any[]>(campaignSnapshotCacheKey);
+  const persistCampaignRows = (value: any[]) => {
+    if (campaignSnapshotCacheKey) writeLocalCache(campaignSnapshotCacheKey, value);
+    return value;
+  };
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
-    queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), JSON.stringify(attributionWindowsByAccount), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
+    queryKey: campaignQueryKey,
     // A carga é dividida em páginas e relações independentes. Assim, nenhum
     // join aninhado fica responsável por materializar a árvore inteira de
     // campanhas e o timeout de uma página não mantém o skeleton infinito.
@@ -506,7 +519,7 @@ export default function Campaigns() {
         }
       }
 
-      return campaigns.map((c: any) => {
+      return persistCampaignRows(campaigns.map((c: any) => {
         const hydratedAdsets = (adsetsByCampaign.get(String(c.id)) || []).map((adset: any) => ({
           ...adset,
           ads: (adsByAdset.get(String(adset.id)) || []).map((ad: any) => ({ ...ad, insights: insightsByAd.get(String(ad.id)) || [] })),
@@ -574,8 +587,13 @@ export default function Campaigns() {
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
         const officialResult = selectOfficialCampaignResult(c.objective, optimizationGoal, officialResults);
         return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate, metaResultType: officialResult?.type || null, metaResultValue: officialResult?.value ?? null, optimizationGoal };
-      });
+      }));
     },
+    initialData: persistedCampaignRows,
+    initialDataUpdatedAt: persistedCampaignRows ? 0 : undefined,
+    placeholderData: (previousData) => previousData ?? persistedCampaignRows,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedCampaignRows)),
+    refetchInterval: 60_000,
   });
 
   const campaignAdIds = useMemo(() => campaignBaseRows.flatMap((campaign: any) =>
