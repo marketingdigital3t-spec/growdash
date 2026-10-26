@@ -94,3 +94,49 @@ jobs:
         run: |
           test -f reports/loop-engineering.json
           node --input-type=module -e "import fs from 'node:fs'; const report=JSON.parse(fs.readFileSync('reports/loop-engineering.json','utf8')); if (report.status === 'blocked') { console.error('Loop gate bloqueado:', report.findings.length, 'achado(s)'); process.exit(2); }"
+
+      - name: Validate publication credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo "SUPABASE_ACCESS_TOKEN ausente; publicação bloqueada."; exit 2; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN ausente; publicação bloqueada."; exit 2; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID ausente; publicação bloqueada."; exit 2; }
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply compatible Supabase migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase db push --linked --yes
+
+      - name: Deploy Meta/RD Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
+            supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
+          done
+
+      - name: Build release artifact
+        run: npm run build
+
+      - name: Deploy Cloudflare Pages canary
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name growdash --branch main --commit-hash "$GITHUB_SHA" --commit-message "Growdash release $GITHUB_SHA" --skip-caching
+
+      - name: Smoke Edge Functions and production HTTP
+        run: |
+          set -eu
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://growdash.com.br/)" = "200"
+          for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
+            code="$(curl -sS -o "/tmp/growdash-${fn}.json" -w '%{http_code}' -X POST "https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/${fn}" -H 'content-type: application/json' --data '{}')"
+            test "$code" = "401" || { echo "$fn retornou HTTP $code; smoke bloqueado."; exit 2; }
+          done

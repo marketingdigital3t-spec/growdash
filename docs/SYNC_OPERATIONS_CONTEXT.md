@@ -27,3 +27,9 @@ Cloudflare Pages
 ## Diagnóstico
 
 Começar pelo `sync_run_id`, consultar `sync_execution_runs`, depois `realtime_sync_state`, `meta_sync_scope_state`, cursores e logs da função. Separar falha de autenticação, permissão, rate limit, timeout, contrato e banco. Nunca converter erro em zero.
+
+## Publicação protegida
+
+O workflow `.github/workflows/loop-engineering.yml` só promove uma versão depois de passar pelos testes, contrato, smoke autenticado e gate de observabilidade. Em seguida aplica migrations compatíveis, publica as quatro Edge Functions de Meta/RD, gera o build e publica o Pages com o SHA do commit. O smoke de produção exige HTTP 200 no domínio e HTTP 401 nas funções quando chamado sem credencial.
+
+Para habilitar essa promoção no GitHub, configure `GROWDASH_AUTH_STATE_B64`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SUPABASE_ACCESS_TOKEN`, `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`. A ausência de qualquer gate mantém a promoção bloqueada; nenhum valor deve ser colocado no repositório.
