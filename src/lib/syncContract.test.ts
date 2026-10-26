@@ -8,6 +8,7 @@ import {
   hasCompleteAttribution,
   normalizeAttribution,
   isTerminalSyncFailure,
+  redactSyncErrorMessage,
   syncFailurePolicy,
 } from "./syncContract";
 
@@ -50,5 +51,7 @@ describe("sync contract", () => {
     expect(isTerminalSyncFailure("failed")).toBe(true);
     expect(isTerminalSyncFailure("blocked")).toBe(true);
     expect(isTerminalSyncFailure("partial")).toBe(false);
+    expect(redactSyncErrorMessage("HTTP 401 https://graph.test?access_token=secret Bearer abc")).toContain("[REDACTED]");
+    expect(redactSyncErrorMessage("HTTP 401 https://graph.test?access_token=secret Bearer abc")).not.toContain("secret");
   });
 });

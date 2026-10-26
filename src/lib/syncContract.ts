@@ -83,6 +83,14 @@ export function isTerminalSyncFailure(status: string | null | undefined): boolea
   return status === "failed" || status === "blocked";
 }
 
+export function redactSyncErrorMessage(value: unknown): string {
+  return String(value instanceof Error ? value.message : value || "")
+    .replace(/Bearer\s+[^\s]+/gi, "Bearer [REDACTED]")
+    .replace(/([?&](?:access_token|token|key|secret)=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/((?:access[_-]?token|refresh[_-]?token|api[_-]?key|secret|password)\s*[=:]\s*)[^\s,;&]+/gi, "$1[REDACTED]")
+    .slice(0, 2_000);
+}
+
 export function normalizeSyncText(value: unknown): string | null {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text || /^\{\{[^{}]+\}\}$/.test(text)) return null;

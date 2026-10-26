@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { syncCrmLeadToRD, syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
-import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
+import { classifySyncErrorCode, redactSyncErrorMessage } from "../../../src/lib/syncContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +33,7 @@ function pickField(fields: unknown, names: string[]) {
 }
 
 async function enqueueFailedEvent(admin: any, event: { provider_event_id: string; event_type: string; payload: any }, account: MetaAccount | null, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = redactSyncErrorMessage(error);
   const errorCode = classifySyncErrorCode(message);
   const payloadSha256 = await sha256(JSON.stringify(event.payload));
   const leadId = event.event_type === "leadgen" ? String(event.payload?.value?.leadgen_id || "") : "";
@@ -57,14 +57,14 @@ async function enqueueFailedEvent(admin: any, event: { provider_event_id: string
       status: "pending",
       attempts: 1,
       last_error_code: errorCode,
-      last_error_message: message.slice(0, 2_000),
+      last_error_message: message,
       next_attempt_at: new Date(Date.now() + 60_000).toISOString(),
     }, { onConflict: "idempotency_key" });
   } else {
     await admin.from("sync_event_dead_letters").upsert({
       ...common,
       error_code: errorCode,
-      error_message: message.slice(0, 2_000),
+      error_message: message,
       attempts: 1,
     }, { onConflict: "idempotency_key" });
   }
