@@ -15,6 +15,9 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("LOOP_ENGINEERING_AUTH_REQUIRED: \"1\"");
     expect(workflow).toContain("LOOP_ENGINEERING_SENTRY_REQUIRED: \"1\"");
     expect(workflow).toContain("GROWDASH_AUTH_STATE_B64: ${{ secrets.GROWDASH_AUTH_STATE_B64 }}");
+    expect(workflow).toContain("npm run test:sync");
+    expect(workflow).toContain("supabase db push --linked --dry-run");
+    expect(workflow).toContain("supabase db advisors --linked");
     expect(workflow).toContain("SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}");
     expect(workflow).toContain("SENTRY_ORG: ${{ vars.SENTRY_ORG }}");
     expect(workflow).toContain("SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}");
@@ -27,6 +30,8 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("supabase functions deploy");
     expect(workflow).toContain("wrangler pages deploy dist --project-name growdash");
     expect(workflow).toContain("Smoke Edge Functions and production HTTP");
+    expect(workflow).toContain("Smoke authenticated production browser");
+    expect(workflow).toContain("GROWDASH_BASE_URL: https://growdash.com.br");
     expect(workflow).toContain("Capture current Cloudflare production deployment");
     expect(workflow).toContain("Create Sentry release and upload private source maps");
     expect(workflow).toContain("Roll back Cloudflare canary after failed smoke");
