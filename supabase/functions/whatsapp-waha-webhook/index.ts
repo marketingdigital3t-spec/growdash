@@ -45,7 +45,8 @@ Deno.serve(async (req) => {
   const { error: messageError } = await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: id, direction: "inbound", message_type: String(message.type || "text"), body, raw: message, sent_at: new Date().toISOString() }, { onConflict: "wamid" });
   if (messageError) return json({ error: messageError.message }, 500);
   await scheduleWhatsAppFollowups(admin, { workspaceId: number.workspace_id, whatsappNumberId: number.id, conversationId: conversation.id, agentId: number.agent_id, inboundAt: new Date().toISOString() });
-  const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
+  const { data: automations, error: automationsError } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
+  if (automationsError) return json({ error: "Automações indisponíveis", error_code: "WHATSAPP_AUTOMATIONS_UNAVAILABLE" }, 503);
   const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
   const results: unknown[] = [];
   for (const automation of matchingWorkflowAutomations(automations || [], { type: "whatsapp_message", id, text: body || "", whatsapp_number_id: number.id, phone_number_id: number.waha_session_name, from })) {

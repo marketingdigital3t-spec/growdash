@@ -31,7 +31,8 @@ Deno.serve(async (req) => {
   if (!number || number.mode === "human" || !number.agent_id) return json({ skipped: true, reason: "human_mode" });
   const { data: agent } = await admin.from("whatsapp_agents").select("id,name,system_prompt,model,knowledge,handoff_rules,status,mode").eq("id", number.agent_id).eq("status", "active").maybeSingle();
   if (!agent) return json({ skipped: true, reason: "agent_inactive" });
-  const { data: messages } = await admin.from("whatsapp_messages").select("direction,body,sent_at").eq("conversation_id", conversation.id).order("sent_at", { ascending: false }).limit(30);
+  const { data: messages, error: messagesError } = await admin.from("whatsapp_messages").select("direction,body,sent_at").eq("conversation_id", conversation.id).order("sent_at", { ascending: false }).limit(30);
+  if (messagesError) return json({ error: "Histórico da conversa indisponível", error_code: "WHATSAPP_HISTORY_UNAVAILABLE" }, 503);
   const history = (messages || []).reverse().map((item) => ({ role: item.direction === "outbound" ? "assistant" : "user", content: item.body || "[mídia]" }));
   const key = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
   if (!key) return json({ error: "AI_API_KEY não configurada" }, 503);

@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
   }
   if (!(expected.length >= 24 && provided === expected) && !cronAuthorized) return json({ error: "Não autorizado" }, 401);
   const now = new Date().toISOString();
-  const { data: due } = await admin.from("whatsapp_followups").select("id,workspace_id,conversation_id,whatsapp_number_id,agent_id,sequence_no").eq("status", "pending").lte("scheduled_at", now).order("scheduled_at").limit(100);
+  const { data: due, error: dueError } = await admin.from("whatsapp_followups").select("id,workspace_id,conversation_id,whatsapp_number_id,agent_id,sequence_no").eq("status", "pending").lte("scheduled_at", now).order("scheduled_at").limit(100);
+  if (dueError) return json({ error: "Fila de follow-ups indisponível", error_code: "WHATSAPP_FOLLOWUP_QUEUE_UNAVAILABLE" }, 503);
   const results: unknown[] = [];
   for (const followup of due || []) {
     const claimed = await admin.from("whatsapp_followups").update({ status: "processing", updated_at: now }).eq("id", followup.id).eq("status", "pending").select("id").maybeSingle();
