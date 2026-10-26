@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
-import { isTerminalAuxiliarySyncFailure, summarizeMetaSyncBlocks } from "@/lib/syncStatus";
+import { collectSyncWarnings, isTerminalAuxiliarySyncFailure, summarizeMetaSyncBlocks } from "@/lib/syncStatus";
 import { shouldRefreshStoredMetaToken } from "@/lib/syncRequestPlan";
 
 interface SyncParams {
@@ -37,6 +37,7 @@ type SyncResponse = {
   warnings?: string[];
   block_status?: { insights?: string; leads?: string; hourly?: string };
   coverage?: Record<string, unknown>;
+  accounts?: Array<{ account?: string; error?: string; errors?: string[] }>;
 };
 
 async function invokeSyncFunction(name: string, body: Record<string, unknown>, options: { allowPartial?: boolean } = {}): Promise<SyncResponse> {
@@ -65,7 +66,7 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>, o
   const data = (result.data ?? {}) as SyncResponse;
   const terminalFailure = isTerminalAuxiliarySyncFailure(data);
   if (data.error || terminalFailure || (!options.allowPartial && data.success === false)) {
-    throw Object.assign(new Error(data.error || data.errors?.join(" · ") || "A Meta recusou a sincronização."), {
+    throw Object.assign(new Error(collectSyncWarnings(data).join(" · ") || "A Meta recusou a sincronização."), {
       details: { needsReauth: Boolean(data.needs_reauth) },
     });
   }

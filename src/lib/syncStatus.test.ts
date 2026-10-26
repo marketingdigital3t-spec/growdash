@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeSyncFailure, isTerminalAuxiliarySyncFailure, summarizeMetaSyncBlocks } from "./syncStatus";
+import { collectSyncWarnings, describeSyncFailure, isTerminalAuxiliarySyncFailure, summarizeMetaSyncBlocks } from "./syncStatus";
 
 describe("Meta sync block status", () => {
   it("preserva sucesso dos KPIs quando hourly falha", () => {
@@ -38,5 +38,12 @@ describe("sync status", () => {
       state: "error",
       message: "Meta indisponível neste momento. Tente novamente para carregar os dados.",
     });
+  });
+
+  it("preserves per-account errors from an auxiliary sync response", () => {
+    expect(collectSyncWarnings({
+      status: "failed",
+      accounts: [{ account: "Conta teste", error: "Permissão leads_retrieval ausente" }],
+    })).toEqual(["Conta teste: Permissão leads_retrieval ausente"]);
   });
 });

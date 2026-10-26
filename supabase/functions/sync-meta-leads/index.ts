@@ -962,6 +962,10 @@ Deno.serve(async (req) => {
         upserted: totalUpserted,
         pagination: { pages: totalPages, last_cursor: lastCursor },
         accounts: accountResults,
+        errors: accountResults.flatMap((result: any) => [
+          ...(Array.isArray(result.errors) ? result.errors : []),
+          ...(result.error ? [result.error] : []),
+        ]),
         warnings: accountResults.flatMap((result: any) => Array.isArray(result.errors) ? result.errors : []),
         range: exactRange
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }

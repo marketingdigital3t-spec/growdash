@@ -89,6 +89,7 @@ import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker"
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 import { campaignLoadState } from "@/lib/campaignLoading";
+import { buildCampaignActionCatalog } from "@/lib/campaignActionCatalog";
 import { hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
@@ -595,9 +596,12 @@ export default function Campaigns() {
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
   const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => [currentAd.id, campaign.ad_account_id])))), [campaignBaseRows]);
+  const campaignActionCatalog = useMemo(() => buildCampaignActionCatalog(campaignBaseRows), [campaignBaseRows]);
   const { data: actionData, error: actionError, isError: actionIsError, isFetching: isActionFetching } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
     adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
     attributionWindowsByAccount,
+    adsetIdByAdId: campaignActionCatalog.adsetIdByAdId,
+    destinationTypeByAdset: campaignActionCatalog.destinationTypeByAdset,
   });
   // A carga canônica de ações é secundária para a primeira pintura: os fatos
   // diários já vêm da consulta principal. Só inicia depois que a hierarquia e

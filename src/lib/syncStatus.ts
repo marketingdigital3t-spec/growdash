@@ -5,6 +5,26 @@ export type SyncBlock = {
   errors?: string[];
 };
 
+export type SyncAccountResult = {
+  account?: string;
+  error?: string;
+  errors?: string[];
+};
+
+/** Preserve provider/account diagnostics when an Edge Function only exposes a generic status. */
+export function collectSyncWarnings(block: SyncBlock & { warnings?: string[]; accounts?: SyncAccountResult[] }) {
+  const messages = [
+    ...(block.error ? [block.error] : []),
+    ...(block.errors || []),
+    ...(block.warnings || []),
+    ...(block.accounts || []).flatMap((account) => [
+      ...(account.errors || []).map((message) => account.account ? `${account.account}: ${message}` : message),
+      ...(account.error ? [account.account ? `${account.account}: ${account.error}` : account.error] : []),
+    ]),
+  ];
+  return Array.from(new Set(messages.filter(Boolean)));
+}
+
 /**
  * Auxiliary resources (leads/forms and hourly facts) may return `success: false`
  * together with a partial snapshot and actionable warnings. Only an explicit
