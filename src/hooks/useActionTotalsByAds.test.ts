@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { hasCompleteMetaAdCatalog } from "./useActionTotalsByAds";
+import { buildActionTotalsSnapshotCacheKey, hasCompleteMetaAdCatalog } from "./useActionTotalsByAds";
+
+describe("Meta action snapshot cache", () => {
+  it("names cached action totals by the authenticated user and exact scope", () => {
+    expect(buildActionTotalsSnapshotCacheKey("user-1", ["actions", "account-1", "2026-10-26"])).toContain("growdash:action-totals-snapshot:user-1:");
+    expect(buildActionTotalsSnapshotCacheKey(undefined, ["actions"])).toBe("");
+  });
+});
 
 describe("Meta action catalog reuse", () => {
   it("accepts the adset catalog already carried by canonical Insights rows", () => {

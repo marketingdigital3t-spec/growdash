@@ -5,6 +5,7 @@ import { AnimatedNumber } from "@/components/AnimatedNumber";
 import type { ReactNode } from "react";
 import { metricDescription } from "@/lib/metricPresentation";
 import type { MetricAvailability } from "@/lib/metricAvailability";
+import { MetricLoadingIndicator } from "@/components/dashboard/MetricLoadingIndicator";
 
 interface MetricCardProps {
   title: string;
@@ -41,7 +42,9 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
           <div className="flex min-w-0 flex-col items-start justify-center gap-1 text-left">
             <p className="line-clamp-2 max-w-full break-words text-[9px] font-bold uppercase leading-[1.18] tracking-[.08em] text-muted-foreground sm:text-[10px] xl:text-xs" title={title}>{title}</p>
             <p data-value-size={formattedLength > 17 ? "long" : formattedLength > 12 ? "medium" : "regular"} className={cn("dashboard-terra-metric-value min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-tight tabular-nums", valueSize, unavailable && "text-muted-foreground", !unavailable && valueTone === "positive" && "text-emerald-500 dark:text-emerald-400", !unavailable && valueTone === "negative" && "text-red-500 dark:text-red-400")} title={availability?.reason || unavailableReason || fullValue}>
-              {unavailable ? statusLabel : <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} duration={700} />}
+              {unavailable
+                ? availability?.state === "loading" ? <MetricLoadingIndicator /> : statusLabel
+                : <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} duration={700} />}
             </p>
           </div>
           <div className="gd-metric-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">

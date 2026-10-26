@@ -408,13 +408,15 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       if (isSameQueryScope(previousQuery?.queryKey, queryKey)) return previousData;
       return enabled ? persistedSnapshot : undefined;
     },
-    // The coordinator refreshes on entry/filter events and every five minutes.
+    // The coordinator refreshes the provider snapshot every minute while this
+    // query reuses the last exact account/date snapshot immediately.
     // Keep the previous result during the request so a pending Meta response
     // can never make the selected cards flash to zero.
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     // A retry after the 2.5s core timeout would break the first-paint budget.
     // The five-minute interval and manual refresh provide the retry path while
     // the persisted snapshot keeps the dashboard useful during an outage.

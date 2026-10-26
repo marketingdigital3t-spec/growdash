@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { metricDescription } from "@/lib/metricPresentation";
 import { isMetricAvailable, type MetricAvailability } from "@/lib/metricAvailability";
+import { MetricLoadingIndicator } from "@/components/dashboard/MetricLoadingIndicator";
 
-interface GlassMetric { label: string; value: string; icon: ReactNode; tone?: "good" | "negative"; requiresMeta?: boolean; }
+interface GlassMetric { label: string; value: ReactNode; icon: ReactNode; tone?: "good" | "negative"; requiresMeta?: boolean; }
 interface Props {
   revenue: number;
   spend: number;
@@ -36,15 +37,15 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
   const availabilityMap = metricAvailability;
-  const display = (value: string, requiresMeta = true, metric?: keyof typeof availabilityMap) => {
+  const display = (value: string, requiresMeta = true, metric?: keyof typeof availabilityMap): ReactNode => {
     if (!requiresMeta) return value;
     const availability = metric ? availabilityMap[metric] : undefined;
+    if (availability?.state === "loading") return <MetricLoadingIndicator />;
     if (availability) {
-      if (availability.state === "loading") return "Aguardando sincronização";
       if (isMetricAvailable(availability)) return value;
       return availability.reason || unavailableReason || "Indisponível";
     }
-    return hasSnapshot ? value : (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível");
+    return hasSnapshot ? value : (loading ? <MetricLoadingIndicator /> : unavailableReason || "Indisponível");
   };
   const metrics: GlassMetric[] = [
     { label: "Faturamento bruto", value: display(brl.format(revenue), true, "revenue"), icon: <DollarSign /> },
@@ -63,7 +64,7 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
         <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-3 border-t border-border/40 bg-transparent p-3 md:grid-cols-4 md:border-t-0 xl:grid-cols-7">
           {metrics.map((metric) => {
             const isLeads = metric.label === "Leads" && leadsBreakdown;
-            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[var(--gd-radius-control)] [&_svg]:h-4 [&_svg]:w-4", metric.tone === "good" && "is-good", metric.tone === "negative" && "is-negative")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="gd-label break-words text-muted-foreground" title={metric.label}>{metric.label}</p><p className={cn("mt-1 min-w-0 break-words text-[22px] font-bold leading-tight tabular-nums", metric.tone === "good" && "text-emerald-600 dark:text-emerald-400", metric.tone === "negative" && "text-red-600 dark:text-red-400")} title={metric.value}>{metric.value}</p></div></>;
+            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[var(--gd-radius-control)] [&_svg]:h-4 [&_svg]:w-4", metric.tone === "good" && "is-good", metric.tone === "negative" && "is-negative")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="gd-label break-words text-muted-foreground" title={metric.label}>{metric.label}</p><p className={cn("mt-1 min-w-0 break-words text-[22px] font-bold leading-tight tabular-nums", metric.tone === "good" && "text-emerald-600 dark:text-emerald-400", metric.tone === "negative" && "text-red-600 dark:text-red-400")} title={typeof metric.value === "string" ? metric.value : metric.label}>{metric.value}</p></div></>;
             const className = cn(
               "gd-glass-metric group flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-left",
               isLeads && "gd-glass-metric-leads",

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
@@ -6,6 +7,8 @@ import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
 import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
 import { ANALYTICS_REQUEST_TIMEOUT_MS, MAX_CAMPAIGN_QUERY_PAGES, fetchCampaignPages } from "@/lib/campaignQuery";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -43,6 +46,10 @@ export interface ActionScope {
   destinationTypeByAdset?: Record<string, string | null | undefined>;
 }
 
+export function buildActionTotalsSnapshotCacheKey(userId: string | undefined, queryKey: readonly unknown[]) {
+  return userId ? `growdash:action-totals-snapshot:${userId}:${encodeURIComponent(JSON.stringify(queryKey))}` : "";
+}
+
 export function hasCompleteMetaAdCatalog(adIds: string[], adsetIdByAdId?: ActionScope["adsetIdByAdId"]) {
   return Boolean(adsetIdByAdId && adIds.every((adId) => Object.prototype.hasOwnProperty.call(adsetIdByAdId, adId)));
 }
@@ -64,6 +71,7 @@ export function useActionTotalsByAds(
   adAccountByAdId?: Record<string, string | null | undefined>,
   scope?: ActionScope,
 ) {
+  const { user } = useAuth();
   const sortedIds = [...(adIds || [])].sort();
   const scopedAccounts = [...(scope?.adAccountIds || [])].sort();
   const scopedCampaigns = [...(scope?.campaignIds || [])].sort();
@@ -90,6 +98,16 @@ export function useActionTotalsByAds(
     endDate ? businessDateKey(endDate) : null,
     accountMapSignature,
   ] as const;
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = buildActionTotalsSnapshotCacheKey(user?.id, queryKey);
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<ActionTotalsResult>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: ActionTotalsResult) => {
+    if (snapshotCacheKey) writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    return value;
+  };
   return useQuery({
     queryKey,
     enabled: sortedIds.length > 0 || scopedAccounts.length > 0 || scopedCampaigns.length > 0,
@@ -124,7 +142,7 @@ export function useActionTotalsByAds(
       // source of inflated leads. An empty universe is therefore a valid
       // empty snapshot; the sync layer will fill it on the next run.
       if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
-        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount: 0 };
+        return persistSnapshot({ totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount: 0 });
       }
       const resolvedSortedIds = [...new Set(resolvedIds)].sort();
       const canUseProvidedCatalog = hasCompleteMetaAdCatalog(resolvedSortedIds, adsetIdByAdId);
@@ -283,11 +301,13 @@ export function useActionTotalsByAds(
           Object.keys(dayActions).some((actionType) => leadActionAliases.has(actionType) || actionType === siteAction),
         ).length;
       }, 0);
-      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount };
+      return persistSnapshot({ totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount });
     },
-    staleTime: 120_000,
+    staleTime: 60_000,
     gcTime: 15 * 60_000,
-    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
+    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : persistedSnapshot,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     // Actions enrich the core Insights snapshot. Retrying after the bounded
     // analytics timeout would delay Leads/CPL beyond the first-paint budget.
