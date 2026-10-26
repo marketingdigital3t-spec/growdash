@@ -12,6 +12,7 @@ describe("loop engineering contract", () => {
     expect(workflow).toMatch(/^\x20{2}push:\n\x20{4}branches:\n\x20{6}- main/m);
     expect(workflow).toMatch(/for fn in controlled-realtime-sync[\s\S]*?\n\s+done\n\n\x20{6}- name: Smoke authenticated production browser/);
     expect(workflow).not.toMatch(/run: npx playwright test[^\n]*\n\s+done/);
+    expect(workflow).toContain("supabase link --project-ref cixnvosxqlacjbpymjha");
   });
 
   it("creates a stable signature from the same finding evidence", () => {
