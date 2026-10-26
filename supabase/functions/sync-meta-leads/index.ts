@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
-import { fetchWithTimeout, hasExceededSyncDeadline, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { fetchWithTimeout, hasExceededSyncDeadline, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +15,77 @@ const GRAPH = `https://graph.facebook.com/${
 }`;
 const GRAPH_REQUEST_TIMEOUT_MS = 12_000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LEAD_SYNC_GATE_USER_ID = "00000000-0000-0000-0000-000000000001";
+const LEAD_SYNC_GATE_PROVIDER = "meta_leads";
+const LEAD_SYNC_GATE_TTL_MS = SYNC_LEAD_RUN_BUDGET_MS + 30_000;
+const AUTOMATIC_LEAD_SYNC_SOURCES = new Set([
+  "near_realtime_background",
+  "controlled_realtime",
+  "five_minute_incremental",
+]);
+
+type LeadSyncGate = { acquired: boolean; skipped?: boolean; reason?: string };
+
+async function acquireLeadSyncGate(admin: any, scopeKey: string, triggerSource: string): Promise<LeadSyncGate> {
+  if (!AUTOMATIC_LEAD_SYNC_SOURCES.has(triggerSource)) return { acquired: false };
+  const now = new Date();
+  const { data: current, error: stateError } = await admin
+    .from("realtime_sync_state")
+    .select("last_started_at,last_finished_at,locked_until")
+    .eq("user_id", LEAD_SYNC_GATE_USER_ID)
+    .eq("provider", LEAD_SYNC_GATE_PROVIDER)
+    .eq("scope_key", scopeKey)
+    .maybeSingle();
+  if (stateError) {
+    // A missing/temporarily unavailable gate must not drop a lead. The
+    // persisted execution audit remains authoritative for this run.
+    console.warn("lead_sync_gate_state_unavailable", { scopeKey, error: String(stateError).slice(0, 300) });
+  } else {
+    if (current?.locked_until && new Date(current.locked_until).getTime() > now.getTime()) {
+      return { acquired: false, skipped: true, reason: "Sincronização automática de leads já está em andamento." };
+    }
+    const lastActivityAt = current?.last_finished_at || current?.last_started_at;
+    if (shouldThrottleLeadSync(lastActivityAt, now.getTime())) {
+      return { acquired: false, skipped: true, reason: "Leads já foram consultados recentemente; o próximo ciclo continuará a partir do watermark." };
+    }
+  }
+
+  const { data: acquired, error: lockError } = await admin.rpc("acquire_realtime_sync_lock", {
+    p_user_id: LEAD_SYNC_GATE_USER_ID,
+    p_provider: LEAD_SYNC_GATE_PROVIDER,
+    p_scope_key: scopeKey,
+    p_now: now.toISOString(),
+    p_locked_until: new Date(now.getTime() + LEAD_SYNC_GATE_TTL_MS).toISOString(),
+  });
+  if (lockError) {
+    console.warn("lead_sync_gate_lock_unavailable", { scopeKey, error: String(lockError).slice(0, 300) });
+    return { acquired: false };
+  }
+  return acquired ? { acquired: true } : {
+    acquired: false,
+    skipped: true,
+    reason: "Sincronização automática de leads já está em andamento.",
+  };
+}
+
+async function releaseLeadSyncGate(admin: any, scopeKey: string, status: string, error?: unknown) {
+  const finishedAt = new Date().toISOString();
+  const update: Record<string, unknown> = {
+    status: status || "success",
+    last_finished_at: finishedAt,
+    last_error: error ? String(error).slice(0, 500) : null,
+    locked_until: null,
+    updated_at: finishedAt,
+  };
+  if (status === "success") update.last_success_at = finishedAt;
+  const { error: releaseError } = await admin
+    .from("realtime_sync_state")
+    .update(update)
+    .eq("user_id", LEAD_SYNC_GATE_USER_ID)
+    .eq("provider", LEAD_SYNC_GATE_PROVIDER)
+    .eq("scope_key", scopeKey);
+  if (releaseError) console.warn("lead_sync_gate_release_failed", { scopeKey, error: String(releaseError).slice(0, 300) });
+}
 
 type LeadRow = {
   ad_account_id: string;
@@ -446,6 +517,8 @@ Deno.serve(async (req) => {
   let admin: any = null;
   let syncRunId: string | null = null;
   let previousValidSnapshotAt: string | null = null;
+  let leadGateAcquired = false;
+  let leadGateScopeKey: string | null = null;
   try {
     const body = await req.json().catch(() => ({}));
     const deadlineAt = Date.now() + SYNC_LEAD_RUN_BUDGET_MS;
@@ -491,6 +564,22 @@ Deno.serve(async (req) => {
     const since = exactRange?.startEpoch ?? recentRange?.startEpoch ??
       Math.floor((Date.now() - days * 86400000) / 1000);
     const scopeKey = `${adAccountIds.join(",") || adAccountId || "all"}:${exactRange ? `${exactRange.startDate}:${exactRange.endDate}` : recentRange ? "recent" : `last-${days}d`}`;
+    const leadGate = await acquireLeadSyncGate(admin, scopeKey, triggerSource);
+    if (leadGate.skipped) {
+      return new Response(JSON.stringify({
+        success: true,
+        status: "skipped",
+        reason: leadGate.reason,
+        sync_run_id: null,
+        range: recentRange
+          ? { startAt: new Date(recentRange.startEpoch * 1000).toISOString(), endAt: new Date(recentRange.endExclusiveEpoch * 1000).toISOString() }
+          : exactRange
+            ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
+            : { days },
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    leadGateAcquired = leadGate.acquired;
+    leadGateScopeKey = leadGateAcquired ? scopeKey : null;
     syncRunId = await startSyncExecution(admin, {
       userId,
       provider: "meta_leads",
@@ -1105,6 +1194,9 @@ Deno.serve(async (req) => {
       recordsRead: totalPages,
       recordsUpserted: totalUpserted,
     });
+    if (leadGateAcquired && leadGateScopeKey) {
+      await releaseLeadSyncGate(admin, leadGateScopeKey, finalStatus, accountResults.find((result: any) => result.error)?.error);
+    }
     return new Response(
       JSON.stringify({
         success,
@@ -1138,6 +1230,9 @@ Deno.serve(async (req) => {
       lastValidSnapshotAt: previousValidSnapshotAt,
       error: (e as Error).message,
     });
+    if (leadGateAcquired && leadGateScopeKey && admin) {
+      await releaseLeadSyncGate(admin, leadGateScopeKey, preserved ? "stale" : "failed", (e as Error).message);
+    }
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

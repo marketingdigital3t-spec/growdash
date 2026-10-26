@@ -8,6 +8,7 @@ import {
   fetchWithTimeout,
   buildLeadSyncWindow,
   leadSyncExecutionPolicy,
+  shouldThrottleLeadSync,
 } from "./syncReliabilityPolicy";
 
 describe("sync reliability policy", () => {
@@ -82,5 +83,12 @@ describe("sync reliability policy", () => {
       startDate: "2026-10-26",
       endDate: "2026-10-26",
     });
+  });
+
+  it("throttles automatic lead polling after a recent attempt", () => {
+    const now = Date.parse("2026-10-26T19:00:00.000Z");
+    expect(shouldThrottleLeadSync("2026-10-26T18:57:00.000Z", now)).toBe(true);
+    expect(shouldThrottleLeadSync("2026-10-26T18:54:59.999Z", now)).toBe(false);
+    expect(shouldThrottleLeadSync(null, now)).toBe(false);
   });
 });

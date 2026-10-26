@@ -4,6 +4,7 @@ export const SYNC_EXECUTION_MAX_AGE_MS = 10 * 60_000;
 // fields returned by Meta; missing pages stay partial and are retried later.
 export const META_AD_CATALOG_PAGE_SIZE = 500;
 export const SYNC_LEAD_RUN_BUDGET_MS = 90_000;
+export const LEAD_SYNC_COOLDOWN_MS = 5 * 60_000;
 
 export type LeadSyncExecutionPolicy = {
   catalogMaxPages: number;
@@ -54,6 +55,21 @@ export function leadSyncExecutionPolicy(recent: boolean, triggerSource = ""): Le
 
 export function hasExceededSyncDeadline(deadlineAt: number, now = Date.now()) {
   return now >= deadlineAt;
+}
+
+/**
+ * Automatic lead polling is deliberately less frequent than UI refreshes.
+ * Webhooks remain available for immediate delivery; this gate only prevents
+ * duplicate background reads from exhausting the Meta application quota.
+ */
+export function shouldThrottleLeadSync(
+  lastActivityAt: string | null | undefined,
+  now = Date.now(),
+  cooldownMs = LEAD_SYNC_COOLDOWN_MS,
+) {
+  if (!lastActivityAt) return false;
+  const last = Date.parse(lastActivityAt);
+  return Number.isFinite(last) && now - last < cooldownMs;
 }
 
 export function classifyAbandonedExecution(lastValidSnapshotAt: string | null | undefined) {
