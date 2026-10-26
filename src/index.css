@@ -15505,6 +15505,36 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: inherit !important;
 }
 
+/* Keep the selected Meta account control visually unified.  A legacy light
+   rule targets the label inside the trigger and can leave a white rectangle
+   over the dark green account block. */
+.campaigns-workspace .campaign-account-pill,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill {
+  background: #17241e !important;
+  background-color: #17241e !important;
+  color: #fff !important;
+}
+
+.campaigns-workspace .campaign-account-pill > span:not(.gd-account-count),
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill > span:not(.gd-account-count) {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+.campaigns-workspace .campaign-account-pill > svg,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill > svg {
+  color: #fff !important;
+}
+
+.campaigns-workspace .campaign-account-pill .gd-account-count,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
+  background: #10b981 !important;
+  background-color: #10b981 !important;
+  border-color: #34d399 !important;
+  color: #fff !important;
+}
+
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
   .meta-toolbar-button-active,
   .campaign-hierarchy-tab[data-state="active"]
