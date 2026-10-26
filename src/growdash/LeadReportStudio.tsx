@@ -20,6 +20,7 @@ import { useSales } from "@/hooks/useSales";
 import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficReport";
 import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { buildLeadQualitySummary, type LeadQualitySummary } from "@/lib/leadQualityReport";
+import type { DatePreset } from "@/hooks/useDateFilter";
 
 export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "costPerOpportunity" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
@@ -64,7 +65,7 @@ const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
-export function LeadReportStudio({ accountId, accountName, accounts, onAccountChange, startDate, endDate, insights, deals, sales, audience, audienceLoading = false }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void; startDate: Date; endDate: Date; insights: InsightRow[]; deals: RDDealLite[]; sales: Sale[]; audience?: AudienceProfileData; audienceLoading?: boolean }) {
+export function LeadReportStudio({ accountId, accountName, accounts, onAccountChange, preset, onPresetChange, customRange, onCustomRangeChange, startDate, endDate, insights, deals, sales, audience, audienceLoading = false }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void; preset: DatePreset; onPresetChange: (preset: DatePreset) => void; customRange: { from: Date; to: Date }; onCustomRangeChange: (range: { from: Date; to: Date }) => void; startDate: Date; endDate: Date; insights: InsightRow[]; deals: RDDealLite[]; sales: Sale[]; audience?: AudienceProfileData; audienceLoading?: boolean }) {
   const { user } = useAuth();
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
@@ -179,7 +180,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
           <div className="flex shrink-0 items-center gap-2"><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-[10px] font-black text-primary">{selected.length} métrica(s) selecionada(s)</span>{banner ? <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-300">Banner pronto</span> : null}</div>
         </div>
         <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="min-w-0"><MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} applyPresetOnClick className="h-10 min-w-0 w-full" /></div>
+          <div className="min-w-0"><MetaDateRangePicker preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} applyPresetOnClick className="h-10 min-w-0 w-full" /></div>
           <div className="flex min-w-0 gap-2 sm:col-span-2 lg:col-span-1"><input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => { upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /><Button variant="outline" className="h-10 flex-1" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />{banner ? "Trocar banner" : "Adicionar banner"}</Button>{banner ? <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" title="Remover banner" aria-label="Remover banner" onClick={() => { setBanner(""); window.localStorage.removeItem(`growdash:report-banner:${accountId}`); }}><X className="h-4 w-4" /></Button> : null}</div>
         </div>
       </header>
