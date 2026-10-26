@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hydrateCampaignHierarchy, hierarchyCountLabel, shouldLoadCampaignHierarchy } from "./campaignHierarchy";
+import { countCampaignHierarchy, hydrateCampaignHierarchy, hierarchyCountLabel, shouldLoadCampaignHierarchy } from "./campaignHierarchy";
 
 describe("campaign hierarchy loading", () => {
   it("hydrates ad sets and ads while Intelligence is open", () => {
@@ -25,6 +25,13 @@ describe("campaign hierarchy loading", () => {
 
     expect(hydrated.adsets[0].campaigns).toEqual([campaign]);
     expect(hydrated.ads[0].adsets).toEqual([{ ...adset, campaigns: [campaign] }]);
+  });
+
+  it("counts descendants embedded in the campaign snapshot", () => {
+    expect(countCampaignHierarchy([
+      { adsets: [{ id: "set-1", ads: [{ id: "ad-1" }, { id: "ad-2" }] }, { id: "set-2", ads: [{ id: "ad-3" }] }] },
+      { adsets: [{ id: "set-1", ads: [{ id: "ad-1" }] }] },
+    ])).toEqual({ adsets: 2, ads: 3 });
   });
 
   it("does not report zero while the independent hierarchy query is loading or unavailable", () => {

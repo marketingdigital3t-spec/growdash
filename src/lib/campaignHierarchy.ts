@@ -7,6 +7,23 @@ export type CampaignHierarchyRows = {
   ads: any[];
 };
 
+/** Count the descendants already embedded in the campaign query. */
+export function countCampaignHierarchy(campaigns: any[]) {
+  const adsetIds = new Set<string>();
+  const adIds = new Set<string>();
+  for (const campaign of campaigns || []) {
+    for (const adset of campaign?.adsets || []) {
+      const adsetId = String(adset?.id || "");
+      if (adsetId) adsetIds.add(adsetId);
+      for (const ad of adset?.ads || []) {
+        const adId = String(ad?.id || "");
+        if (adId) adIds.add(adId);
+      }
+    }
+  }
+  return { adsets: adsetIds.size, ads: adIds.size };
+}
+
 /**
  * Intelligence renders campaign descendants even while the main hierarchy tab
  * remains on campaigns. Keep those relation queries enabled for that panel so

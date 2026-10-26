@@ -90,7 +90,7 @@ import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues,
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 import { campaignLoadState } from "@/lib/campaignLoading";
 import { buildCampaignActionCatalog } from "@/lib/campaignActionCatalog";
-import { hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
+import { countCampaignHierarchy, hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -1167,6 +1167,16 @@ export default function Campaigns() {
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
+  const embeddedHierarchyCounts = useMemo(() => countCampaignHierarchy(filtered), [filtered]);
+  const embeddedHierarchyState = {
+    isLoading: isLoading || isFetching,
+    isError,
+    hasSnapshot: dataUpdatedAt > 0,
+  };
+  const adsetTabCount = hierarchyEnabled ? selectedAdsets.length : embeddedHierarchyCounts.adsets;
+  const adTabCount = hierarchyEnabled ? selectedAds.length : embeddedHierarchyCounts.ads;
+  const adsetTabState = hierarchyEnabled ? hierarchyAdsetsState : embeddedHierarchyState;
+  const adTabState = hierarchyEnabled ? hierarchyAdsState : embeddedHierarchyState;
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   // Seleção, nome e status são colunas estruturais da tabela. Mesmo que uma
@@ -1261,10 +1271,10 @@ export default function Campaigns() {
                 <FolderKanban className="h-3.5 w-3.5" /> {campaignCountLabel}
               </TabsTrigger>
               <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <Layers3 className="h-3.5 w-3.5" /> {hierarchyCountLabel("Conjuntos de anúncios", selectedAdsets.length, hierarchyAdsetsState)}
+                <Layers3 className="h-3.5 w-3.5" /> {hierarchyCountLabel("Conjuntos de anúncios", adsetTabCount, adsetTabState)}
               </TabsTrigger>
               <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <RectangleHorizontal className="h-3.5 w-3.5" /> {hierarchyCountLabel("Anúncios", selectedAds.length, hierarchyAdsState)}
+                <RectangleHorizontal className="h-3.5 w-3.5" /> {hierarchyCountLabel("Anúncios", adTabCount, adTabState)}
               </TabsTrigger>
             </TabsList>
             <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5" aria-hidden="true" />

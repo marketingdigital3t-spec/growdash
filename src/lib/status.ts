@@ -22,7 +22,7 @@ export interface StatusBadge {
 export function getStatusBadge(status: EntityStatus): StatusBadge {
   switch ((status || "").toUpperCase()) {
     case "ACTIVE":
-      return { label: "Ativa", dotColor: "bg-emerald-500", textColor: "text-emerald-600" };
+      return { label: "Ativa", dotColor: "bg-[#39ff14] shadow-[0_0_8px_rgba(57,255,20,0.9)]", textColor: "text-emerald-600" };
     case "PAUSED":
     case "CAMPAIGN_PAUSED":
     case "ADSET_PAUSED":
