@@ -17,7 +17,9 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: false,
+    // CI enables hidden maps for Sentry upload; maps are removed before the
+    // Pages artifact is published so source remains private.
+    sourcemap: process.env.SOURCEMAP === "true" ? "hidden" : false,
     modulePreload: {
       // The route graph contains heavy, lazy-only dependencies such as
       // Recharts and the map renderer. Vite otherwise emits modulepreload

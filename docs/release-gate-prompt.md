@@ -15,10 +15,10 @@ Cloudflare.
    deployment atual. Preserve alterações externas.
 2. Valide `GROWDASH_AUTH_STATE`. Se não existir, não crie sessão, não copie
    token e marque `authenticated_gate=blocked`.
-3. Valide `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` e `SENTRY_PROJECT`. Sem os três,
+3. Valide `SENTRY_AUTH_TOKEN`, `SENTRY_DSN`, `SENTRY_ORG` e `SENTRY_PROJECT`. Sem os quatro,
    não invente configuração e marque `observability_gate=blocked`. Se
    existirem, valide release por commit, source maps privados e um evento de
-   teste sem PII.
+   teste sem PII correlacionado por `sync_run_id`.
 4. Execute `supabase db advisors --linked --type all`, classifique cada aviso
    e só corrija segurança/RLS/RPC com causa reproduzida, migration versionada,
    teste de isolamento, rollback e nova rodada de advisors.
@@ -57,6 +57,6 @@ no runner, com permissão `600`, e define
 `GROWDASH_AUTH_STATE` para a execução. Sem esse secret, o gate autenticado fica
 bloqueado deliberadamente.
 
-Para o gate de observabilidade, configure o secret `SENTRY_AUTH_TOKEN` e as
+Para o gate de observabilidade, configure os secrets `SENTRY_AUTH_TOKEN` e `SENTRY_DSN` e as
 variáveis `SENTRY_ORG` e `SENTRY_PROJECT`. O workflow passa esses valores
 somente ao processo do loop; nenhum deles é incluído no frontend.

@@ -6928,7 +6928,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      sync_reliability_metrics: {
+        Row: {
+          window_start: string
+          executions_started: number
+          terminal_failures: number
+          success_count: number
+          partial_count: number
+          stale_count: number
+          running_count: number
+          failure_rate_pct: number | null
+          snapshot_age_seconds: number | null
+          duration_p50_ms: number | null
+          duration_p95_ms: number | null
+          duration_p99_ms: number | null
+          retries: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _normalize_uf: { Args: { _raw: string }; Returns: string }

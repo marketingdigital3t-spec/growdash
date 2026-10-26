@@ -90,11 +90,12 @@ async function authenticatedRuntimeFinding({ authStatePath = process.env.GROWDAS
   }
 }
 
-function sentryConfigurationFinding({ required = false, token = process.env.SENTRY_AUTH_TOKEN } = {}) {
-  if (!required || token) return null;
+function sentryConfigurationFinding({ required = false, token = process.env.SENTRY_AUTH_TOKEN, organization = process.env.SENTRY_ORG, project = process.env.SENTRY_PROJECT, dsn = process.env.SENTRY_DSN } = {}) {
+  if (!required || (token && organization && project && dsn)) return null;
+  const missing = [!token && "SENTRY_AUTH_TOKEN", !organization && "SENTRY_ORG", !project && "SENTRY_PROJECT", !dsn && "SENTRY_DSN"].filter(Boolean).join(", ");
   return finding({
     command: "sentry-release-check",
-    result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "SENTRY_AUTH_TOKEN ausente; eventos e source maps não podem ser verificados." },
+    result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: `${missing} ausente(s); release, eventos e source maps não podem ser verificados.` },
     severity: "high",
     category: "observability",
     title: "Gate de observabilidade bloqueado: Sentry não configurado",
@@ -239,7 +240,7 @@ function renderMarkdown(report) {
   return `# Loop Engineering\n\n- Execução: ${report.runId}\n- Commit: ${report.commitSha}\n- Modo: ${report.mode}\n- Status: ${report.status}\n\n## Achados\n\n| Severidade | Categoria | Título | Remediação | Release |\n|---|---|---|---|---|\n${rows}\n\n## Pendências\n\n${report.findings.length ? report.findings.map((item) => `- ${item.title}: ${sanitizeText(item.evidence.stderr || "evidência registrada")}`).join("\n") : "- Nenhuma"}\n`;
 }
 
-export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, autoRepair = false, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", backendScan = false, authenticatedRuntime = false, authStatePath = process.env.GROWDASH_AUTH_STATE, sentryRequired = false, sentryToken = process.env.SENTRY_AUTH_TOKEN, fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
+export async function runLoop({ mode = "detect", output = "reports/loop-engineering.json", plan = null, autoRepair = false, commands = DEFAULT_COMMANDS, runCommand = defaultRunCommand, commitSha = "unknown", backendScan = false, authenticatedRuntime = false, authStatePath = process.env.GROWDASH_AUTH_STATE, sentryRequired = false, sentryToken = process.env.SENTRY_AUTH_TOKEN, sentryOrganization = process.env.SENTRY_ORG, sentryProject = process.env.SENTRY_PROJECT, sentryDsn = process.env.SENTRY_DSN, fileSystem = { readFile: (file) => readFile(file, "utf8"), writeFile: (file, content) => writeFile(file, content, "utf8") } }) {
   const unlock = await acquireReportLock(output);
   if (!unlock) {
     const locked = { schemaVersion: 1, runId: `loop_locked_${stableHash({ output })}`, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), commitSha, mode, status: "blocked", findings: [finding({ command: output, result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Outra execução do loop já está usando este relatório." }, severity: "high", category: "runtime", title: "Execução concorrente bloqueada" })] };
@@ -251,7 +252,7 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
     const findings = [];
     const authFinding = await authenticatedRuntimeFinding({ authStatePath, required: authenticatedRuntime });
     if (authFinding) findings.push(authFinding);
-    const sentryFinding = sentryConfigurationFinding({ required: sentryRequired, token: sentryToken });
+    const sentryFinding = sentryConfigurationFinding({ required: sentryRequired, token: sentryToken, organization: sentryOrganization, project: sentryProject, dsn: sentryDsn });
     if (sentryFinding) findings.push(sentryFinding);
     for (const command of commands) {
       const result = await runCommand(command);
@@ -347,6 +348,9 @@ async function main() {
     backendScan: process.env.LOOP_ENGINEERING_BACKEND_SCAN === "1",
     authenticatedRuntime: process.env.LOOP_ENGINEERING_AUTH_REQUIRED === "1",
     sentryRequired: process.env.LOOP_ENGINEERING_SENTRY_REQUIRED === "1",
+    sentryOrganization: process.env.SENTRY_ORG,
+    sentryProject: process.env.SENTRY_PROJECT,
+    sentryDsn: process.env.SENTRY_DSN,
   });
   console.log(JSON.stringify({ runId: report.runId, status: report.status, findings: report.findings.length, output: args.output }, null, 2));
   if (report.status === "blocked") process.exitCode = 2;

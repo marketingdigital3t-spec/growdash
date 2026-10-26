@@ -18,6 +18,8 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}");
     expect(workflow).toContain("SENTRY_ORG: ${{ vars.SENTRY_ORG }}");
     expect(workflow).toContain("SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}");
+    expect(workflow).toContain("SENTRY_DSN: ${{ secrets.SENTRY_DSN }}");
+    expect(workflow).toContain("supabase secrets set --project-ref cixnvosxqlacjbpymjha");
     expect(workflow).toContain("base64 --decode | gzip -d > .auth/growdash.json");
     expect(workflow).toContain("SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}");
     expect(workflow).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
@@ -25,5 +27,9 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("supabase functions deploy");
     expect(workflow).toContain("wrangler pages deploy dist --project-name growdash");
     expect(workflow).toContain("Smoke Edge Functions and production HTTP");
+    expect(workflow).toContain("Capture current Cloudflare production deployment");
+    expect(workflow).toContain("Create Sentry release and upload private source maps");
+    expect(workflow).toContain("Roll back Cloudflare canary after failed smoke");
+    expect(workflow).toContain("find dist -type f -name '*.map' -delete");
   });
 });

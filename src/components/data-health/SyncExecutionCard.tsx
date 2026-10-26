@@ -46,6 +46,17 @@ export function SyncExecutionCard() {
     staleTime: 30_000,
   });
 
+  const sloQuery = useQuery({
+    queryKey: ["sync-reliability-metrics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sync_reliability_metrics").select("*").maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+
   const runs = query.data || [];
   const latest = runs[0];
   const terminal = runs.filter((run) => ["failed", "blocked"].includes(String(run.status))).length;
@@ -62,6 +73,12 @@ export function SyncExecutionCard() {
         {denominator > 0 && <Badge variant={failureRate > 1 ? "destructive" : "outline"}>{failureRate}% falhas recentes</Badge>}
       </CardHeader>
       <CardContent className="space-y-3">
+        {sloQuery.data && <div className="grid gap-2 rounded-lg border border-border/60 bg-muted/20 p-3 text-xs sm:grid-cols-4">
+          <div><span className="text-muted-foreground">Falha em 30 dias</span><p className={cn("font-bold", Number(sloQuery.data.failure_rate_pct || 0) > 1 ? "text-destructive" : "text-emerald-500")}>{Number(sloQuery.data.failure_rate_pct || 0).toFixed(2)}%</p></div>
+          <div><span className="text-muted-foreground">Execuções</span><p className="font-bold">{Number(sloQuery.data.executions_started || 0).toLocaleString("pt-BR")}</p></div>
+          <div><span className="text-muted-foreground">Parciais / stale</span><p className="font-bold">{Number(sloQuery.data.partial_count || 0)} / {Number(sloQuery.data.stale_count || 0)}</p></div>
+          <div><span className="text-muted-foreground">Latência p95</span><p className="font-bold">{sloQuery.data.duration_p95_ms == null ? "—" : `${Math.round(Number(sloQuery.data.duration_p95_ms))} ms`}</p></div>
+        </div>}
         {query.isLoading ? <p className="text-sm text-muted-foreground">Carregando auditoria…</p> : query.error ? <p className="text-sm text-destructive">Auditoria de sincronização indisponível: {(query.error as Error).message}</p> : !latest ? <p className="text-sm text-muted-foreground">Nenhuma execução auditada neste escopo.</p> : <>
           <div className={cn("flex items-center gap-2 text-sm font-semibold", statusClass(String(latest.status)))}>
             <StatusIcon status={String(latest.status)} />

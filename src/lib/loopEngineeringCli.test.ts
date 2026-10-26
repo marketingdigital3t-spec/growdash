@@ -56,6 +56,9 @@ describe("loop engineering CLI", () => {
       authStatePath: null,
       sentryRequired: true,
       sentryToken: null,
+      sentryOrganization: null,
+      sentryProject: null,
+      sentryDsn: null,
       runCommand: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: "", stderr: "" }),
     });
     expect(report.status).toBe("blocked");

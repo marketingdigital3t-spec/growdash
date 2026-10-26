@@ -35,3 +35,8 @@ A chave é composta por provedor, conta, objeto, evento e escopo. O mesmo evento
 ## Evidência mínima
 
 Toda execução registra `sync_run_id`, provedor, trigger, escopo, versão do contrato, versão do código, tentativa, contagem lida/upsertada, estado final, código de erro, avisos e timestamps. HTTP 200 ou uma mensagem de “sincronização iniciada” não é prova de sucesso.
+
+Eventos de erro e degradação no Sentry carregam os mesmos identificadores e métricas,
+sem payload bruto, token ou dado pessoal. A release só é promovida após testes,
+migrations, source maps, smoke autenticado e verificação HTTP; falha do canário pede
+rollback do deployment anterior e mantém a decisão como bloqueada até nova evidência.

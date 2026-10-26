@@ -52,6 +52,7 @@ jobs:
           LOOP_ENGINEERING_AUTH_REQUIRED: "1"
           LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npm run loop-engineering:detect
@@ -65,6 +66,7 @@ jobs:
           LOOP_ENGINEERING_AUTH_REQUIRED: "1"
           LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npm run loop-engineering:repair:auto
@@ -100,10 +102,24 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo "SUPABASE_ACCESS_TOKEN ausente; publicação bloqueada."; exit 2; }
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN ausente; publicação bloqueada."; exit 2; }
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID ausente; publicação bloqueada."; exit 2; }
+          test -n "${SENTRY_DSN:-}" || { echo "SENTRY_DSN ausente; eventos de sincronização não serão observáveis."; exit 2; }
+
+      - name: Capture current Cloudflare production deployment
+        id: previous_deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -eu
+          response="$(curl -fsSL -X GET "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/growdash/deployments?per_page=20" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H 'Content-Type: application/json')"
+          previous="$(printf '%s' "$response" | jq -r '.result[] | select(.environment == "production") | .id' | head -n 1)"
+          test -n "$previous" && test "$previous" != "null" || { echo "Não foi possível identificar o deployment de produção anterior."; exit 2; }
+          echo "deployment_id=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -118,13 +134,32 @@ jobs:
       - name: Deploy Meta/RD Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
+          supabase secrets set --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
           for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
             supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
           done
 
       - name: Build release artifact
+        env:
+          SOURCEMAP: "true"
         run: npm run build
+
+      - name: Create Sentry release and upload private source maps
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: |
+          set -eu
+          npx --yes @sentry/cli@latest releases new "$SENTRY_RELEASE"
+          npx --yes @sentry/cli@latest releases set-commits "$SENTRY_RELEASE" --auto
+          npx --yes @sentry/cli@latest sourcemaps upload dist --release "$SENTRY_RELEASE" --url-prefix "~/" --rewrite
+          npx --yes @sentry/cli@latest releases finalize "$SENTRY_RELEASE"
+          npx --yes @sentry/cli@latest releases info "$SENTRY_RELEASE"
+          find dist -type f -name '*.map' -delete
 
       - name: Deploy Cloudflare Pages canary
         env:
@@ -133,6 +168,8 @@ jobs:
         run: npx wrangler pages deploy dist --project-name growdash --branch main --commit-hash "$GITHUB_SHA" --commit-message "Growdash release $GITHUB_SHA" --skip-caching
 
       - name: Smoke Edge Functions and production HTTP
+        id: smoke
+        continue-on-error: true
         run: |
           set -eu
           test "$(curl -sS -o /dev/null -w '%{http_code}' https://growdash.com.br/)" = "200"
@@ -140,3 +177,19 @@ jobs:
             code="$(curl -sS -o "/tmp/growdash-${fn}.json" -w '%{http_code}' -X POST "https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/${fn}" -H 'content-type: application/json' --data '{}')"
             test "$code" = "401" || { echo "$fn retornou HTTP $code; smoke bloqueado."; exit 2; }
           done
+
+      - name: Roll back Cloudflare canary after failed smoke
+        if: steps.smoke.outcome == 'failure'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIOUS_DEPLOYMENT_ID: ${{ steps.previous_deployment.outputs.deployment_id }}
+        run: |
+          set -eu
+          curl -fsSL -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/growdash/deployments/${PREVIOUS_DEPLOYMENT_ID}/rollback" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H 'Content-Type: application/json'
+          echo "Rollback Cloudflare solicitado para ${PREVIOUS_DEPLOYMENT_ID}."
+
+      - name: Fail closed after smoke or rollback failure
+        if: steps.smoke.outcome == 'failure'
+        run: exit 2
