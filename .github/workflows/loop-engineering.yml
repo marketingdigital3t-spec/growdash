@@ -193,6 +193,7 @@ jobs:
           for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
             code="$(curl -sS -o "/tmp/growdash-${fn}.json" -w '%{http_code}' -X POST "https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/${fn}" -H 'content-type: application/json' --data '{}')"
             test "$code" = "401" || { echo "$fn retornou HTTP $code; smoke bloqueado."; exit 2; }
+          done
 
       - name: Smoke authenticated production browser
         id: browser_smoke
@@ -200,7 +201,6 @@ jobs:
         env:
           GROWDASH_BASE_URL: https://growdash.com.br
         run: npx playwright test tests/visual/route-health.spec.ts --project=desktop --workers=1
-          done
 
       - name: Roll back Cloudflare canary after failed smoke
         if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'

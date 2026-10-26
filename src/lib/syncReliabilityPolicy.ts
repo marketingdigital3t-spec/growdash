@@ -5,6 +5,23 @@ export const SYNC_EXECUTION_MAX_AGE_MS = 10 * 60_000;
 export const META_AD_CATALOG_PAGE_SIZE = 500;
 export const SYNC_LEAD_RUN_BUDGET_MS = 90_000;
 
+export type LeadSyncExecutionPolicy = {
+  catalogMaxPages: number;
+  refreshSubscriptions: boolean;
+  deliveryFields: "combined" | "isolated";
+};
+
+/**
+ * Recent lead windows are latency-sensitive. They reuse the local form
+ * catalog and must not refresh page/app subscriptions or walk every catalog
+ * page in the request that persists the lead snapshot.
+ */
+export function leadSyncExecutionPolicy(recent: boolean): LeadSyncExecutionPolicy {
+  return recent
+    ? { catalogMaxPages: 1, refreshSubscriptions: false, deliveryFields: "combined" }
+    : { catalogMaxPages: Number.POSITIVE_INFINITY, refreshSubscriptions: true, deliveryFields: "isolated" };
+}
+
 export function hasExceededSyncDeadline(deadlineAt: number, now = Date.now()) {
   return now >= deadlineAt;
 }

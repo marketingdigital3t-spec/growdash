@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRunSelectedMetaLeadSync, selectedMetaSyncIsPartial } from "./controlledMetaSync";
+import { canRunSelectedMetaLeadSync, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "./controlledMetaSync";
 
 describe("selected Meta sync blocks", () => {
   it("runs leads after a partial Insights response", () => {
@@ -17,5 +17,13 @@ describe("selected Meta sync blocks", () => {
     expect(selectedMetaSyncIsPartial({ data: { status: "success" } }, { data: { status: "partial" } })).toBe(true);
     expect(selectedMetaSyncIsPartial({ data: { status: "success" } }, { error: new Error("Leads failed") })).toBe(true);
     expect(selectedMetaSyncIsPartial({ data: { status: "success" } }, { data: { status: "success" } })).toBe(false);
+  });
+
+  it("keeps the provider error code when an auxiliary function returns a terminal status", () => {
+    expect(controlledSyncErrorMessage("sync-meta-leads", null, {
+      status: "failed",
+      error_code: "PROVIDER_TIMEOUT",
+      errors: ["Meta excedeu 90s; snapshot anterior preservado."],
+    })).toBe("PROVIDER_TIMEOUT: [\"Meta excedeu 90s; snapshot anterior preservado.\"]");
   });
 });

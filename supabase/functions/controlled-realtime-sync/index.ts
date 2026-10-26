@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { canRunSelectedMetaLeadSync } from "../../../src/lib/controlledMetaSync.ts";
+import { canRunSelectedMetaLeadSync, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
+import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
 import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
 import { aggregateSyncStatus, finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
@@ -235,7 +236,9 @@ Deno.serve(async (req) => {
             ? "partial"
             : insights.data?.status === "failed"
               ? "failed"
-              : "success";
+              : selectedMetaSyncIsPartial(insights, leads)
+                ? "partial"
+                : "success";
           return {
             data: {
               // The controlled result is successful when the primary daily
@@ -426,7 +429,11 @@ async function runControlled(args: {
     const stale = !hasError && !partial && (explicitStatus === "stale" || explicitStatus === "stale_snapshot");
     const finishedAt = new Date().toISOString();
     const error = hasError
-      ? stringifyError(response?.error || payload?.error || payload?.errors || "Falha na sincronização")
+      ? controlledSyncErrorMessage(
+        provider,
+        response?.error,
+        payload,
+      )
       : null;
 
     await admin.from("realtime_sync_state").update({
@@ -436,7 +443,7 @@ async function runControlled(args: {
       last_error: hasError
         ? error
         : partial || stale
-          ? stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado.")
+          ? controlledSyncErrorMessage(provider, null, payload)
           : null,
       locked_until: null,
       updated_at: finishedAt,
@@ -448,7 +455,7 @@ async function runControlled(args: {
       scope: scopeKey,
       synced: Number(payload?.synced || payload?.deals || payload?.updated || 0),
       errors: hasError || partial || stale
-        ? (error || stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado."))
+        ? (error || controlledSyncErrorMessage(provider, null, payload))
         : undefined,
       warnings: payload?.warnings,
       block_status: payload?.block_status,
@@ -464,7 +471,8 @@ async function runControlled(args: {
       locked_until: null,
       updated_at: finishedAt,
     }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
-    return { provider, scope: scopeKey, status: "failed", errors: (error as Error).message };
+    const message = error instanceof Error ? error.message : String(error);
+    return { provider, scope: scopeKey, status: "failed", errors: `${classifySyncErrorCode(error)}: ${message}` };
   }
 }
 
@@ -545,12 +553,6 @@ function dateInSaoPaulo(date: Date) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
-}
-
-function stringifyError(value: unknown) {
-  if (!value) return null;
-  if (typeof value === "string") return value.slice(0, 1_000);
-  try { return JSON.stringify(value).slice(0, 1_000); } catch { return String(value).slice(0, 1_000); }
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

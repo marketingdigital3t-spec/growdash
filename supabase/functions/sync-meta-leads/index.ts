@@ -1,8 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
-import { attributionStatus, normalizeAttribution } from "../../../src/lib/syncContract.ts";
-import { fetchWithTimeout, hasExceededSyncDeadline, META_AD_CATALOG_PAGE_SIZE, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { fetchWithTimeout, hasExceededSyncDeadline, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -206,6 +206,7 @@ async function hydrateMissingAttribution(
   adNames: Map<string, string>,
   adsetNames: Map<string, string>,
   campaignNames: Map<string, string>,
+  deliveryFields: "combined" | "isolated" = "isolated",
 ) {
   const cache = new Map<string, any>();
   const getObject = async (id: string, fields: string) => {
@@ -225,14 +226,17 @@ async function hydrateMissingAttribution(
     // so one unsupported field never removes the delivery facts that are
     // available for the lead.
     const value: Record<string, unknown> = {};
-    for (const field of [
-      "platform",
-      "site_source_name",
-      "publisher_platform",
-      "placement",
-      "platform_position",
-      "is_organic",
-    ]) {
+    const fields = deliveryFields === "combined"
+      ? ["platform,site_source_name,publisher_platform,placement,platform_position,is_organic"]
+      : [
+        "platform",
+        "site_source_name",
+        "publisher_platform",
+        "placement",
+        "platform_position",
+        "is_organic",
+      ];
+    for (const field of fields) {
       const part = await getObject(id, field);
       if (part && typeof part === "object") Object.assign(value, part);
     }
@@ -413,6 +417,7 @@ Deno.serve(async (req) => {
 
   let admin: any = null;
   let syncRunId: string | null = null;
+  let previousValidSnapshotAt: string | null = null;
   try {
     const body = await req.json().catch(() => ({}));
     const deadlineAt = Date.now() + SYNC_LEAD_RUN_BUDGET_MS;
@@ -450,6 +455,7 @@ Deno.serve(async (req) => {
       : [];
     const exactRange = parseExactDateRange(body);
     const recentRange = exactRange ? null : parseRecentTimestampRange(body);
+    const executionPolicy = leadSyncExecutionPolicy(Boolean(recentRange));
     const permissionAudit = body?.permission_audit === true;
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
     const since = exactRange?.startEpoch ?? recentRange?.startEpoch ??
@@ -468,6 +474,20 @@ Deno.serve(async (req) => {
         recent_end_at: recentRange ? new Date(recentRange.endExclusiveEpoch * 1000).toISOString() : null,
       },
     });
+    if (syncRunId) {
+      const { data: previous } = await admin
+        .from("sync_execution_runs")
+        .select("last_valid_snapshot_at")
+        .eq("provider", "meta_leads")
+        .eq("scope_key", scopeKey)
+        .neq("id", syncRunId)
+        .in("status", ["success", "partial", "stale"])
+        .not("last_valid_snapshot_at", "is", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      previousValidSnapshotAt = previous?.last_valid_snapshot_at || null;
+    }
 
     // Explicitly disabled accounts must never be queried or treated as a
     // successful lead sync. They require an authorized reconnection first.
@@ -641,29 +661,50 @@ Deno.serve(async (req) => {
         const actId = raw.startsWith("act_") ? raw : `act_${raw}`;
         const grantedPermissions = permissionAudit ? await inspectPermissions(token) : null;
 
+        // Recent windows reuse the durable form catalog. A full ad/page
+        // discovery belongs to manual or historical reconciliation and must
+        // not delay persistence of a lead that just arrived.
+        const formIds = new Set<string>();
+        const formNames = formNamesByToken.get(token) || new Map<string, string>();
+        const { data: cachedForms, error: cachedFormsError } = await admin
+          .from("meta_lead_form_catalog")
+          .select("form_id,name")
+          .eq("ad_account_id", acc.id)
+          .limit(500);
+        if (cachedFormsError) {
+          if (recentRange) throw cachedFormsError;
+        } else {
+          for (const form of cachedForms || []) {
+            if (form?.id || form?.form_id) formIds.add(String(form.form_id || form.id));
+            if (form?.form_id && form?.name) formNames.set(String(form.form_id), String(form.name));
+          }
+        }
+
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
           `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id,adset{name},campaign{name},creative{object_story_spec}&limit=${META_AD_CATALOG_PAGE_SIZE}&access_token=${token}`;
-        // Follow every ads page. Discovering only the first page silently
-        // omitted forms from larger accounts and made lead KPIs look partial.
-        let adsRes = await fetchAll(adsUrl, Number.POSITIVE_INFINITY, deadlineAt);
+        const needsRecentDiscovery = Boolean(recentRange) && formIds.size === 0;
+        let adsRes = (recentRange && !needsRecentDiscovery)
+          ? { data: [], pages: 0 }
+          : await fetchAll(adsUrl, executionPolicy.catalogMaxPages, deadlineAt);
         if (adsRes.error) {
           // Older tokens/API versions may reject nested creative fields. Keep
           // lead synchronization alive with the minimal ad listing, while
           // retaining the error only if the fallback also fails.
           const fallbackAds = await fetchAll(
             `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id&limit=${META_AD_CATALOG_PAGE_SIZE}&access_token=${token}`,
-            Number.POSITIVE_INFINITY,
+            executionPolicy.catalogMaxPages,
             deadlineAt,
           );
           if (!fallbackAds.error) adsRes = fallbackAds;
           else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };
         }
-        const formIds = new Set<string>();
         const discoveryWarnings: string[] = [];
-        const appSubscriptionWarning = await ensureAppPageWebhook(token);
-        if (appSubscriptionWarning) discoveryWarnings.push(appSubscriptionWarning);
+        if (executionPolicy.refreshSubscriptions) {
+          const appSubscriptionWarning = await ensureAppPageWebhook(token);
+          if (appSubscriptionWarning) discoveryWarnings.push(appSubscriptionWarning);
+        }
         if (grantedPermissions && !grantedPermissions.has("leads_retrieval")) {
           discoveryWarnings.push(
             "Meta token sem a permissão leads_retrieval; reconecte a conta após aprovar essa permissão e o acesso às Páginas.",
@@ -693,19 +734,20 @@ Deno.serve(async (req) => {
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id,name&limit=200&access_token=${token}`;
         const canReadLeadForms = !grantedPermissions || grantedPermissions.has("leads_retrieval");
-        const formsRes = canReadLeadForms
-          ? await fetchAll(formsUrl, Number.POSITIVE_INFINITY, deadlineAt)
+        const formsRes = (recentRange && !needsRecentDiscovery)
+          ? { data: [], pages: 0 }
+          : canReadLeadForms
+          ? await fetchAll(formsUrl, executionPolicy.catalogMaxPages, deadlineAt)
           : { data: [], pages: 0, error: "leads_retrieval ausente" };
-        const formNames = formNamesByToken.get(token) || new Map<string, string>();
         for (const form of formsRes.data || []) {
           if (form?.id && form?.name) formNames.set(String(form.id), String(form.name));
         }
         formNamesByToken.set(token, formNames);
-        if (formsRes.error && canReadLeadForms) {
+        if (formsRes.error && canReadLeadForms && executionPolicy.refreshSubscriptions) {
           const pageForms = await discoverPageForms(token);
           for (const id of pageForms.get(raw.replace(/^act_/, "")) || []) formIds.add(id);
         }
-        if (!pageFormsByToken.has(token)) await discoverPageForms(token);
+        if (executionPolicy.refreshSubscriptions && !pageFormsByToken.has(token)) await discoverPageForms(token);
         for (const warning of pageSubscriptionWarningsByToken.get(token) || []) {
           if (!discoveryWarnings.includes(warning)) discoveryWarnings.push(warning);
         }
@@ -796,7 +838,7 @@ Deno.serve(async (req) => {
             placement: row.placement,
             attribution_status: row.attribution_status,
           })]));
-          await hydrateMissingAttribution(existingRows, token, formNames, adNames, adsetNames, campaignNames);
+          await hydrateMissingAttribution(existingRows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
           const changedRows = existingRows.filter((row: any) => before.get(String(row.meta_lead_id)) !== JSON.stringify({
             campaign_name: row.campaign_name,
             adset_name: row.adset_name,
@@ -820,6 +862,9 @@ Deno.serve(async (req) => {
             leadsUpserted += Math.min(500, changedRows.length - i);
           }
           for (const row of changedRows) {
+            if (hasExceededSyncDeadline(deadlineAt)) {
+              throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
+            }
             await syncMetaLeadToRD(admin, String(row.meta_lead_id));
           }
         }
@@ -929,7 +974,7 @@ Deno.serve(async (req) => {
           // versions return only immutable IDs on /<form>/leads. Resolve the
           // missing names from the canonical Graph objects before persistence;
           // IDs remain the only matching key and failures stay partial.
-          await hydrateMissingAttribution(rows, token, formNames, adNames, adsetNames, campaignNames);
+          await hydrateMissingAttribution(rows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
 
           // Enrich rows still missing state via RD deals (match by email only — rd_deals has no phone column)
           const missing = rows.filter((x) => !x.lead_state && x.email);
@@ -973,6 +1018,9 @@ Deno.serve(async (req) => {
             }
             leadsUpserted += chunk.length;
             for (const row of chunk) {
+              if (hasExceededSyncDeadline(deadlineAt)) {
+                throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
+              }
               await syncMetaLeadToRD(admin, String(row.meta_lead_id));
             }
           }
@@ -996,18 +1044,24 @@ Deno.serve(async (req) => {
     const hasFatalErrors = accountResults.some((result: any) => Boolean(result.error));
     const skippedDisconnected = disconnectedAccounts?.length || 0;
     const failedAccounts = accountResults.filter((result: any) => Boolean(result.error)).length;
+    const timeoutOnlyFailure = hasFatalErrors && accountResults
+      .filter((result: any) => Boolean(result.error))
+      .every((result: any) => classifySyncErrorCode(result.error) === SYNC_ERROR_CODES.PROVIDER_TIMEOUT);
+    const hasCurrentSnapshot = !hasFatalErrors || totalUpserted > 0 || accountResults.some((result: any) => !result.error);
+    const validSnapshotAt = hasCurrentSnapshot ? new Date().toISOString() : previousValidSnapshotAt;
     const status = accounts?.length === 0
       ? "skipped"
       : hasFatalErrors && failedAccounts >= accounts.length
-      ? "failed"
+      ? timeoutOnlyFailure && previousValidSnapshotAt ? "stale" : "failed"
       : hasFatalErrors || hasWarnings
       ? "partial"
       : "success";
     const success = !hasFatalErrors && !hasWarnings;
-    const finalStatus = accounts?.length === 0 ? "stale" : hasFatalErrors && failedAccounts >= accounts.length ? "failed" : hasFatalErrors || hasWarnings ? "partial" : "success";
+    const finalStatus = accounts?.length === 0 ? "stale" : hasFatalErrors && failedAccounts >= accounts.length ? timeoutOnlyFailure && previousValidSnapshotAt ? "stale" : "failed" : hasFatalErrors || hasWarnings ? "partial" : "success";
     await finishSyncExecution(admin, syncRunId, {
       status: finalStatus,
       success,
+      lastValidSnapshotAt: validSnapshotAt,
       error: accountResults.find((result: any) => result.error)?.error,
       warnings: accountResults.flatMap((result: any) => Array.isArray(result.errors) ? result.errors : []),
       recordsRead: totalPages,
@@ -1039,7 +1093,13 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
-    await finishSyncExecution(admin, syncRunId, { status: "failed", error: (e as Error).message });
+    const errorCode = classifySyncErrorCode(e);
+    const preserved = errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT && previousValidSnapshotAt;
+    await finishSyncExecution(admin, syncRunId, {
+      status: preserved ? "stale" : "failed",
+      lastValidSnapshotAt: previousValidSnapshotAt,
+      error: (e as Error).message,
+    });
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

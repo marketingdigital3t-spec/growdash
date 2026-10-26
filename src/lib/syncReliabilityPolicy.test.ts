@@ -6,6 +6,7 @@ import {
   hasExceededSyncDeadline,
   classifyAbandonedExecution,
   fetchWithTimeout,
+  leadSyncExecutionPolicy,
 } from "./syncReliabilityPolicy";
 
 describe("sync reliability policy", () => {
@@ -37,5 +38,18 @@ describe("sync reliability policy", () => {
 
     expect(result).toBeInstanceOf(DOMException);
     expect(result.name).toBe("AbortError");
+  });
+
+  it("keeps recent lead sync bounded and leaves subscriptions to the durable path", () => {
+    expect(leadSyncExecutionPolicy(true)).toEqual({
+      catalogMaxPages: 1,
+      refreshSubscriptions: false,
+      deliveryFields: "combined",
+    });
+    expect(leadSyncExecutionPolicy(false)).toEqual({
+      catalogMaxPages: Number.POSITIVE_INFINITY,
+      refreshSubscriptions: true,
+      deliveryFields: "isolated",
+    });
   });
 });
