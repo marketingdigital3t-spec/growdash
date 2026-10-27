@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { createAuthStorage, createMemoryStorage, type AuthPersistenceMode } from './authPersistence';
+import { fetchAuthWithRetry } from './authFetch';
 
 // These are intentionally public client settings (not a service-role secret).
 // Cloudflare's Git builds provide them as VITE_* variables, but a manual Pages
@@ -43,5 +44,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLIC_KEY
     storage: createAuthStorage(browserLocalStorage, browserSessionStorage, () => authPersistenceMode, authStorageKey),
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    fetch: fetchAuthWithRetry,
+  },
 });

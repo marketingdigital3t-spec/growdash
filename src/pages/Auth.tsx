@@ -6,12 +6,11 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
-import { withRequestTimeout } from "@/lib/resilience";
 
 type Mode = "login" | "register";
 
 function isTransientAuthError(error: { status?: number; message?: string } | null | undefined) {
-  return !!error && ([0, 408, 429, 500, 502, 503, 504].includes(Number(error.status)) || /HTTP\s*50[234]|upstream|temporar|tempo de carregamento|timed out|timeout|network|fetch failed/i.test(error.message || ""));
+  return !!error && ([0, 408, 429, 500, 501, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530].includes(Number(error.status)) || /HTTP\s*5\d\d|upstream|temporar|tempo de carregamento|timed out|timeout|network|fetch failed/i.test(error.message || ""));
 }
 
 function authErrorMessage(error: { status?: number; message?: string } | null | undefined) {
@@ -47,15 +46,10 @@ export default function Auth() {
     if (mode === "login") {
       setAuthPersistence(remember);
       let error: { status?: number; message?: string } | null = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const result = await withRequestTimeout(supabase.auth.signInWithPassword({ email, password }), 12_000);
-          error = result.error;
-        } catch (requestError) {
-          error = { status: 0, message: requestError instanceof Error ? requestError.message : "Falha de rede no serviço de autenticação." };
-        }
-        if (!error || !isTransientAuthError(error) || attempt === 2) break;
-        await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
+      try {
+        ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+      } catch (requestError) {
+        error = { status: 0, message: requestError instanceof Error ? requestError.message : "Falha de rede no serviço de autenticação." };
       }
       setLoading(false);
       if (error) {
