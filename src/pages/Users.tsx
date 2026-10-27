@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { withRequestTimeout } from "@/lib/resilience";
 import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound, Mail, ShieldCheck, FilePenLine, Eye, Search, Copy, Clipboard } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -122,13 +123,17 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const hasAllowedPage = form.role === "admin" || PAGES.some(({ key }) => form[key]);
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, isError, error: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ["managed_users", workspace?.id],
     enabled: !!workspace?.id && (!!isMaster || ["owner", "admin"].includes(workspace.role)),
+    retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: { action: "list", workspace_id: workspace!.id },
-      });
+      const { data, error } = await withRequestTimeout(
+        supabase.functions.invoke("admin-create-user", {
+          body: { action: "list", workspace_id: workspace!.id },
+        }),
+        15_000,
+      );
       if (error) throw new Error(await readableFunctionError(error));
       if (data?.error) throw new Error(data.error);
       return (data?.users ?? []) as UserRow[];
@@ -280,14 +285,21 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6 space-y-3">
             {isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
-            {!isLoading && users.length === 0 && (
+            {isError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                <p className="font-medium text-destructive">Não foi possível carregar os usuários.</p>
+                <p className="mt-1 text-muted-foreground">{usersError instanceof Error ? usersError.message : "A consulta não respondeu."}</p>
+                <Button className="mt-3" size="sm" variant="outline" onClick={() => void refetchUsers()}>Tentar novamente</Button>
+              </div>
+            )}
+            {!isLoading && !isError && users.length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum usuário criado ainda.</p>
             )}
             <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
               <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail" className="pl-9" /></label>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="all">Todos os status</option><option value="active">Ativos</option><option value="invited">Convites pendentes</option><option value="disabled">Bloqueados</option></select>
             </div>
-            {!isLoading && users.length > 0 && visibleUsers.length === 0 && <p className="text-sm text-muted-foreground">Nenhum usuário corresponde aos filtros.</p>}
+            {!isLoading && !isError && users.length > 0 && visibleUsers.length === 0 && <p className="text-sm text-muted-foreground">Nenhum usuário corresponde aos filtros.</p>}
             {visibleUsers.map((u) => (
               <div key={u.user_id} className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <div className="space-y-2">

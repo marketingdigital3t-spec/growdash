@@ -357,25 +357,25 @@ async function listUsers(admin: any, workspaceId: string, callerId: string) {
   const ids = editable.map((member: any) => member.user_id);
   if (!ids.length) return json({ users: [] });
 
-  const [{ data: permissions, error: permissionError }, { data: accounts }, { data: funnels }, authUsers] = await Promise.all([
+  // The permission row already stores the workspace-scoped e-mail in
+  // `username`. Avoid one Auth admin request per member here: Auth can be
+  // temporarily slow or unavailable while PostgREST is healthy, and a
+  // management screen must still return the authorized workspace list.
+  const [{ data: permissions, error: permissionError }, { data: accounts }, { data: funnels }] = await Promise.all([
     admin.from("workspace_user_permissions").select("*").eq("workspace_id", workspaceId).in("user_id", ids),
     admin.from("user_ad_account_access").select("user_id, ad_account_id").eq("workspace_id", workspaceId).in("user_id", ids),
     admin.from("user_rd_funnel_access").select("user_id, rd_funnel_id").eq("workspace_id", workspaceId).in("user_id", ids),
-    Promise.all(ids.map(async (id: string) => {
-      const { data } = await admin.auth.admin.getUserById(id);
-      return data?.user ?? null;
-    })),
   ]);
   if (permissionError) return json({ error: permissionError.message }, 400);
 
   const result = editable.map((member: any) => {
     const permission = (permissions ?? []).find((row: any) => row.user_id === member.user_id) ?? {};
-    const authUser = authUsers.find((user: any) => user?.id === member.user_id);
+    const email = String(permission.username ?? "");
     return {
       ...Object.fromEntries(PERMISSION_KEYS.map((key) => [key, permission[key] === true])),
       user_id: member.user_id,
-      email: authUser?.email ?? permission.username ?? "",
-      name: authUser?.user_metadata?.full_name ?? authUser?.user_metadata?.name ?? "",
+      email,
+      name: email,
       role: (["admin", "editor", "viewer", "financial", "analyst"] as string[]).includes(permission.access_role)
         ? permission.access_role
         : fromWorkspaceRole(member.role),
