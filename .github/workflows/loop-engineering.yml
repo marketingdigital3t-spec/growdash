@@ -162,7 +162,7 @@ jobs:
           mkdir -p reports
           set +e
           for attempt in 1 2 3; do
-            supabase db advisors --linked --output json > reports/supabase-advisors.json
+            timeout 90s supabase db advisors --linked --output json > reports/supabase-advisors.json
             status=$?
             if [ "$status" -eq 0 ]; then
               exit 0
