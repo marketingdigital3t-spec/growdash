@@ -74,8 +74,8 @@ async function fetchWithDeadline(
  * Serializes password-login retries at the network boundary. Supabase Auth
  * returns 5xx/Cloudflare gateway responses as retryable errors, but a caller
  * timeout alone leaves the original fetch alive and can create overlapping
- * login requests. Only the password grant is retried here; all other Auth and
- * application requests keep the default Supabase behavior.
+ * login requests. Only the password grant is retried here. Other Auth, Data
+ * API and Edge Function requests use a bounded deadline without retries.
  */
 export async function fetchAuthWithRetry(
   input: RequestInfo | URL,
