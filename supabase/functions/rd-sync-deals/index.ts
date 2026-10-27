@@ -1489,14 +1489,17 @@ Deno.serve(async (req) => {
       // CRM record. The rd_deals trigger then propagates the same amount to
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
-      if (analytics_mode && !fullHistoryRequested) {
+      if (analytics_mode) {
         const hydrateByDefault = shouldHydrateRDAnalyticsDeal({
           analyticsMode: analytics_mode,
           skipEnrichment: effectiveSkipEnrichment,
           fullHistoryRequested,
         });
-        // Reuse complete local profiles in incremental cycles. Only new or
-        // incomplete deals call the RD detail/contact endpoints.
+        // Reuse local profiles in both bounded and full-history cycles. The
+        // full-history path is intentionally list-first: it must not rewrite
+        // every unchanged deal and retrigger attribution/sales work on every
+        // manual refresh. Bounded analytics may still hydrate incomplete or
+        // newly changed deals when the policy below requests it.
         const existingProfiles = new Map<string, any>();
         const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
         if (ids.length) {
@@ -1519,12 +1522,10 @@ Deno.serve(async (req) => {
             const hasContactIdentity = Boolean(profile?.contact_email || profile?.contact_phone);
             const complete = Boolean(profile?.raw) && hasContactIdentity && Boolean(profile.contact_name || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
             // A list snapshot with the same provider timestamp/stage/value is
-            // already authoritative for the mirror. Rehydrating every won
-            // deal on every historical pass made two otherwise harmless
-            // syncs compete on the rd_deals triggers and could time out the
-            // whole run before the remaining pages were persisted. Changed
-            // rows (or incomplete local profiles) still go through the detail
-            // endpoint; unchanged rows are reconciled by identity below.
+            // already authoritative for the mirror. Rewriting every won deal
+            // on every historical pass made otherwise harmless syncs compete
+            // on the rd_deals triggers and could time out before later pages
+            // were persisted. Changed rows are reconciled by identity below.
             const stageId = rdDealStageId(item);
             const likelyWon = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(item);
             const needsAuthoritativeClose = shouldHydrateRDAnalyticsItem({
