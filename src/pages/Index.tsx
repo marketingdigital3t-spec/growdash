@@ -137,7 +137,7 @@ const Index = () => {
   });
   const rdWonDeals = useMemo(() => rdWonDealsQuery.data ?? [], [rdWonDealsQuery.data]);
   const { isError: rdWonDealsError, dataUpdatedAt: rdWonDealsUpdatedAt, isLoading: loadingRDWonDeals, isFetching: fetchingRDWonDeals, refetch: refetchRDWonDeals } = rdWonDealsQuery;
-  const { isError: rdDealsError, error: rdDealsQueryError, isLoading: loadingRDDeals, isFetching: fetchingRDDeals } = rdDealsQuery;
+  const { isError: rdDealsError, error: rdDealsQueryError, isLoading: loadingRDDeals, isFetching: fetchingRDDeals, refetch: refetchRDDeals } = rdDealsQuery;
   const { data: alerts = [] } = useAlerts();
   const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
