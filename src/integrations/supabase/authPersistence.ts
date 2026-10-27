@@ -19,8 +19,10 @@ export function readPersistedSession(storage: StorageLike, storageKey: string): 
     if (typeof candidate.access_token !== "string" || !candidate.access_token) return null;
     if (typeof candidate.refresh_token !== "string" || !candidate.refresh_token) return null;
     if (!candidate.user || typeof candidate.user !== "object") return null;
-    if (typeof candidate.expires_at !== "number" || !Number.isFinite(candidate.expires_at)) return null;
-    if (candidate.expires_at <= Math.floor(Date.now() / 1000) + 15) return null;
+    if (typeof candidate.user.id !== "string" || !candidate.user.id) return null;
+    // An expired access token can still have a valid refresh token. Keep this
+    // session as a recovery hint while Auth is unavailable; protected calls
+    // remain server-validated and Supabase will replace it when refresh works.
     return candidate as Session;
   } catch {
     return null;

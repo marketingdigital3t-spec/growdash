@@ -45,7 +45,7 @@ describe("auth persistence storage", () => {
     expect(storage.getItem("auth-token")).toBe("temporary");
   });
 
-  it("recovers an unexpired persisted session without trusting malformed or expired data", () => {
+  it("recovers a persisted session without trusting malformed data", () => {
     const storage = memoryStorage();
     storage.setItem("auth-token", JSON.stringify({
       access_token: "access",
@@ -56,9 +56,11 @@ describe("auth persistence storage", () => {
 
     expect(readPersistedSession(storage, "auth-token")?.access_token).toBe("access");
 
-    storage.setItem("auth-token", JSON.stringify({ access_token: "access", refresh_token: "refresh", expires_at: 1, user: { id: "user-1" } }));
-    expect(readPersistedSession(storage, "auth-token")).toBeNull();
+    storage.setItem("auth-token", JSON.stringify({ access_token: "expired-access", refresh_token: "refresh", expires_at: 1, user: { id: "user-1" } }));
+    expect(readPersistedSession(storage, "auth-token")?.access_token).toBe("expired-access");
     storage.setItem("auth-token", "not-json");
+    expect(readPersistedSession(storage, "auth-token")).toBeNull();
+    storage.setItem("auth-token", JSON.stringify({ access_token: "access", refresh_token: "refresh", user: {} }));
     expect(readPersistedSession(storage, "auth-token")).toBeNull();
   });
 });

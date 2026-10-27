@@ -28,7 +28,6 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [remember, setRemember] = useState(true);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -44,7 +43,7 @@ export default function Auth() {
     if (mode === "register" && !legalAccepted) { toast({ title: "Aceite os documentos legais", description: "Leia e aceite os Termos de Uso e a Política de Privacidade para criar sua conta.", variant: "destructive" }); return; }
     setLoading(true);
     if (mode === "login") {
-      setAuthPersistence(remember);
+      setAuthPersistence(true);
       let error: { status?: number; message?: string } | null = null;
       try {
         ({ error } = await supabase.auth.signInWithPassword({ email, password }));
@@ -95,7 +94,7 @@ export default function Auth() {
   async function sendAccessLink() {
     const email = (forgotEmail || identifier).trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast({ title: "Informe um email válido", variant: "destructive" }); return; }
-    setAuthPersistence(remember);
+    setAuthPersistence(true);
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -107,7 +106,7 @@ export default function Auth() {
   }
 
   async function social(provider: "google" | "apple") {
-    setAuthPersistence(remember);
+    setAuthPersistence(true);
     const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
     if (error) toast({ title: `Login ${provider === "google" ? "Google" : "Apple"} indisponível`, description: "Confira se o provedor está habilitado no Supabase.", variant: "destructive" });
   }
@@ -135,7 +134,7 @@ export default function Auth() {
         <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" className="grid h-11 w-11 place-items-center rounded-lg" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
         {mode === "register" && <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
         {mode === "register" && <label className="flex items-start gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} required className="mt-0.5" /><span>Li e aceito os <Link to="/termos" target="_blank" className="font-bold text-primary hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="font-bold text-primary hover:underline">Política de Privacidade</Link>.</span></label>}
-        {mode === "login" && <div className="auth-forgot-row"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Lembrar de mim</label><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link min-h-11">Esqueceu a senha?</button></div>}
+        {mode === "login" && <div className="auth-forgot-row"><span className="text-xs text-muted-foreground">Acesso mantido neste dispositivo até você sair</span><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link min-h-11">Esqueceu a senha?</button></div>}
         {forgotOpen && <div className="auth-recovery-box"><p>Recupere a senha ou entre sem senha por um link enviado ao seu email.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" aria-label="E-mail para recuperação" /><button type="button" onClick={recover} disabled={loading}>Redefinir senha</button></div><button type="button" onClick={sendAccessLink} disabled={loading} className="auth-link mt-3 min-h-11 w-full text-center">Enviar link de acesso sem senha</button></div>}
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? "Entrando…" : mode === "login" ? "Entrar" : "Criar conta"}</button>
       </form>
