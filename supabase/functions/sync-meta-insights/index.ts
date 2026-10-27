@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { datesSafeToReconcile, recentWindowForTimezone, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../_shared/metaInsightReconciliation.ts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, META_LEAD_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
+import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
@@ -1880,9 +1881,15 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
+    const errorCode = classifySyncErrorCode(e);
+    const status = errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT
+      ? 504
+      : errorCode === SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE
+        ? 503
+        : 500;
     return new Response(
-      JSON.stringify({ error: (e as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: (e as Error).message, error_code: errorCode, retryable: status >= 500 }),
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

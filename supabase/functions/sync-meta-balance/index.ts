@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -223,9 +224,10 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error("Balance sync error:", e);
+    const errorCode = classifySyncErrorCode(e);
     return new Response(
-      JSON.stringify({ error: (e as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: (e as Error).message, error_code: errorCode, retryable: [SYNC_ERROR_CODES.PROVIDER_TIMEOUT, SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE].includes(errorCode) }),
+      { status: errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT ? 504 : errorCode === SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE ? 503 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

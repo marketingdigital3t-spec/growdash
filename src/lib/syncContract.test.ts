@@ -44,6 +44,7 @@ describe("sync contract", () => {
     expect(classifySyncErrorCode("HTTP 403 permission denied")).toBe("PERMISSION_DENIED");
     expect(classifySyncErrorCode("AbortError: timeout")).toBe("PROVIDER_TIMEOUT");
     expect(classifySyncErrorCode("PROVIDER_TIMEOUT: Meta excedeu o prazo")).toBe("PROVIDER_TIMEOUT");
+    expect(classifySyncErrorCode("PGRST002: Could not query the database for the schema cache. Retrying.")).toBe("PROVIDER_UNAVAILABLE");
   });
 
   it("keeps the automatic repair policy explicit and fail-closed", () => {

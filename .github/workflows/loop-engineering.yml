@@ -212,7 +212,7 @@ jobs:
           # Only cron/webhook functions intentionally accept requests without a
           # Supabase JWT; authenticated sync functions must be rejected at the
           # gateway before their handler runs.
-          for fn in controlled-realtime-sync sync-meta-leads; do
+          for fn in controlled-realtime-sync sync-meta-insights sync-meta-hourly sync-meta-leads sync-meta-balance rd-sync-deals; do
             supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha
           done
           for fn in daily-incremental-sync meta-webhook; do

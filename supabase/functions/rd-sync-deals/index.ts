@@ -8,6 +8,7 @@ import {
   shouldSkipRDDealEnrichment,
 } from "../_shared/rdSyncCursor.ts";
 import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
+import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -2187,6 +2188,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     const msg = (err as Error).message;
+    const errorCode = classifySyncErrorCode(err);
     await finishRun({
       status: "failed",
       deals: 0,
@@ -2195,8 +2197,8 @@ Deno.serve(async (req) => {
       skipped: 0,
       errorMessage: msg,
     });
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: msg, error_code: errorCode, retryable: [SYNC_ERROR_CODES.PROVIDER_TIMEOUT, SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE].includes(errorCode) }), {
+      status: errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT ? 504 : errorCode === SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE ? 503 : 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -162,6 +162,11 @@ export function classifySyncErrorCode(error: unknown): SyncErrorCode {
   if (/403|forbidden|permission|scope/.test(text)) return SYNC_ERROR_CODES.PERMISSION_DENIED;
   if (/429|#4\b|rate.?limit|application request limit|too many/.test(text)) return SYNC_ERROR_CODES.RATE_LIMITED;
   if (/abort|timeout|timed out|excedeu/.test(text)) return SYNC_ERROR_CODES.PROVIDER_TIMEOUT;
+  // PostgREST emits PGRST002 while it cannot reach the database/schema cache.
+  // This is a transient data-plane outage and must remain retryable; treating
+  // the word "schema" as a contract defect blocks promotion and can dead-letter
+  // a valid sync even though no payload contract changed.
+  if (/pgrst002|schema cache|could not query the database|connection terminated|database.*(?:unavailable|timeout)/.test(text)) return SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE;
   if (/5\d\d|unavailable|network|fetch failed/.test(text)) return SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE;
   if (/duplicate|idempot/.test(text)) return SYNC_ERROR_CODES.DUPLICATE_EVENT;
   if (/contract|schema|invalid payload/.test(text)) return SYNC_ERROR_CODES.CONTRACT_INVALID;

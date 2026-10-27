@@ -1229,7 +1229,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const errorCode = classifySyncErrorCode(e);
-    const preserved = errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT && previousValidSnapshotAt;
+    const preserved = [SYNC_ERROR_CODES.PROVIDER_TIMEOUT, SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE].includes(errorCode) && previousValidSnapshotAt;
     await finishSyncExecution(admin, syncRunId, {
       status: preserved ? "stale" : "failed",
       lastValidSnapshotAt: previousValidSnapshotAt,
@@ -1238,8 +1238,8 @@ Deno.serve(async (req) => {
     if (leadGateAcquired && leadGateScopeKey && admin) {
       await releaseLeadSyncGate(admin, leadGateScopeKey, preserved ? "stale" : "failed", (e as Error).message);
     }
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: (e as Error).message, error_code: errorCode, retryable: [SYNC_ERROR_CODES.PROVIDER_TIMEOUT, SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE].includes(errorCode) }), {
+      status: errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT ? 504 : errorCode === SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE ? 503 : 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
