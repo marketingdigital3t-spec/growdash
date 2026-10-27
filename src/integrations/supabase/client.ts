@@ -8,11 +8,15 @@ import { createAuthStorage, createMemoryStorage, type AuthPersistenceMode } from
 // deploy does not inherit build variables. Keeping a safe fallback prevents a
 // malformed manual build from crashing before React can render.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cixnvosxqlacjbpymjha.supabase.co";
-// This project currently exposes the legacy anon key to the Auth gateway while
-// its newer publishable key can hang on /auth/v1. Both keys are public client
-// identifiers; service-role/secret keys must never be used here. Allow the
-// deployment to override the public key without changing application code.
-const SUPABASE_PUBLIC_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpeG52b3N4cWxhY2picHltamhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ0ODcsImV4cCI6MjA5NjA3MDQ4N30.-pvMgga16zuNfQMkXZS7uR6WY0PlGhDzN4YSQXMyk7g";
+// Supabase rotated this project's legacy JWT anon key. The current
+// publishable key is the supported browser credential for Auth and PostgREST.
+// Keep a publishable fallback so manual and CI builds remain usable even when
+// no VITE_* variables are injected. Never use a service-role/secret key here.
+export const SUPABASE_PUBLIC_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  || (import.meta.env.VITE_SUPABASE_ANON_KEY?.startsWith("sb_publishable_")
+    ? import.meta.env.VITE_SUPABASE_ANON_KEY
+    : undefined)
+  || "sb_publishable_z8AGO0BnFocDtOVyaYMbNQ_JiEYpPIY";
 
 const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
 const authStorageKey = `sb-${projectRef}-auth-token`;
