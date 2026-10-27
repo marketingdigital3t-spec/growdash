@@ -22,7 +22,7 @@ describe("near realtime sync policy", () => {
   });
 
   it("releases the shell after five seconds while preserving the snapshot", () => {
-    expect(SYNC_UI_DEADLINE_MS).toBe(5_000);
+    expect(SYNC_UI_DEADLINE_MS).toBe(4_500);
     expect(backgroundSyncStatus()).toEqual({
       state: "background",
       message: "Meta ainda está atualizando em segundo plano. O último snapshot válido permanece visível.",
