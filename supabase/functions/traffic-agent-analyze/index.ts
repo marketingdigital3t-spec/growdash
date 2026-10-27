@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -66,16 +67,24 @@ Deno.serve(async (req) => {
   const start = typeof body.start_date === "string" ? body.start_date : day(7);
   const end = typeof body.end_date === "string" ? body.end_date : day(1);
   const trigger = body.trigger === "manual" ? "manual" : "scheduled";
-  const { data: workspace } = await admin.from("workspaces").select("id").eq("owner_id", user.id).maybeSingle();
+  let { data: workspace } = await admin.from("workspaces").select("id").eq("owner_id", user.id).maybeSingle();
+  if (!workspace) {
+    const { data: membership } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: true }).limit(1).maybeSingle();
+    if (membership?.workspace_id) {
+      const { data: memberWorkspace } = await admin.from("workspaces").select("id").eq("id", membership.workspace_id).maybeSingle();
+      workspace = memberWorkspace;
+    }
+  }
   if (!workspace) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
   const { data: settings } = await admin.from("traffic_agent_settings").upsert({ workspace_id: workspace.id }, { onConflict: "workspace_id" }).select("*").single();
   if (settings?.execution_mode === "paused") return json({ status: "paused", reason: "EXECUTION_PAUSED" });
 
   await admin.from("traffic_agent_runtime").upsert({ workspace_id: workspace.id, status: "analyzing", browser_status: "disconnected", last_heartbeat_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  let accountQuery = admin.from("ad_accounts").select("id,account_id,name,access_token,connection_status").eq("user_id", user.id);
-  if (selectedAccountId) accountQuery = accountQuery.eq("id", selectedAccountId);
-  const { data: accounts, error: accountsError } = await accountQuery;
-  if (accountsError) return json({ status: "failed", error: "ACCOUNT_QUERY_FAILED" }, 500);
+  const resolvedAccounts = await resolveAuthorizedAdAccounts(admin, user.id, {
+    accountIds: selectedAccountId ? [selectedAccountId] : [],
+    select: "id,account_id,name,user_id,workspace_id,access_token,connection_status,metadata,created_at",
+  });
+  const accounts = resolvedAccounts.filter((account) => !account.workspace_id || account.workspace_id === workspace.id);
   if (!selectedAccountId && (accounts || []).length !== 1) {
     return json({ error: "ACCOUNT_SELECTION_REQUIRED", accounts_available: accounts?.length || 0 }, 400);
   }

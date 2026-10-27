@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { datesSafeToReconcile, recentWindowForTimezone, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../_shared/metaInsightReconciliation.ts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, META_LEAD_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,12 +131,15 @@ Deno.serve(async (req) => {
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
-    let accountsQuery = supabaseAdmin.from("ad_accounts").select("*");
-    if (adAccountId) accountsQuery = accountsQuery.eq("id", adAccountId);
-    else if (adAccountIds.length > 0) accountsQuery = accountsQuery.in("id", adAccountIds);
-    if (userId) accountsQuery = accountsQuery.eq("user_id", userId);
-    const { data: allAccounts, error: accError } = await accountsQuery;
-    if (accError) throw accError;
+    const requestedAccountIds = adAccountId ? [adAccountId] : adAccountIds;
+    let allAccounts: any[];
+    if (userId) {
+      allAccounts = await resolveAuthorizedAdAccounts(supabaseAdmin, userId, { accountIds: requestedAccountIds, select: "*" });
+    } else {
+      const result = await supabaseAdmin.from("ad_accounts").select("*");
+      if (result.error) throw result.error;
+      allAccounts = result.data || [];
+    }
 
     const blockedStatuses = new Set(["disconnected", "blocked"]);
     const blockedOAuthStatuses = new Set(["permission_removed", "expired", "invalid"]);

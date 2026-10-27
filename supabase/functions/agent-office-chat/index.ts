@@ -6,6 +6,7 @@ import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFact
 import { isWonRDStageName } from "../../../src/lib/rdDealStatus.ts";
 import { fetchWithRetry, inCivilPeriod, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 import { isValidCivilDate } from "../_shared/mcpContract.ts";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,12 +75,11 @@ Deno.serve(async (req) => {
     // Keep legacy NULL workspace accounts available only to their owner while
     // preventing a member of one workspace from reading another workspace's
     // accounts through the agent context.
-    let accountQuery = admin.from("ad_accounts").select("id,name,workspace_id,attribution_window,timezone_name")
-      .eq("user_id", user.id)
-      .or(`workspace_id.eq.${workspace.id},workspace_id.is.null`);
-    if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
-    const { data: accounts, error: accountsError } = await accountQuery;
-    if (accountsError) throw accountsError;
+    const resolvedAccounts = await resolveAuthorizedAdAccounts(admin, user.id, {
+      accountIds: requestedAccountIds,
+      select: "id,name,user_id,workspace_id,attribution_window,timezone_name,metadata,created_at",
+    });
+    const accounts = resolvedAccounts.filter((account) => !account.workspace_id || account.workspace_id === workspace.id);
     if (requestedAccountIds.length && (accounts || []).length !== requestedAccountIds.length) return json({ error: "ACCOUNT_SCOPE_NOT_AUTHORIZED" }, 403);
     const accountIds = (accounts || []).map((account) => account.id);
     let coverageRows: MetaSyncCoverageRow[] = [];
@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
       for (let offset = 0; ; offset += 1000) {
         let dealQuery = admin.from("rd_deals")
           .select("rd_deal_id,rd_connection_id,ad_account_id,rd_funnel_id,rd_stage_name,win,amount_total,amount_total_effective,deal_owner_name,lead_created_at,closed_at,stage_updated_at,updated_at")
-          .eq("user_id", user.id).in("ad_account_id", accountIds);
+          .in("ad_account_id", accountIds);
         if (rdStart && rdEnd) {
           const from = rdStart.toISOString();
           const to = rdEnd.toISOString();
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
     const uniqueDeals = Array.from(new Map(scopedDeals.filter((deal) => deal.rd_deal_id).map((deal) => [`${deal.rd_connection_id || deal.ad_account_id}:${deal.rd_deal_id}`, deal])).values());
     const saleRows: any[] = [];
     for (let offset = 0; ; offset += 1000) {
-      let query = admin.from("sales").select("id,ad_account_id,rd_funnel_id,rd_deal_id,status,quantity,net_revenue,sale_date,source_provider,source_record_id,updated_at").eq("user_id", user.id);
+      let query = admin.from("sales").select("id,ad_account_id,rd_funnel_id,rd_deal_id,status,quantity,net_revenue,sale_date,source_provider,source_record_id,updated_at");
       if (accountIds.length && !funnelIds.length) query = query.in("ad_account_id", accountIds);
       if (startDate) query = query.gte("sale_date", startDate);
       if (endDate) query = query.lte("sale_date", endDate);

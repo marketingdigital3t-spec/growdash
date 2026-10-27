@@ -14,9 +14,15 @@ export type RDConnection = {
   permissions: unknown;
 };
 
+export function isRDConnectionReadableByUser(connection: Pick<RDConnection, "user_id" | "workspace_id">, userId: string, activeWorkspaceMember: boolean) {
+  if (!userId) return false;
+  if (connection.user_id === userId) return true;
+  return Boolean(connection.workspace_id && activeWorkspaceMember);
+}
+
 export async function resolveRDConnection(
   admin: AdminClient,
-  input: { connectionId?: string | null; funnelId?: string | null; userId?: string | null },
+  input: { connectionId?: string | null; funnelId?: string | null; userId?: string | null; access?: "read" | "write" },
 ): Promise<RDConnection> {
   let connectionId = input.connectionId || null;
   let userId = input.userId || null;
@@ -38,11 +44,29 @@ export async function resolveRDConnection(
     .from("rd_account_connections")
     .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions,write_enabled")
     .eq("id", connectionId);
-  if (userId) query = query.eq("user_id", userId);
+  // Resolve by connection first, then apply the same workspace membership
+  // contract to every read caller. Filtering only by owner excluded delegated
+  // users from funnel and activity reads.
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("RD_CONNECTION_NOT_FOUND");
   if (data.status !== "connected" || !data.api_token) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
+  if (userId && data.user_id !== userId) {
+    if (!data.workspace_id) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
+    const { data: membership, error: membershipError } = await admin.from("workspace_members")
+      .select("workspace_id")
+      .eq("workspace_id", data.workspace_id)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+    if (!isRDConnectionReadableByUser(data, userId, Boolean(membership))) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
+    if (input.access === "write") {
+      const { data: canEdit, error: editError } = await admin.rpc("can_edit_workspace", { _workspace_id: data.workspace_id, _user_id: userId });
+      if (editError) throw editError;
+      if (canEdit !== true) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
+    }
+  }
   return data as RDConnection;
 }
 

@@ -119,6 +119,11 @@ jobs:
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID ausente; publicação bloqueada."; exit 2; }
           test -n "${SENTRY_DSN:-}" || { echo "SENTRY_DSN ausente; eventos de sincronização não serão observáveis."; exit 2; }
 
+      - name: Smoke authentication on current production
+        env:
+          GROWDASH_BASE_URL: https://growdash.com.br
+        run: npx playwright test tests/visual/auth-availability.spec.ts --project=desktop --workers=1
+
       - name: Capture current Cloudflare production deployment
         id: previous_deployment
         env:
@@ -212,7 +217,7 @@ jobs:
         continue-on-error: true
         env:
           GROWDASH_BASE_URL: https://growdash.com.br
-        run: npx playwright test tests/visual/route-health.spec.ts --project=desktop --workers=1
+        run: npx playwright test tests/visual/auth-availability.spec.ts tests/visual/route-health.spec.ts --project=desktop --workers=1
 
       - name: Roll back Cloudflare canary after failed smoke
         if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'

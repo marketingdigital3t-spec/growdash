@@ -4,6 +4,7 @@ import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 import { fetchWithRetry, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,14 +129,12 @@ Deno.serve(async (req) => {
     if (membershipError || !membership?.workspace_id) return responseError("WORKSPACE_NOT_FOUND", 404);
     // This function uses a service-role client after validating the session;
     // enforce the active workspace again instead of relying on browser RLS.
-    let accountQuery = admin.from("ad_accounts")
-      .select("id, account_id, name, workspace_id, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold")
-      .eq("user_id", user.id)
-      .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`);
-    if (accountId && accountId !== "all") accountQuery = accountQuery.eq("id", accountId);
-    else if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
-    const { data: accounts, error: accountError } = await accountQuery;
-    if (accountError) throw accountError;
+    const requestedScopeIds = accountId && accountId !== "all" ? [accountId] : requestedAccountIds;
+    const resolvedAccounts = await resolveAuthorizedAdAccounts(admin, user.id, {
+      accountIds: requestedScopeIds,
+      select: "id, account_id, name, user_id, workspace_id, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold, metadata, created_at",
+    });
+    const accounts = resolvedAccounts.filter((account) => !account.workspace_id || account.workspace_id === membership.workspace_id);
     if (accountId && !accounts?.length) return responseError("Conta não encontrada ou sem permissão.", 403);
     if (requestedAccountIds.length && requestedAccountIds.some((id) => !(accounts || []).some((account) => account.id === id))) {
       return responseError("Uma ou mais contas selecionadas não existem ou não estão autorizadas.", 403);
@@ -283,7 +282,7 @@ Deno.serve(async (req) => {
     for (let offset = 0; ; offset += 1000) {
       const { data: page, error: salesError } = await admin.from("sales")
         .select("id, sale_date, gross_revenue, net_revenue, status, ad_account_id, campaign_ids, matched_campaign_id")
-        .eq("user_id", user.id).in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
+        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
         .gte("sale_date", dataStartStr).lte("sale_date", endStr)
         .order("sale_date", { ascending: true }).order("id", { ascending: true })
         .range(offset, offset + 999);

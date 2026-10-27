@@ -3,6 +3,7 @@ import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { fetchWithTimeout, hasExceededSyncDeadline, isMetaApplicationRateLimitError, leadSyncCooldownMs, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -610,21 +611,19 @@ Deno.serve(async (req) => {
 
     // Explicitly disabled accounts must never be queried or treated as a
     // successful lead sync. They require an authorized reconnection first.
-    let q = admin.from("ad_accounts").select(
-      "id,name,account_id,access_token,user_id,connection_status",
-    ).neq("connection_status", "disconnected");
-    if (adAccountIds.length) q = q.in("id", adAccountIds);
-    else if (adAccountId) q = q.eq("id", adAccountId);
-    if (userId) q = q.eq("user_id", userId);
-    const { data: accounts, error: accErr } = await q;
-    if (accErr) throw accErr;
-
-    let disconnectedQuery = admin.from("ad_accounts").select("id,name,account_id").eq("connection_status", "disconnected");
-    if (adAccountIds.length) disconnectedQuery = disconnectedQuery.in("id", adAccountIds);
-    else if (adAccountId) disconnectedQuery = disconnectedQuery.eq("id", adAccountId);
-    if (userId) disconnectedQuery = disconnectedQuery.eq("user_id", userId);
-    const { data: disconnectedAccounts, error: disconnectedError } = await disconnectedQuery;
-    if (disconnectedError) throw disconnectedError;
+    const requestedAccountIds = adAccountIds.length ? adAccountIds : adAccountId ? [adAccountId] : [];
+    let resolvedAccounts: any[];
+    if (userId) {
+      resolvedAccounts = await resolveAuthorizedAdAccounts(admin, userId, { accountIds: requestedAccountIds, select: "id,name,account_id,access_token,user_id,workspace_id,connection_status,metadata,created_at" });
+    } else {
+      let accountQuery = admin.from("ad_accounts").select("id,name,account_id,access_token,user_id,workspace_id,connection_status,metadata,created_at");
+      if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
+      const accountResult = await accountQuery;
+      if (accountResult.error) throw accountResult.error;
+      resolvedAccounts = accountResult.data || [];
+    }
+    const accounts = resolvedAccounts.filter((account: any) => account.connection_status !== "disconnected");
+    const disconnectedAccounts = resolvedAccounts.filter((account: any) => account.connection_status === "disconnected");
 
     const accountResults: any[] = [];
     let totalUpserted = 0;

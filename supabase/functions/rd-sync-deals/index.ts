@@ -702,7 +702,7 @@ Deno.serve(async (req) => {
 
     let connection;
     try {
-      connection = await resolveRDConnection(admin, { connectionId: funnel.rd_connection_id, funnelId: funnel.id, userId });
+      connection = await resolveRDConnection(admin, { connectionId: funnel.rd_connection_id, funnelId: funnel.id, userId, access: "write" });
       rdConnectionId = String(connection.id || funnel.rd_connection_id || "") || null;
     } catch (error) {
       return new Response(

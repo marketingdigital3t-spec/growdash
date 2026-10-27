@@ -200,7 +200,7 @@ async function executeInstagramNode(admin: any, actorId: string, type: string, p
 async function executeRDNode(admin: any, actorId: string, type: string, parameters: Record<string, unknown>, context: Record<string, unknown>) {
   const trigger = (context.trigger || {}) as Record<string, unknown>;
   const connectionId = String(parameters.rd_connection_id || parameters.rdConnectionId || trigger.rd_connection_id || "").trim();
-  const connection = await resolveRDConnection(admin, { connectionId, userId: actorId });
+  const connection = await resolveRDConnection(admin, { connectionId, userId: actorId, access: "write" });
   if (!connection.write_enabled) throw new Error("As escritas no RD estão desativadas para esta conexão.");
   const token = String(connection.api_token || "");
   const dealId = String(parameters.rd_deal_id || parameters.rdDealId || trigger.rd_deal_id || getPath(context, "lead.rd_deal_id") || "").trim();

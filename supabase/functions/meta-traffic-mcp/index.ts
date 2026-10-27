@@ -3,7 +3,8 @@ import { canonicalMetaLeads, META_LEAD_ACTION_TYPES } from "../_shared/metaLeadM
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
-import { CRM_LEAD_STATUSES, isValidCivilDate, isValidDateRange, isValidUuid, parseMcpLimit } from "../_shared/mcpContract.ts";
+import { civilDateRangeToUtc, CRM_LEAD_STATUSES, decodeMcpCursor, encodeMcpCursor, isValidCivilDate, isValidDateRange, isValidUuid, parseMcpLimit } from "../_shared/mcpContract.ts";
+import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,17 +80,9 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   if (accountIds.some((id) => !isValidUuid(id))) throw new Error("account_ids precisa conter somente UUIDs internos válidos.");
   if (!isValidDateRange(startDate, endDate)) throw new Error("start_date e end_date devem ser datas civis válidas e inclusivas (YYYY-MM-DD).");
 
-  const { data: memberships, error: membershipError } = await admin.from("workspace_members")
-    .select("workspace_id").eq("user_id", userId).eq("status", "active");
-  if (membershipError) throw membershipError;
-  const activeWorkspaceIds = new Set((memberships || []).map((row: { workspace_id: string }) => String(row.workspace_id)));
-  const { data: accounts, error: accountsError } = await admin.from("ad_accounts")
-    .select("id,name,account_id,user_id,workspace_id,timezone_name,attribution_window")
-    .in("id", accountIds);
-  if (accountsError) throw accountsError;
-  const authorizedAccounts = (accounts || []).filter((account: { user_id: string; workspace_id: string | null }) => {
-    if (account.workspace_id) return activeWorkspaceIds.has(String(account.workspace_id));
-    return account.user_id === userId;
+  const authorizedAccounts = await resolveAuthorizedAdAccounts(admin, userId, {
+    accountIds,
+    select: "id,name,account_id,user_id,workspace_id,timezone_name,attribution_window,metadata,created_at",
   });
   if (authorizedAccounts.length !== accountIds.length) throw new Error("Uma ou mais contas não existem ou não estão autorizadas no workspace ativo.");
 
@@ -243,29 +236,42 @@ async function readCRMLeads(admin: any, userId: string, args: Record<string, unk
   const endDate = isValidCivilDate(args.end_date) ? args.end_date as string : null;
   if (args.start_date && !startDate || args.end_date && !endDate) throw new Error("start_date/end_date devem ser datas civis válidas (YYYY-MM-DD).");
   if (startDate && endDate && !isValidDateRange(startDate, endDate)) throw new Error("start_date não pode ser posterior a end_date.");
+  const { data: workspace, error: workspaceError } = await admin.from("workspaces").select("id,timezone").eq("id", workspaceId).maybeSingle();
+  if (workspaceError) throw workspaceError;
+  const timezone = String(workspace?.timezone || "America/Sao_Paulo");
+  const startBound = startDate ? civilDateRangeToUtc(startDate, startDate, timezone).start : null;
+  const endBound = endDate ? civilDateRangeToUtc(endDate, endDate, timezone).endExclusive : null;
+  const cursor = decodeMcpCursor(args.cursor);
+  if (args.cursor && !cursor) throw new Error("cursor inválido ou expirado.");
   let query = admin.from("crm_leads")
     .select("id,workspace_id,source_provider,external_id,full_name,email,phone,lead_city,lead_state,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,fbclid,gclid,ttclid,landing_page,referrer,ad_account_id,campaign_id,adset_id,ad_id,first_received_at,last_received_at,created_at,updated_at")
-    .eq("workspace_id", workspaceId).order("first_received_at", { ascending: false });
+    .eq("workspace_id", workspaceId).order("first_received_at", { ascending: false }).order("id", { ascending: false });
   if (status) query = query.eq("status", status);
   if (sourceProvider) query = query.eq("source_provider", sourceProvider);
-  if (startDate) query = query.gte("first_received_at", `${startDate}T00:00:00.000Z`);
-  if (endDate) {
-    const nextDate = new Date(`${endDate}T12:00:00Z`);
-    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-    query = query.lt("first_received_at", `${nextDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
-  }
+  if (startBound) query = query.gte("first_received_at", startBound);
+  if (endBound) query = query.lt("first_received_at", endBound);
+  if (cursor) query = query.or(`first_received_at.lt.${cursor.firstReceivedAt},and(first_received_at.eq.${cursor.firstReceivedAt},id.lt.${cursor.id})`);
   const limit = parseMcpLimit(args.limit);
   if (limit === null) throw new Error("limit deve ser um inteiro entre 1 e 500.");
-  const leads = await readPages(query.limit(limit));
+  const { data, error } = await query.limit(limit + 1);
+  if (error) throw error;
+  const rows = data || [];
+  const hasMore = rows.length > limit;
+  const leads = rows.slice(0, limit);
+  const nextCursor = hasMore && leads.length
+    ? encodeMcpCursor({ firstReceivedAt: String(leads[leads.length - 1].first_received_at), id: String(leads[leads.length - 1].id) })
+    : null;
   return {
     source: "Growdash CRM leads",
     retrieved_at: new Date().toISOString(),
     retrieval: { mode: "structured_facts", historical_rows_are_not_fallback: true },
-    scope: { workspace_id: workspaceId, source_provider: sourceProvider || "all", status: status || "all", start_date: startDate, end_date: endDate },
+    scope: { workspace_id: workspaceId, source_provider: sourceProvider || "all", status: status || "all", start_date: startDate, end_date: endDate, timezone },
     status: "available",
     count: leads.length,
-    truncated: leads.length >= limit,
-    coverage: { requested_limit: limit, returned_rows: leads.length, complete: leads.length < limit },
+    truncated: hasMore,
+    next_cursor: nextCursor,
+    has_more: hasMore,
+    coverage: { requested_limit: limit, returned_rows: leads.length, complete: !hasMore },
     leads,
   };
 }
@@ -301,7 +307,7 @@ Deno.serve(async (req) => {
       },
       {
         name: "get_crm_leads",
-        description: "Consulta leads normalizados do CRM próprio por workspace, origem, status e período. O resultado informa fonte, escopo, cobertura, truncamento e retrieved_at; falha não vira zero.",
+        description: "Consulta leads normalizados do CRM próprio por workspace, origem, status e período civil no fuso do workspace. A paginação usa cursor opaco e has_more só é verdadeiro quando existe uma linha adicional; falha não vira zero.",
         inputSchema: { type: "object", additionalProperties: false, required: ["workspace_id"], properties: {
           workspace_id: { type: "string", format: "uuid" },
           source_provider: { type: "string" },
@@ -309,6 +315,7 @@ Deno.serve(async (req) => {
           start_date: { type: "string", format: "date" },
           end_date: { type: "string", format: "date" },
           limit: { type: "integer", minimum: 1, maximum: 500 },
+          cursor: { type: "string", description: "Cursor opaco retornado em next_cursor." },
         } },
       },
     ] } });

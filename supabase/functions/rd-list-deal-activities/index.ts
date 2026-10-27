@@ -78,13 +78,15 @@ Deno.serve(async (req) => {
     const rdDealId = text(body?.rd_deal_id);
     if (!connectionId || !rdDealId) return json({ error: "rd_connection_id e rd_deal_id são obrigatórios" }, 400);
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const connection = await resolveRDConnection(admin, { connectionId });
-    let allowed = connection.user_id === userId;
-    if (!allowed && connection.workspace_id) {
-      const { data: manager } = await admin.rpc("can_manage_workspace", { _workspace_id: connection.workspace_id, _user_id: userId });
-      allowed = manager === true;
+    // resolveRDConnection applies the canonical owner-or-active-workspace
+    // member read contract shared with rd-list-funnels. Write permissions stay
+    // stricter in rdWrite.ts.
+    let connection;
+    try {
+      connection = await resolveRDConnection(admin, { connectionId, userId });
+    } catch {
+      return json({ error: "Usuário sem acesso a esta conexão RD" }, 403);
     }
-    if (!allowed) return json({ error: "Usuário sem acesso a esta conexão RD" }, 403);
     const { data: deal, error: dealError } = await admin.from("rd_deals").select("id,rd_deal_id,rd_connection_id,user_id").eq("rd_connection_id", connectionId).eq("rd_deal_id", rdDealId).maybeSingle();
     if (dealError) throw dealError;
     if (!deal) return json({ error: "Negociação não encontrada na conexão RD selecionada" }, 404);

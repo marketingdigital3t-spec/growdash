@@ -13,6 +13,15 @@ type SentryContext = {
   recordsUpserted?: number | null;
 };
 
+export function sanitizeSentryErrorMessage(value: unknown, maxLength = 1_000) {
+  return String(value instanceof Error ? value.message : value ?? "")
+    .replace(/Bearer\s+[^\s]+/gi, "Bearer [REDACTED]")
+    .replace(/([?&](?:access_token|token|key|secret)=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/((?:access[_-]?token|refresh[_-]?token|api[_-]?key|token|key|secret|password)\s*[=:]\s*)[^\s,;&]+/gi, "$1[REDACTED]")
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[REDACTED_EMAIL]")
+    .slice(0, Math.max(100, maxLength));
+}
+
 export function parseSentryDsn(value: string) {
   try {
     const url = new URL(value);
@@ -58,8 +67,7 @@ export async function captureSyncSentryEvent(context: SentryContext): Promise<vo
       retry_count: context.retryCount ?? 0,
       records_read: context.recordsRead ?? 0,
       records_upserted: context.recordsUpserted ?? 0,
-      // Error text can contain provider PII. Keep only a boolean; the stable
-      // error_code above is the searchable diagnostic contract.
+      error_message: context.errorMessage ? sanitizeSentryErrorMessage(context.errorMessage) : null,
       error_message_present: Boolean(context.errorMessage),
     },
   };

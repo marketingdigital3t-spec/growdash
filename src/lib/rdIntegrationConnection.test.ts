@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { selectPrimaryRDIntegration } from "./rdIntegrationConnection";
+import { isRDConnectionReadableByUser } from "../../supabase/functions/_shared/rdConnection";
 
 const connection = (overrides: Partial<Parameters<typeof selectPrimaryRDIntegration>[0][number]>) => ({
   id: "connection",
@@ -33,5 +34,16 @@ describe("selectPrimaryRDIntegration", () => {
 
   it("returns null when no RD connection exists", () => {
     expect(selectPrimaryRDIntegration([])).toBeNull();
+  });
+});
+
+describe("RD connection read authorization", () => {
+  it("allows a workspace member to read an owner connection but not a legacy connection", () => {
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: "workspace" }, "member", true)).toBe(true);
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: null }, "member", true)).toBe(false);
+  });
+
+  it("keeps owner access independent of membership lookup", () => {
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: "workspace" }, "owner", false)).toBe(true);
   });
 });
