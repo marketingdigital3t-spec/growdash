@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRDDeals, rdLeadCreatedAtRange, type RDDealLite } from "./useRDDealsForPeriod";
+import { dedupeRDDeals, rdLeadCreatedAtRange, resolveRDServerScope, type RDDealLite } from "./useRDDealsForPeriod";
 
 const base = (overrides: Partial<RDDealLite> = {}): RDDealLite => ({
   id: "row-1",
@@ -76,5 +76,21 @@ describe("RD period query bounds", () => {
 
   it("keeps the operational pipeline unbounded when dates are omitted", () => {
     expect(rdLeadCreatedAtRange()).toBeNull();
+  });
+});
+
+describe("RD period server scope", () => {
+  it("prefers resolved funnels when both account and funnel scopes exist", () => {
+    expect(resolveRDServerScope(["funnel-ranniely"], ["account-ranniely"])).toEqual({
+      kind: "funnel",
+      ids: ["funnel-ranniely"],
+    });
+  });
+
+  it("falls back to account ids when no funnel was resolved", () => {
+    expect(resolveRDServerScope([], ["account-ranniely"])).toEqual({
+      kind: "account",
+      ids: ["account-ranniely"],
+    });
   });
 });

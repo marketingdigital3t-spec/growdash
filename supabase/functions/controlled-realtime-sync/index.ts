@@ -542,7 +542,7 @@ async function listAccessibleFunnels(admin: any, userId: string, requestedFunnel
   }
   const { data, error } = await query;
   if (error) throw error;
-  const accessible = filterRDFunnelsByAccountScope(data || [], selectedAccountIds);
+  const accessible = filterRDFunnelsByAccountScope(data || [], selectedAccountIds, requestedFunnelIds || []);
   if (!requestedFunnelIds?.length) return accessible;
   const requested = new Set(requestedFunnelIds);
   return accessible.filter((funnel: any) => requested.has(String(funnel.id)) || requested.has(String(funnel.rd_funnel_id)));

@@ -12,6 +12,10 @@ describe("filterRDFunnelsByAccountScope", () => {
     expect(filterRDFunnelsByAccountScope(funnels, ["account-b"]).map((funnel) => funnel.id)).toEqual(["funnel-b"]);
   });
 
+  it("mantém o funil explicitamente resolvido pela conta mesmo sem ad_account_id local", () => {
+    expect(filterRDFunnelsByAccountScope(funnels, ["account-a"], ["funnel-unlinked"]).map((funnel) => funnel.id)).toEqual(["funnel-a", "funnel-unlinked"]);
+  });
+
   it("mantém todos os funis quando não há escopo de conta", () => {
     expect(filterRDFunnelsByAccountScope(funnels).map((funnel) => funnel.id)).toEqual(["funnel-a", "funnel-b", "funnel-unlinked"]);
   });

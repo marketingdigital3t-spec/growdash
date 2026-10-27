@@ -137,6 +137,13 @@ export function rdLeadCreatedAtRange(startDate?: Date, endDate?: Date) {
   return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
 }
 
+export function resolveRDServerScope(funnelIds: string[] = [], accountIds: string[] = []) {
+  const usableFunnelIds = funnelIds.filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
+  if (usableFunnelIds.length) return { kind: "funnel" as const, ids: usableFunnelIds };
+  if (accountIds.length) return { kind: "account" as const, ids: accountIds };
+  return { kind: "none" as const, ids: [] as string[] };
+}
+
 const FIELDS =
   "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, source, campaign, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_campaign_name, meta_adset_name, meta_ad_name, meta_form_name, meta_platform, meta_placement, meta_is_organic, meta_attribution_status, meta_attribution_method, manual_tracking, manual_tracking_updated_at, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, raw, updated_at";
 
@@ -181,18 +188,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           // the selected interval must not be lost by a lead_created filter.
           .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
-        const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
-        if (usableFunnelIds.length && selectedAccountIds.length) {
-          // Keep the period as the only server-side `or` expression. The
-          // PostgREST client appends repeated `or` params, which is not a
-          // reliable AND between `(date A OR date B)` and `(funnel OR direct
-          // account)`. The final client-side scope check below applies both
-          // account paths without risking an empty or widened response.
-        } else if (usableFunnelIds.length) {
-          q = q.in("rd_funnel_id", usableFunnelIds);
-        } else if (selectedAccountIds.length) {
-          q = q.in("ad_account_id", selectedAccountIds);
-        }
+        const serverScope = resolveRDServerScope(resolvedFunnelIds ?? [], selectedAccountIds);
+        if (serverScope.kind === "funnel") q = q.in("rd_funnel_id", serverScope.ids);
+        if (serverScope.kind === "account") q = q.in("ad_account_id", serverScope.ids);
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await withRequestTimeout(q.range(from, to), RD_ANALYTICS_TIMEOUT_MS);
