@@ -11,8 +11,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
-/** Dashboard RD reads must settle within the same first-paint budget as Meta. */
-const RD_ANALYTICS_TIMEOUT_MS = 2_500;
+/**
+ * RD period reads can legitimately span the full historical snapshot (the
+ * "Máximo" dashboard range) and return a wide, attribution-rich row shape.
+ * A 2.5s client cutoff turned a slow but valid PostgREST read into a false
+ * provider failure. Keep the cached snapshot visible while allowing the
+ * bounded paginated query enough time to complete under normal load.
+ */
+const RD_ANALYTICS_TIMEOUT_MS = 15_000;
 
 export interface RDDealLite {
   id: string;
