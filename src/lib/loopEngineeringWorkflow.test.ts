@@ -7,7 +7,7 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain('cron: "17 */3 * * *"');
     expect(workflow).toContain("npm ci");
-    expect(workflow).toContain("npx playwright install --with-deps chromium");
+    expect(workflow).toContain("npx playwright install chromium");
     expect(workflow).toContain("npm run loop-engineering:detect");
     expect(workflow).toContain("npm run loop-engineering:repair:auto");
     expect(workflow).toContain("git push origin HEAD:main");
