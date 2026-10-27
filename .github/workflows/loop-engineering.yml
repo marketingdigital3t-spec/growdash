@@ -180,7 +180,27 @@ jobs:
       - name: Apply compatible Supabase migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase db push --linked --yes
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            supabase db push --linked --yes
+            status=$?
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            echo "Supabase db push falhou (tentativa $attempt/3; exit $status); aguardando antes de repetir."
+            sleep $((attempt * 15))
+          done
+          echo "As tentativas de aplicar migrations falharam; verificando se o banco já está atualizado."
+          verification="$(supabase db push --linked --dry-run 2>&1)"
+          verification_status=$?
+          printf '%s\n' "$verification"
+          if [ "$verification_status" -eq 0 ] && printf '%s\n' "$verification" | grep -Eqi 'upToDate[[:space:]]*:[[:space:]]*true|Remote database is up to date'; then
+            echo "Banco remoto confirmado atualizado; a falha anterior foi apenas de disponibilidade do apply."
+            exit 0
+          fi
+          echo "Não foi possível confirmar o estado das migrations após a falha do apply."
+          exit 1
 
       - name: Deploy Meta/RD Edge Functions
         env:
