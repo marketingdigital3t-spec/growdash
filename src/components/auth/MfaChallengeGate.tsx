@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MFA_CHECK_TIMEOUT_MS, MFA_VERIFY_TIMEOUT_MS, mfaCheckErrorMessage, mfaVerifyErrorMessage } from "@/lib/mfaAvailability";
+import { recordRuntimeDiagnostic } from "@/lib/resilience";
 
 type GateState = "checking" | "clear" | "challenge" | "unavailable";
 
@@ -17,36 +19,31 @@ export function MfaChallengeGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const timeout = window.setTimeout(() => {
-      if (active) {
-        setError("A verificação de segurança demorou mais que o esperado.");
-        setState("unavailable");
-      }
-    }, 8000);
     void (async () => {
       try {
-        const { data: aal } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel(), 7000);
+        const { data: aal, error: aalError } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel(), MFA_CHECK_TIMEOUT_MS);
+        if (aalError) throw aalError;
+        if (!aal?.currentLevel) throw new Error("Resposta de segurança incompleta.");
         if (!active) return;
         if (aal?.currentLevel === "aal1" && aal?.nextLevel === "aal2") {
-          const { data } = await withTimeout(supabase.auth.mfa.listFactors(), 7000);
+          const { data, error: factorsError } = await withTimeout(supabase.auth.mfa.listFactors(), MFA_CHECK_TIMEOUT_MS);
+          if (factorsError) throw factorsError;
           const factor = ((data as any)?.totp || []).find((item: any) => item.status === "verified");
-          if (factor) {
-            setFactorId(factor.id);
-            setState("challenge");
-            return;
-          }
+          if (!factor?.id) throw new Error("Nenhum fator MFA verificado foi encontrado.");
+          setFactorId(factor.id);
+          setState("challenge");
+          return;
         }
         setState("clear");
-      } catch {
+      } catch (checkError) {
+        recordRuntimeDiagnostic("auth:mfa-check", new Error(`mfa_check:${mfaCheckErrorMessage(checkError)}`));
         if (active) {
-          setError("Não foi possível verificar a segurança da sessão. Tente novamente.");
+          setError(mfaCheckErrorMessage(checkError));
           setState("unavailable");
         }
-      } finally {
-        window.clearTimeout(timeout);
       }
     })();
-    return () => { active = false; window.clearTimeout(timeout); };
+    return () => { active = false; };
   }, [checkAttempt]);
 
   const verify = async () => {
@@ -54,11 +51,12 @@ export function MfaChallengeGate({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
     try {
-      const { error: verifyError } = await withTimeout(supabase.auth.mfa.challengeAndVerify({ factorId, code }), 10000);
+      const { error: verifyError } = await withTimeout(supabase.auth.mfa.challengeAndVerify({ factorId, code }), MFA_VERIFY_TIMEOUT_MS);
       if (verifyError) throw verifyError;
       setState("clear");
-    } catch {
-      setError("Código inválido ou expirado. Gere um novo código e tente novamente.");
+    } catch (verifyError) {
+      recordRuntimeDiagnostic("auth:mfa-verify", new Error(`mfa_verify:${mfaVerifyErrorMessage(verifyError)}`));
+      setError(mfaVerifyErrorMessage(verifyError));
     } finally {
       setBusy(false);
     }
