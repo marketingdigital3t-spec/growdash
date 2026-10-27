@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
               // statement timeout. Later cycles continue from the provider's
               // current snapshot without replaying unchanged rows.
               max_pages: realtime ? 1 : 50,
-              max_deals: realtime ? 30 : 3_000,
+              max_deals: realtime ? 10 : 3_000,
               trigger_source: realtime ? "auto_realtime" : "manual",
             }),
           }));
