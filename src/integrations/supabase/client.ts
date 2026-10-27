@@ -24,6 +24,18 @@ const authStorageKey = `sb-${projectRef}-auth-token`;
 let authPersistenceMode: AuthPersistenceMode = "auto";
 const browserLocalStorage = typeof window === "undefined" ? createMemoryStorage() : window.localStorage;
 const browserSessionStorage = typeof window === "undefined" ? createMemoryStorage() : window.sessionStorage;
+try {
+  // Persistent access is the product policy. Promote an older tab-only
+  // session once so an existing user is not logged out just because the
+  // remember-me option was removed.
+  const tabSession = browserSessionStorage.getItem(authStorageKey);
+  if (!browserLocalStorage.getItem(authStorageKey) && tabSession) {
+    browserLocalStorage.setItem(authStorageKey, tabSession);
+    browserSessionStorage.removeItem(authStorageKey);
+  }
+} catch {
+  // Auth storage failures are handled by the existing memory-safe adapter.
+}
 const authStorage = createAuthStorage(browserLocalStorage, browserSessionStorage, () => authPersistenceMode, authStorageKey);
 
 export function getPersistedAuthSession() {
