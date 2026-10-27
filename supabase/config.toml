@@ -33,6 +33,17 @@ verify_jwt = true
 [functions.rd-test-connection]
 verify_jwt = true
 
+[functions.rd-sync-deals]
+# Manual callers send a user JWT; scheduled/internal callers may authenticate
+# with the private cron secret, so the handler performs the second-factor check.
+verify_jwt = false
+
+[functions.rd-list-funnels]
+verify_jwt = true
+
+[functions.rd-list-deal-activities]
+verify_jwt = true
+
 [functions.rd-write-settings]
 verify_jwt = true
 

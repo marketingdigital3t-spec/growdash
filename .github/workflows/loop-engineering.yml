@@ -158,7 +158,17 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           mkdir -p reports
-          supabase db advisors --linked > reports/supabase-advisors.json
+          set +e
+          for attempt in 1 2 3; do
+            supabase db advisors --linked --output json > reports/supabase-advisors.json
+            status=$?
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            echo "Supabase advisors falhou (tentativa $attempt/3; exit $status); aguardando antes de repetir."
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Apply compatible Supabase migrations
         env:
@@ -171,7 +181,14 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           supabase secrets set --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
-          for fn in controlled-realtime-sync sync-meta-leads daily-incremental-sync meta-webhook; do
+          # Keep gateway JWT verification aligned with supabase/config.toml.
+          # Only cron/webhook functions intentionally accept requests without a
+          # Supabase JWT; authenticated sync functions must be rejected at the
+          # gateway before their handler runs.
+          for fn in controlled-realtime-sync sync-meta-leads; do
+            supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha
+          done
+          for fn in daily-incremental-sync meta-webhook; do
             supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
           done
 

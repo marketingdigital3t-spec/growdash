@@ -621,17 +621,21 @@ Deno.serve(async (req) => {
       skipEnrichment: skip_enrichment === true,
     });
     let deal_ids = body?.deal_ids;
-    if (!funnel_id) {
-      return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
+    // Authentication is the first contract boundary. Do not reveal request
+    // validation details (such as a missing funnel id) to unauthenticated
+    // callers or make public probes look like client errors.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!funnel_id) {
+      return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
