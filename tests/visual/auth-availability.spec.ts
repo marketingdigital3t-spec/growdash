@@ -2,8 +2,10 @@ import { expect, test } from "@playwright/test";
 
 // Never inherit the authenticated CI state here. This is the release gate for
 // a new browser session and must exercise the same bootstrap path as a user
-// who has just opened the login page.
-test.use({ storageState: undefined });
+// who has just opened the login page. An explicit empty state is required:
+// `undefined` leaves the project-level storageState in place when CI provides
+// an expired authenticated smoke state.
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test("login público fica disponível sem mascarar falha do Auth gateway", async ({ page }) => {
   const response = await page.goto("/auth", { waitUntil: "domcontentloaded" });
