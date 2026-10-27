@@ -610,6 +610,12 @@ export default function CrmPage() {
           // before its page cursor is persisted. Existing profiles stay
           // intact; missing contact fields use a separate bounded path.
           refresh_amounts: false,
+          // A full-history refresh is resumable. Keep each Edge invocation
+          // inside the gateway budget and let the persisted RD cursor carry
+          // the next page into the following pass. Without this bound, a
+          // large pipeline could run until the gateway returned a non-2xx
+          // response before the cursor reached the UI.
+          max_pages: 1,
           // "Máximo" is a full RD pipeline reconciliation, not a synthetic
           // date interval beginning in 2000. The RD API's date filter can
           // omit legacy/open negotiations in some accounts.
