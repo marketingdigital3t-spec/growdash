@@ -36,7 +36,9 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser for visual checks
-        run: npx playwright install --with-deps chromium
+        # GitHub's Ubuntu runner already includes Chromium system libraries;
+        # avoid apt dependency downloads that can hang the release gate.
+        run: npx playwright install chromium
 
       - name: Configure optional authenticated smoke state
         env:
