@@ -89,11 +89,12 @@ import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
-import { campaignLoadState } from "@/lib/campaignLoading";
+import { campaignDisplayState } from "@/lib/campaignLoading";
 import { buildCampaignActionCatalog } from "@/lib/campaignActionCatalog";
 import { countCampaignHierarchy, hierarchyCountLabel, hydrateCampaignHierarchy, shouldLoadCampaignHierarchy, type CampaignHierarchyTab } from "@/lib/campaignHierarchy";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+import { SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -596,6 +597,21 @@ export default function Campaigns() {
     refetchInterval: 60_000,
   });
 
+  // A provider query may continue safely after the visual deadline. Do not
+  // leave the hierarchy skeleton on screen while PostgREST is unavailable;
+  // show the persisted snapshot when one exists, or an explicit unavailable
+  // state while the request continues in the background.
+  const campaignHasSnapshot = dataUpdatedAt > 0 || campaignBaseRows.length > 0;
+  const campaignQueryEnabled = visibleAdAccounts.length > 0 || selectedAccountIds.length > 0;
+  const campaignScopeKey = campaignQueryKey.join("|");
+  const [campaignVisualTimedOut, setCampaignVisualTimedOut] = useState(false);
+  useEffect(() => {
+    setCampaignVisualTimedOut(false);
+    if (!campaignQueryEnabled || campaignHasSnapshot || (!isLoading && !isFetching)) return;
+    const timer = window.setTimeout(() => setCampaignVisualTimedOut(true), SYNC_UI_DEADLINE_MS);
+    return () => window.clearTimeout(timer);
+  }, [campaignHasSnapshot, campaignQueryEnabled, campaignScopeKey, isFetching, isLoading]);
+
   const campaignAdIds = useMemo(() => campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
   const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
@@ -694,14 +710,17 @@ export default function Campaigns() {
   const showCampaignLoadError = isError && campaigns.length === 0;
   const campaignLoadErrorMessage = campaignError instanceof Error
     ? campaignError.message
-    : "Não foi possível consultar os dados.";
-  const campaignsLoading = campaignLoadState({
-    isLoading: isLoading || isLoadingAdAccounts,
-    isFetching: isFetching || isLoadingAdAccounts,
-    hasData: dataUpdatedAt > 0,
+    : campaignVisualTimedOut
+      ? "A lista de campanhas não respondeu em 5 segundos. A atualização continua em segundo plano; nenhum valor foi convertido em zero."
+      : "Não foi possível consultar os dados.";
+  const campaignDisplay = campaignDisplayState({
+    pending: isLoading || isFetching || isLoadingAdAccounts,
+    hasSnapshot: campaignHasSnapshot,
+    visualTimedOut: campaignVisualTimedOut,
     hasError: isError,
-  }) === "loading";
-  const campaignsUnavailable = showCampaignLoadError && campaigns.length === 0;
+  });
+  const campaignsLoading = campaignDisplay === "loading";
+  const campaignsUnavailable = !campaignHasSnapshot && (campaignDisplay === "error" || campaignDisplay === "background");
   const hierarchyEnabled = shouldLoadCampaignHierarchy(activeTab, analysisPanel);
   // Conjuntos e anúncios são carregados em duas etapas, com escopo explícito
   // por conta. Isso evita joins aninhados lentos do PostgREST e mantém os
@@ -1179,9 +1198,9 @@ export default function Campaigns() {
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
   const embeddedHierarchyCounts = useMemo(() => countCampaignHierarchy(filtered), [filtered]);
   const embeddedHierarchyState = {
-    isLoading: isLoading || isFetching,
-    isError,
-    hasSnapshot: dataUpdatedAt > 0,
+    isLoading: (isLoading || isFetching) && !campaignVisualTimedOut,
+    isError: isError || campaignVisualTimedOut,
+    hasSnapshot: campaignHasSnapshot,
   };
   const adsetTabCount = hierarchyEnabled ? selectedAdsets.length : embeddedHierarchyCounts.adsets;
   const adTabCount = hierarchyEnabled ? selectedAds.length : embeddedHierarchyCounts.ads;
@@ -1195,9 +1214,9 @@ export default function Campaigns() {
   const showColumn = (key: CampaignColumnKey) => ["check", "name", "delivery"].includes(key) || visibleColumns.has(key);
   const availableColumnFilters = useMemo(() => CAMPAIGN_COLUMN_FILTERS.filter((item) => !item.column || visibleColumns.has(item.column)), [visibleColumns]);
   const activeColumnFilterCount = Object.values(columnFilters).filter((value) => value.trim()).length;
-  const campaignCountLabel = dataUpdatedAt > 0
+  const campaignCountLabel = campaignHasSnapshot
     ? `Campanhas (${filtered.length})`
-    : (isLoading || isFetching ? "Campanhas (carregando…)" : "Campanhas");
+    : campaignVisualTimedOut ? "Campanhas (indisponível)" : (isLoading || isFetching ? "Campanhas (carregando…)" : "Campanhas");
   const cellW = (k: CampColKey) => ({ width: camp.colWidths[k], minWidth: camp.colWidths[k], maxWidth: camp.colWidths[k] });
   const adsetCellW = (k: AdsetColKey) => ({ width: adset.colWidths[k], minWidth: adset.colWidths[k], maxWidth: adset.colWidths[k] });
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
