@@ -1,7 +1,10 @@
 const RETRYABLE_AUTH_STATUS = new Set([500, 501, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530]);
 
-export const AUTH_PASSWORD_ATTEMPTS = 3;
-export const AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS = 8_000;
+// GoTrue password verification in this project can take ~12s under load.
+// Eight seconds aborted valid logins and converted a normal 400 into a fake
+// outage, so allow one complete verification window and one bounded retry.
+export const AUTH_PASSWORD_ATTEMPTS = 2;
+export const AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS = 20_000;
 export const SUPABASE_FUNCTION_TIMEOUT_MS = 120_000;
 export const SUPABASE_DATA_TIMEOUT_MS = 30_000;
 
