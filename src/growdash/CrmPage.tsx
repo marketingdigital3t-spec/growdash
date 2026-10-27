@@ -635,7 +635,11 @@ export default function CrmPage() {
         const MAX_RESUMABLE_PASSES = 24;
         for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
           const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
-          if (error || data?.error || data?.success === false) {
+          // A historical refresh is resumable. The Edge Function returns
+          // HTTP 200 with `partial: true` while it checkpoints the next RD
+          // page; only transport errors or non-resumable responses should
+          // abort the loop and preserve the previous snapshot.
+          if (error || data?.error || (data?.success === false && !data?.partial)) {
             const details = data?.snapshot_missing_ids?.length
               ? ` IDs ausentes: ${data.snapshot_missing_ids.slice(0, 5).join(", ")}`
               : "";
