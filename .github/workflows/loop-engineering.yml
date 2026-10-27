@@ -146,14 +146,14 @@ jobs:
       - name: Link Supabase project
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref cixnvosxqlacjbpymjha
+        run: timeout -k 10s 90s supabase link --project-ref cixnvosxqlacjbpymjha
 
       - name: Validate migrations without applying them
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase migration list --linked
-          supabase db push --linked --dry-run
+          timeout -k 10s 90s supabase migration list --linked
+          timeout -k 10s 90s supabase db push --linked --dry-run
 
       - name: Run Supabase advisors and retain evidence
         env:
@@ -182,7 +182,7 @@ jobs:
         run: |
           set +e
           for attempt in 1 2 3; do
-            supabase db push --linked --yes
+            timeout -k 10s 90s supabase db push --linked --yes
             status=$?
             if [ "$status" -eq 0 ]; then
               exit 0
@@ -191,7 +191,7 @@ jobs:
             sleep $((attempt * 15))
           done
           echo "As tentativas de aplicar migrations falharam; verificando se o banco já está atualizado."
-          verification="$(supabase db push --linked --dry-run 2>&1)"
+          verification="$(timeout -k 10s 90s supabase db push --linked --dry-run 2>&1)"
           verification_status=$?
           printf '%s\n' "$verification"
           if [ "$verification_status" -eq 0 ] && printf '%s\n' "$verification" | grep -Eqi 'upToDate[[:space:]]*:[[:space:]]*true|Remote database is up to date'; then
