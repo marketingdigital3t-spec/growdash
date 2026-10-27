@@ -298,8 +298,13 @@ Deno.serve(async (req) => {
               // Each deal may require a detail and contact request; allowing
               // 200 items here left sync_runs orphaned before the snapshot was
               // committed. Repeated five-minute cycles cover the remainder.
-              max_pages: realtime ? 3 : 50,
-              max_deals: realtime ? 60 : 3_000,
+              // A five-minute cycle only needs to cover the newest changes.
+              // Keeping the automatic batch small prevents a large funnel
+              // from holding the database lock long enough to hit the
+              // statement timeout. Later cycles continue from the provider's
+              // current snapshot without replaying unchanged rows.
+              max_pages: realtime ? 1 : 50,
+              max_deals: realtime ? 30 : 3_000,
               trigger_source: realtime ? "auto_realtime" : "manual",
             }),
           }));
@@ -507,6 +512,11 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
         return { data: { ...data, success: true, status: "running" } };
       }
       last = { error: data?.error || `${name} failed with HTTP ${response.status}`, data };
+      // A Postgres statement timeout is produced after the database has
+      // already cancelled the transaction. Retrying immediately only makes
+      // another worker contend for the same funnel and can leave an orphaned
+      // auto run behind. The next scheduled cycle is the safe retry point.
+      if (/statement timeout|canceling statement/i.test(String(data?.error || last.error || ""))) break;
       if (![429, 500, 502, 503, 504].includes(response.status) || attempt === delays.length - 1) break;
       const retryAfter = Number(response.headers.get("Retry-After") || 0);
       await sleep(retryAfter > 0 ? retryAfter * 1_000 : delays[attempt]);

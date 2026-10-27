@@ -724,9 +724,11 @@ Deno.serve(async (req) => {
 
     // A crashed Edge invocation can leave its audit row as `running`. Do not
     // let those orphaned rows create concurrent writers and database timeouts.
-    // Runs older than 20 minutes cannot be a healthy interactive sync; close
-    // them explicitly, and reject a genuinely active duplicate invocation.
-    const staleBefore = new Date(Date.now() - 20 * 60_000).toISOString();
+    // Every worker is bounded by the 90-second runtime budget. A run that is
+    // still marked as running after five minutes is therefore an orphan from
+    // a cancelled/timeout invocation, and must not block the next automatic
+    // cycle for twenty minutes.
+    const staleBefore = new Date(Date.now() - 5 * 60_000).toISOString();
     const { data: runningRows, error: runningError } = await admin
       .from("sync_runs")
       .select("id,started_at")
@@ -1154,7 +1156,7 @@ Deno.serve(async (req) => {
       return { ...detail, _contacts: dealContacts };
     }
 
-    async function persistDeal(d: any) {
+    async function persistDeal(d: any, existingProfile: any = null) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
       const stageName = rdDealStageName(d);
@@ -1167,6 +1169,31 @@ Deno.serve(async (req) => {
         !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
+
+      // The bounded worker receives the provider list snapshot without the
+      // expensive detail/contact calls. If the provider timestamp and all
+      // fields that drive the CRM card are unchanged, the local row is already
+      // current. Skipping that upsert also skips the canonical-sales and
+      // attribution triggers, which is what keeps a large funnel below the
+      // database statement timeout during automatic cycles.
+      const providerUpdatedAt = d.stage_updated_at || d.updated_at || d.last_activity_at || null;
+      const providerStageKnown = stageId != null || stageName != null;
+      const providerAmountKnown = d.amount_total != null || d.amount != null;
+      const providerClosedAtKnown = Object.prototype.hasOwnProperty.call(d, "closed_at");
+      const providerWinKnown = d.win != null || stageId != null;
+      const sameProviderSnapshot = Boolean(
+        boundedRealtime && existingProfile && providerUpdatedAt
+          && String(existingProfile.stage_updated_at || "") === String(providerUpdatedAt)
+          && (!providerStageKnown || String(existingProfile.rd_stage_id || "") === String(stageId || ""))
+          && (!providerStageKnown || String(existingProfile.rd_stage_name || "") === String(stageName || ""))
+          && (!providerAmountKnown || Number(existingProfile.amount_total || 0) === amountTotal)
+          && (!providerClosedAtKnown || String(existingProfile.closed_at || "") === String(d.closed_at || ""))
+          && (!providerWinKnown || Boolean(existingProfile.win) === Boolean(won)),
+      );
+      if (sameProviderSnapshot) {
+        totalSkipped++;
+        return;
+      }
 
       const baseContact = d.contact || d.deal_contact || {};
       const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
@@ -2048,10 +2075,31 @@ Deno.serve(async (req) => {
             : deals;
           totalDeals += dealsToProcess.length;
 
+          const existingRealtimeProfiles = new Map<string, any>();
+          if (boundedRealtime) {
+            const realtimeIds = dealsToProcess
+              .map((deal: any) => String(deal?.id || deal?._id || ""))
+              .filter(Boolean);
+            if (realtimeIds.length) {
+              const { data: profiles, error: profilesError } = await admin
+                .from("rd_deals")
+                .select("rd_deal_id,rd_stage_id,rd_stage_name,stage_updated_at,closed_at,amount_total,win")
+                .eq("rd_funnel_id", funnel.id)
+                .in("rd_deal_id", realtimeIds);
+              if (profilesError) throw profilesError;
+              for (const profile of profiles || []) {
+                existingRealtimeProfiles.set(String(profile.rd_deal_id), profile);
+              }
+            }
+          }
+
           for (let i = 0; i < dealsToProcess.length; i += BATCH_SIZE) {
             const batch = dealsToProcess.slice(i, i + BATCH_SIZE);
             const details = await Promise.all(batch.map(processDeal));
-            for (const d of details) await persistDeal(d);
+            for (const d of details) {
+              const id = String(d.id || d._id || "");
+              await persistDeal(d, existingRealtimeProfiles.get(id) || null);
+            }
             await sleep(BATCH_PAUSE_MS);
           }
 
