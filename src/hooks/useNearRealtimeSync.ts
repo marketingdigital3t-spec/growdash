@@ -132,14 +132,27 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           realtime: true,
           force,
         };
-        const { data, error } = await withRequestTimeout(
-          supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody }),
-          FAST_SYNC_TIMEOUT_MS,
-        );
-        const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
-        if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
-          throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
+        // Meta and RD are independent providers. A slow Meta response must
+        // not abort the CRM reconciliation that follows; otherwise a Meta
+        // timeout leaves the RD snapshot stale even though its worker could
+        // still complete safely in the background.
+        let data: any = null;
+        let metaError: unknown = null;
+        try {
+          const result = await withRequestTimeout(
+            supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody }),
+            FAST_SYNC_TIMEOUT_MS,
+          );
+          data = result.data;
+          metaError = result.error;
+        } catch (error) {
+          metaError = error;
         }
+        const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
+        const metaFailed = Boolean(metaError || data?.error || ["failed", "error"].includes(metaStatus));
+        const metaFailureMessage = metaError instanceof Error
+          ? metaError.message
+          : String(metaError || data?.error || "A atualização em segundo plano falhou.");
         // The controlled endpoint aggregates Meta, RD and balance for audit
         // purposes. A pending RD page or balance refresh must not mark the Meta
         // KPI snapshot as failed; use the provider-specific status instead.
@@ -147,12 +160,15 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
           : "";
         if (isCurrentScope()) {
-          setSyncError(auxiliaryWarnings || null);
-          setRdSyncError(null);
+          const failure = metaFailed
+            ? describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message: metaFailureMessage })
+            : null;
+          setSyncError(failure?.message || auxiliaryWarnings || null);
+          if (!metaFailed) setRdSyncError(null);
           if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
           setLastUpdatedAt(new Date());
-          setState(metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh");
-          if (["failed", "partial", "error"].includes(metaStatus)) {
+          setState(failure?.state || (metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh"));
+          if (!failure && ["failed", "partial", "error"].includes(metaStatus)) {
             setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
           }
         }
@@ -162,19 +178,21 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // KPI response. It can paginate through Meta without keeping the
         // navigation button disabled; Realtime invalidation refreshes the
         // lead cards as soon as the rows are persisted.
-        void supabase.functions.invoke("sync-meta-leads", {
-          body: {
-            adAccountId,
-            adAccountIds,
-            ...(force ? { startDate: startDateKey, endDate: endDateKey } : {}),
-            ...(force ? {} : { recentStartAt: selectedBody.recentHours ? new Date(Date.now() - selectedBody.recentHours * 3600_000).toISOString() : undefined, recentEndAt: new Date().toISOString() }),
-            timezone,
-            attributionWindow,
-            triggerSource: "near_realtime_background",
-          },
-        }).catch((leadError) => {
-          console.warn("[near-realtime-sync] leads em segundo plano", leadError);
-        });
+        if (!metaFailed) {
+          void supabase.functions.invoke("sync-meta-leads", {
+            body: {
+              adAccountId,
+              adAccountIds,
+              ...(force ? { startDate: startDateKey, endDate: endDateKey } : {}),
+              ...(force ? {} : { recentStartAt: selectedBody.recentHours ? new Date(Date.now() - selectedBody.recentHours * 3600_000).toISOString() : undefined, recentEndAt: new Date().toISOString() }),
+              timezone,
+              attributionWindow,
+              triggerSource: "near_realtime_background",
+            },
+          }).catch((leadError) => {
+            console.warn("[near-realtime-sync] leads em segundo plano", leadError);
+          });
+        }
 
         // RD is intentionally isolated from the selected Meta response. A
         // large CRM funnel must never delay or fail the visible ad snapshot;
