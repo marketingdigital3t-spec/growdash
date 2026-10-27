@@ -5,7 +5,12 @@ import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
-const RD_SCOPE_TIMEOUT_MS = 2_500;
+// Resolving the linked RD funnels is a prerequisite for every CRM read. A
+// cold PostgREST/auth connection can exceed the old 2.5s cutoff even when the
+// small query succeeds immediately afterwards, which falsely rendered the CRM
+// as having no linked funnel. Keep this bounded, but allow the same 15s window
+// used by the historical deal reads.
+const RD_SCOPE_TIMEOUT_MS = 15_000;
 
 export interface RDFunnel {
   id: string;
