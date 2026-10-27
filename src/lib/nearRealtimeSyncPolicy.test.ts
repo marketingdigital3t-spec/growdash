@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BACKGROUND_SYNC_INTERVAL_MS } from "@/hooks/useNearRealtimeSync";
 import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 describe("near realtime sync policy", () => {
@@ -27,5 +28,9 @@ describe("near realtime sync policy", () => {
       state: "background",
       message: "Meta ainda está atualizando em segundo plano. O último snapshot válido permanece visível.",
     });
+  });
+
+  it("runs automatic provider reconciliation every fifteen minutes", () => {
+    expect(BACKGROUND_SYNC_INTERVAL_MS).toBe(15 * 60_000);
   });
 });

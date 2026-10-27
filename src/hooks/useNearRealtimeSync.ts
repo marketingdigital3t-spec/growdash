@@ -13,7 +13,10 @@ import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE
 // browser whenever someone changes tabs or returns to the application.
 // The sync function fetches deltas, so a short watermark window keeps the CRM
 // close to RD without re-running a full historical reconciliation.
-const REFRESH_INTERVAL_MS = 60_000;
+// Provider reconciliation is intentionally quarter-hourly. Realtime database
+// events keep already-persisted rows current between cycles without starting
+// another Meta/RD request for every UI update.
+export const BACKGROUND_SYNC_INTERVAL_MS = 15 * 60_000;
 const LOCAL_DEDUP_WINDOW_MS = 45_000;
 const RECENT_SYNC_WINDOW_HOURS = 2;
 const STORAGE_PREFIX = "growdash:last-background-sync";
@@ -82,6 +85,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
   const activeScope = useRef(scope);
   activeScope.current = scope;
+  const refreshRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
   const previousContext = useRef<SyncContext | null>(null);
 
   const invalidateLiveQueries = useCallback(() => {
@@ -290,32 +294,26 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     return task;
   }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, queryClient, scope, startDate, startDateKey, timezone]);
 
+  // Keep the timer attached to the current callback without restarting it on
+  // every render when a parent supplies a new array reference.
+  refreshRef.current = refresh;
+
   useEffect(() => {
     if (!enabled) return;
     const context: SyncContext = { scope, navigationKey };
     const forceContextSync = shouldForceSyncForContextChange(previousContext.current, context);
     previousContext.current = context;
-    // Revalida assim que a tela entra. O React Query mantém o último snapshot
-    // visível enquanto esta chamada acontece em segundo plano.
-    // Cada entrada/recarregamento solicita uma nova tentativa do escopo atual.
+    // Revalida uma vez ao entrar no escopo. O React Query mantém o último
+    // snapshot visível enquanto esta chamada acontece em segundo plano; novas
+    // reconciliações automáticas acontecem somente no ciclo de quinze minutos.
     // O lock persistido no backend continua impedindo duplicidade entre abas.
-    const initial = window.setTimeout(() => void refresh(forceContextSync), forceContextSync ? 0 : INITIAL_SYNC_DELAY_MS);
-    const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
-    const onFocus = () => void refresh(false);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onFocus();
-    };
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("online", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
+    const initial = window.setTimeout(() => void refreshRef.current?.(forceContextSync), forceContextSync ? 0 : INITIAL_SYNC_DELAY_MS);
+    const interval = window.setInterval(() => void refreshRef.current?.(false), BACKGROUND_SYNC_INTERVAL_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("online", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [enabled, invalidateLiveQueries, navigationKey, refresh, scope]);
+  }, [enabled, invalidateLiveQueries, navigationKey, scope]);
 
   useEffect(() => {
     if (!enabled) return;
