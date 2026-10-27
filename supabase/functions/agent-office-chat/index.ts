@@ -7,6 +7,7 @@ import { isWonRDStageName } from "../../../src/lib/rdDealStatus.ts";
 import { fetchWithRetry, inCivilPeriod, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 import { isValidCivilDate } from "../_shared/mcpContract.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ function isCanonicalWonDeal(deal: { win?: boolean | null; rd_stage_name?: string
 async function authenticate(req: Request, url: string, serviceKey: string) {
   const authorization = req.headers.get("Authorization") || "";
   if (!authorization) return null;
-  const client = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || serviceKey, { global: { headers: { Authorization: authorization } } });
+  const client = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || serviceKey, { global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authorization } } });
   const { data } = await client.auth.getUser();
   return data.user || null;
 }
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
     }
     const requestedAccountIds = Array.isArray(body?.scope?.accountIds) ? Array.from(new Set(body.scope.accountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0))) : [];
     const funnelIds = Array.isArray(body?.scope?.funnelIds) ? body.scope.funnelIds.filter((id: unknown) => typeof id === "string") : [];
-    const admin = createClient(url, serviceKey);
+    const admin = createClient(url, serviceKey, { global: { fetch: fetchSupabaseWithTimeout } });
     // Workspace membership, not ownership, is the source of authorization for
     // SaaS members. The previous owner-only lookup made permitted analysts and
     // operators lose the agent context even though RLS granted them access.

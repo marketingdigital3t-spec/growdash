@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { global: { fetch: fetchSupabaseWithTimeout } });
 
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
         });
       }
       const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
+        global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } },
       });
       const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
       if (userError || !user) {

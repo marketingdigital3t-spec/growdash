@@ -9,6 +9,7 @@ import {
 } from "../_shared/rdSyncCursor.ts";
 import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -494,6 +495,7 @@ Deno.serve(async (req) => {
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { global: { fetch: fetchSupabaseWithTimeout } },
   );
   let caller: any = null;
   const runtimeDeadline = startedAt + RD_SYNC_RUNTIME_BUDGET_MS;
@@ -665,7 +667,7 @@ Deno.serve(async (req) => {
       }
     } else {
       caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
+        global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } },
       });
       const { data: userRes } = await caller.auth.getUser();
       userId = userRes.user?.id || null;

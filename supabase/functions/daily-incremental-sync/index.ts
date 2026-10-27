@@ -4,6 +4,7 @@ import { resolveMetaLookbackDateRange } from "../_shared/metaLookbackWindow.ts";
 import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../_shared/metaSyncBatch.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { buildLeadSyncWindow, selectRotatingRDSyncTargets } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,7 +225,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const admin = createClient(supabaseUrl, serviceKey);
+  const admin = createClient(supabaseUrl, serviceKey, { global: { fetch: fetchSupabaseWithTimeout } });
   const authHeader = req.headers.get("Authorization") || "";
   const isService = authHeader === `Bearer ${serviceKey}`;
   const cronSecret = req.headers.get("x-cron-secret");

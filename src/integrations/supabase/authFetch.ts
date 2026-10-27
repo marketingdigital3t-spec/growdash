@@ -2,6 +2,8 @@ const RETRYABLE_AUTH_STATUS = new Set([500, 501, 502, 503, 504, 520, 521, 522, 5
 
 export const AUTH_PASSWORD_ATTEMPTS = 3;
 export const AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS = 8_000;
+export const SUPABASE_FUNCTION_TIMEOUT_MS = 120_000;
+export const SUPABASE_DATA_TIMEOUT_MS = 30_000;
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -39,6 +41,35 @@ function requestInputForAttempt(input: RequestInfo | URL) {
   return typeof Request !== "undefined" && input instanceof Request ? input.clone() : input;
 }
 
+function requestTimeoutMs(input: RequestInfo | URL) {
+  try {
+    const url = new URL(requestUrl(input), typeof window === "undefined" ? "http://localhost" : window.location.origin);
+    return url.pathname.includes("/functions/v1/") ? SUPABASE_FUNCTION_TIMEOUT_MS : SUPABASE_DATA_TIMEOUT_MS;
+  } catch {
+    return SUPABASE_DATA_TIMEOUT_MS;
+  }
+}
+
+async function fetchWithDeadline(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  fetcher: Fetcher,
+  timeoutMs: number,
+) {
+  const externalSignal = init?.signal;
+  const controller = new AbortController();
+  const abortFromExternal = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) abortFromExternal();
+  else externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  const timer = globalThis.setTimeout(() => controller.abort(new DOMException("Tempo de resposta do Supabase excedido.", "TimeoutError")), timeoutMs);
+  try {
+    return await fetcher(input, { ...init, signal: controller.signal });
+  } finally {
+    globalThis.clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", abortFromExternal);
+  }
+}
+
 /**
  * Serializes password-login retries at the network boundary. Supabase Auth
  * returns 5xx/Cloudflare gateway responses as retryable errors, but a caller
@@ -57,7 +88,7 @@ export async function fetchAuthWithRetry(
   } = {},
 ): Promise<Response> {
   const fetcher = options.fetcher ?? ((request, requestInit) => globalThis.fetch(request, requestInit));
-  if (!isPasswordGrantRequest(input, init)) return fetcher(input, init);
+  if (!isPasswordGrantRequest(input, init)) return fetchWithDeadline(input, init, fetcher, requestTimeoutMs(input));
 
   const attempts = Math.max(1, options.attempts ?? AUTH_PASSWORD_ATTEMPTS);
   const attemptTimeoutMs = Math.max(1, options.attemptTimeoutMs ?? AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS);

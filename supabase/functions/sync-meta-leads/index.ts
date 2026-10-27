@@ -4,6 +4,7 @@ import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecutio
 import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { fetchWithTimeout, hasExceededSyncDeadline, isMetaApplicationRateLimitError, leadSyncCooldownMs, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -525,7 +526,7 @@ Deno.serve(async (req) => {
     const deadlineAt = Date.now() + SYNC_LEAD_RUN_BUDGET_MS;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    admin = createClient(SUPABASE_URL, SERVICE);
+    admin = createClient(SUPABASE_URL, SERVICE, { global: { fetch: fetchSupabaseWithTimeout } });
 
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -537,7 +538,7 @@ Deno.serve(async (req) => {
         SUPABASE_URL,
         Deno.env.get("SUPABASE_ANON_KEY")!,
         {
-          global: { headers: { Authorization: authHeader } },
+          global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } },
         },
       );
       const { data: { user } } = await sb.auth.getUser();

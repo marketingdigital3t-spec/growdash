@@ -5,6 +5,7 @@ import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } fro
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 import { civilDateRangeToUtc, CRM_LEAD_STATUSES, decodeMcpCursor, encodeMcpCursor, isValidCivilDate, isValidDateRange, isValidUuid, parseMcpLimit } from "../_shared/mcpContract.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -285,7 +286,7 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "UNAUTHORIZED" }, 401);
-    const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const userClient = createClient(url, anonKey, { global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } } });
     const { data: userData, error: authError } = await userClient.auth.getUser();
     if (authError || !userData.user) return json({ error: "UNAUTHORIZED" }, 401);
     const rpc = await req.json();
@@ -330,7 +331,7 @@ Deno.serve(async (req) => {
         const cacheKey = toolCacheKey(userData.user.id, params.name, args);
         const cached = readToolCache(cacheKey);
         const result = cached ?? await (async () => {
-          const admin = createClient(url, serviceKey);
+          const admin = createClient(url, serviceKey, { global: { fetch: fetchSupabaseWithTimeout } });
           const fresh = params.name === "get_crm_leads"
             ? await readCRMLeads(admin, userData.user.id, args)
             : await readMetaMetrics(admin, userData.user.id, args);

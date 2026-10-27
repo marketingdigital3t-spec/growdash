@@ -5,6 +5,7 @@ import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } fro
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 import { fetchWithRetry, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
     const aiKey = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
     if (!aiKey) return responseError("A integração de IA ainda não foi configurada.", 503);
 
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const userClient = createClient(supabaseUrl, anonKey, { global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } } });
     const { data: userData } = await userClient.auth.getUser();
     const user = userData?.user;
     if (!user) return responseError("Unauthorized", 401);
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
     const twoMonthStartStr = dateString(previousMonthStart);
     const previousMonthEndStr = dateString(previousMonthEnd);
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    const admin = createClient(supabaseUrl, serviceKey, { global: { fetch: fetchSupabaseWithTimeout } });
     const { data: membership, error: membershipError } = await admin.from("workspace_members")
       .select("workspace_id")
       .eq("user_id", user.id)
