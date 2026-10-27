@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fetchAuthWithRetry, isPasswordGrantRequest } from "./authFetch";
+import { AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS, fetchAuthWithRetry, isPasswordGrantRequest } from "./authFetch";
 
 const response = (status: number) => new Response(null, { status });
 
 describe("Supabase password authentication transport", () => {
+  it("keeps a bounded 30-second window for slow GoTrue verification", () => {
+    expect(AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS).toBe(30_000);
+  });
+
   it("allows the project password verification window to complete", async () => {
     let completed = false;
     const result = await fetchAuthWithRetry(
