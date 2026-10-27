@@ -28,7 +28,10 @@ const INITIAL_SYNC_DELAY_MS = 2_000;
 // enough budget for Edge auth, database writes and the network hop so a valid
 // completed sync is not reported as a client timeout.
 const FAST_SYNC_TIMEOUT_MS = 30_000;
-const RD_RECONCILIATION_TIMEOUT_MS = 30_000;
+// Bounded RD snapshots have taken 40–55s in production. The client must wait
+// longer than that window or it reports a false timeout while the snapshot is
+// still being persisted by the coordinator.
+const RD_RECONCILIATION_TIMEOUT_MS = 90_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",

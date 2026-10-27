@@ -477,12 +477,14 @@ async function runControlled(args: {
 }
 
 async function invokeFunction(supabaseUrl: string, authHeader: string, name: string, body: Record<string, unknown>) {
-  // A slow RD reconciliation must not occupy the coordinator for several
-  // minutes. It is serialized per funnel and the next cycle retries it, while
-  // Meta keeps the more patient retry window.
+  // RD realtime snapshots can legitimately take 40–55s for a bounded funnel.
+  // Keep the coordinator alive long enough to receive the completed response;
+  // the per-funnel lock and max-pages/max-deals bounds still prevent an
+  // unbounded run. Aborting at 30s made successful RD runs look failed in the
+  // dashboard while the Edge function continued and persisted the snapshot.
   const isRD = name === "rd-sync-deals";
   const delays = isRD ? [800, 2_000] : [800, 2_000, 5_000];
-  const timeoutMs = isRD ? 30_000 : 45_000;
+  const timeoutMs = isRD ? 90_000 : 45_000;
   let last: { error?: unknown; data?: any } | null = null;
   for (let attempt = 0; attempt < delays.length; attempt++) {
     try {
