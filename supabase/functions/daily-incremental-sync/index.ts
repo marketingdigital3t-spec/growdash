@@ -230,6 +230,19 @@ Deno.serve(async (req) => {
   const cronSecret = req.headers.get("x-cron-secret");
 
   if (!isService) {
+    // Reject anonymous requests before touching Postgres. Besides avoiding an
+    // unnecessary database round-trip, this keeps the public smoke endpoint
+    // deterministic when the database is under load. Requests with a secret
+    // still go through server-side verification below.
+    if (!cronSecret) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized cron request" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
     const { data: secretIsValid, error: secretError } = await admin.rpc(
       "verify_daily_incremental_sync_secret",
       { candidate: cronSecret },
