@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldForceSyncForContextChange } from "@/lib/nearRealtimeSyncPolicy";
+import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 describe("near realtime sync policy", () => {
   const base = { scope: "account-a:2026-10-01:2026-10-27", navigationKey: "/" };
@@ -19,5 +19,13 @@ describe("near realtime sync policy", () => {
 
   it("does not force a duplicate sync when context is unchanged", () => {
     expect(shouldForceSyncForContextChange(base, base)).toBe(false);
+  });
+
+  it("releases the shell after five seconds while preserving the snapshot", () => {
+    expect(SYNC_UI_DEADLINE_MS).toBe(5_000);
+    expect(backgroundSyncStatus()).toEqual({
+      state: "background",
+      message: "Meta ainda está atualizando em segundo plano. O último snapshot válido permanece visível.",
+    });
   });
 });

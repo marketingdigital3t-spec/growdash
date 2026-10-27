@@ -6,7 +6,7 @@ import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
-import { shouldForceSyncForContextChange, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
+import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -25,10 +25,10 @@ const REALTIME_UI_BATCH_MS = 1_000;
 // reconciliation starts. The sync remains automatic, but it no longer
 // competes with the initial campaigns/CRM queries on a cold navigation.
 const INITIAL_SYNC_DELAY_MS = 2_000;
-// The selected Meta snapshot completes in roughly 6–10s in production. Keep
-// enough budget for Edge auth, database writes and the network hop so a valid
-// completed sync is not reported as a client timeout.
-const FAST_SYNC_TIMEOUT_MS = 30_000;
+// The interface has a five-second response budget. This is only the visual
+// deadline: the provider request keeps running and its eventual persisted
+// snapshot is picked up by Realtime/React Query. A slow provider must not keep
+// the toolbar locked while a previously confirmed snapshot remains usable.
 // Bounded RD snapshots have taken 40–55s in production. The client must wait
 // longer than that window or it reports a false timeout while the snapshot is
 // still being persisted by the coordinator.
@@ -43,7 +43,7 @@ const LIVE_TABLES = [
 // A realtime write must refresh live data, but invalidating every cached query
 // makes expensive route modules re-render together and can freeze navigation.
 // Keep the list explicit and restricted to data fed by the realtime tables.
-type SyncState = "idle" | "refreshing" | "fresh" | "partial" | "error";
+type SyncState = "idle" | "refreshing" | "background" | "fresh" | "partial" | "error";
 
 interface Params {
   adAccountId?: string;
@@ -140,17 +140,52 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // not abort the CRM reconciliation that follows; otherwise a Meta
         // timeout leaves the RD snapshot stale even though its worker could
         // still complete safely in the background.
+        const metaRequest = supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody });
         let data: any = null;
         let metaError: unknown = null;
+        let metaTimedOut = false;
         try {
           const result = await withRequestTimeout(
-            supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody }),
-            FAST_SYNC_TIMEOUT_MS,
+            metaRequest,
+            SYNC_UI_DEADLINE_MS,
           );
           data = result.data;
           metaError = result.error;
         } catch (error) {
-          metaError = error;
+          if (error instanceof Error && /tempo|timeout|excedido/i.test(error.message)) {
+            metaTimedOut = true;
+            if (isCurrentScope()) {
+              setSyncError(backgroundSyncStatus().message);
+              setLastUpdatedAt(new Date());
+              setState(backgroundSyncStatus().state);
+            }
+            // Do not cancel the Edge Function. It may still persist a valid
+            // snapshot after the five-second UI deadline.
+            void metaRequest.then(({ data: lateData, error: lateError }) => {
+              if (lateError || lateData?.error || ["failed", "error"].includes(String(lateData?.meta_status || lateData?.status || ""))) {
+                if (isCurrentScope()) {
+                  setSyncError("Meta não concluiu a atualização. O último snapshot válido permanece visível.");
+                  setState(hasCachedSnapshot() ? "partial" : "error");
+                }
+                return;
+              }
+              if (isCurrentScope()) {
+                setSyncError(null);
+                if (lateData?.synced_at) setLastSyncAt(new Date(lateData.synced_at));
+                setLastUpdatedAt(new Date());
+                setState(String(lateData?.meta_status || lateData?.status || "success") === "partial" ? "partial" : "fresh");
+              }
+              invalidateLiveQueries();
+            }).catch((lateError) => {
+              console.warn("[near-realtime-sync] Meta reconciliation after UI deadline", lateError);
+              if (isCurrentScope()) {
+                setSyncError("Meta não concluiu a atualização. O último snapshot válido permanece visível.");
+                setState(hasCachedSnapshot() ? "partial" : "error");
+              }
+            });
+          } else {
+            metaError = error;
+          }
         }
         const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
         const metaFailed = Boolean(metaError || data?.error || ["failed", "error"].includes(metaStatus));
@@ -163,7 +198,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         const auxiliaryWarnings = Array.isArray(data?.warnings)
           ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
           : "";
-        if (isCurrentScope()) {
+        if (isCurrentScope() && !metaTimedOut) {
           const failure = metaFailed
             ? describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message: metaFailureMessage })
             : null;

@@ -38,7 +38,12 @@ export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncSta
           Atualizando conta/período · histórico em blocos mensais
         </span>
       )}
-      {!syncing && lastSyncAt && (
+      {!syncing && syncState === "background" && (
+        <span role="status" aria-live="polite" className="gd-scope-refresh-status order-last inline-flex max-w-full items-center rounded-md px-2 py-1 text-[10px] font-semibold text-amber-700 sm:order-none">
+          Atualização em segundo plano · último snapshot preservado
+        </span>
+      )}
+      {!syncing && syncState !== "background" && lastSyncAt && (
         <span role="status" className="gd-scope-refresh-status order-last inline-flex items-center rounded-md px-2 py-1 text-[10px] text-muted-foreground sm:order-none">
           Atualizado às {format(lastSyncAt, "HH:mm")} · {formatDistanceToNow(lastSyncAt, { addSuffix: true, locale: ptBR })}
         </span>
