@@ -2110,7 +2110,13 @@ Deno.serve(async (req) => {
     // for this snapshot exists in the local table before reporting success.
     // This is the guard that prevents a partial page/status segment from
     // masquerading as a complete CRM mirror.
-    if (analytics_mode && analyticsRangeComplete) {
+    // A resumed historical run has already checkpointed and persisted earlier
+    // pages. Re-scanning the entire local funnel at the end of that run adds a
+    // large, lock-prone read without improving the upsert guarantee (every
+    // page write already fails the run on error). Keep the completeness audit
+    // for bounded/first-pass snapshots and let the next full reconciliation
+    // handle stale-row cleanup without blocking the resumable worker.
+    if (analytics_mode && analyticsRangeComplete && !(fullHistoryRequested && resumedFromCursor)) {
       let localQuery = admin
         .from("rd_deals")
         .select("rd_deal_id")
