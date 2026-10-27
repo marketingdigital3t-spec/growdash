@@ -18,7 +18,11 @@ import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
  * provider failure. Keep the cached snapshot visible while allowing the
  * bounded paginated query enough time to complete under normal load.
  */
-const RD_ANALYTICS_TIMEOUT_MS = 15_000;
+// A wide RD row includes attribution JSON and can take longer than a small
+// PostgREST read when the database is reconciling provider writes. The query
+// below is split into indexed timestamp ranges, so this budget only prevents
+// a genuinely unavailable database from blocking the dashboard forever.
+const RD_ANALYTICS_TIMEOUT_MS = 30_000;
 
 export interface RDDealLite {
   id: string;
@@ -174,36 +178,41 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       const rangeStart = bounds.start.toISOString();
       const rangeEnd = bounds.end.toISOString();
       const PAGE = 1000;
-      let all: RDDealLite[] = [];
-      // The date interval is already constrained by the user. Stop only when
-      // the database has no further page, never at an arbitrary record cap.
-      for (let p = 0; ; p++) {
-        let q = supabase
-          .from("rd_deals")
-          .select(FIELDS)
-          // Fetch every timestamp that can establish the canonical period.
-          // The final client-side selector below applies the business rule:
-          // creation for open/lost, closing (or a real won-stage transition)
-          // for won. In particular, a deal created months ago but closed in
-          // the selected interval must not be lost by a lead_created filter.
-          .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
-          .order("lead_created_at", { ascending: false });
-        const serverScope = resolveRDServerScope(resolvedFunnelIds ?? [], selectedAccountIds);
-        if (serverScope.kind === "funnel") q = q.in("rd_funnel_id", serverScope.ids);
-        if (serverScope.kind === "account") q = q.in("ad_account_id", serverScope.ids);
-        const from = p * PAGE;
-        const to = from + PAGE - 1;
-        const { data, error } = await withRequestTimeout(q.range(from, to), RD_ANALYTICS_TIMEOUT_MS);
-        // Nunca transforme uma página ausente em um resultado aparentemente
-        // completo: isso era a causa de contagens parciais no funil.
-        if (error) throw error;
-        const batch = ((data ?? []) as any[]).map((d): RDDealLite => ({
-          ...d,
-          rd_campaign_name: d.last_touch_utm_campaign ?? d.first_touch_utm_campaign ?? d.utm_campaign ?? d.campaign ?? null,
-        }));
-        all = all.concat(batch);
-        if (batch.length < PAGE) break;
-      }
+      const serverScope = resolveRDServerScope(resolvedFunnelIds ?? [], selectedAccountIds);
+      const applyServerScope = (query: any) => {
+        if (serverScope.kind === "funnel") return query.in("rd_funnel_id", serverScope.ids);
+        if (serverScope.kind === "account") return query.in("ad_account_id", serverScope.ids);
+        return query;
+      };
+      const fetchRange = async (buildRange: (query: any) => any) => {
+        const rows: RDDealLite[] = [];
+        // Each range is independently indexable. This avoids the broad OR
+        // predicate that made PostgREST fall back to a slow funnel scan while
+        // the database was also processing RD upserts.
+        for (let p = 0; ; p++) {
+          let query = supabase
+            .from("rd_deals")
+            .select(FIELDS)
+            .order("lead_created_at", { ascending: false });
+          query = applyServerScope(buildRange(query));
+          const from = p * PAGE;
+          const to = from + PAGE - 1;
+          const { data, error } = await withRequestTimeout(query.range(from, to), RD_ANALYTICS_TIMEOUT_MS);
+          if (error) throw error;
+          const batch = ((data ?? []) as any[]).map((d): RDDealLite => ({
+            ...d,
+            rd_campaign_name: d.last_touch_utm_campaign ?? d.first_touch_utm_campaign ?? d.utm_campaign ?? d.campaign ?? null,
+          }));
+          rows.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+        return rows;
+      };
+      const all = [
+        ...(await fetchRange((query) => query.gte("lead_created_at", rangeStart).lte("lead_created_at", rangeEnd))),
+        ...(await fetchRange((query) => query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd))),
+        ...(await fetchRange((query) => query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd))),
+      ];
       const scoped = all.filter((deal) => isRDDealInScopePeriod(deal, {
         accountIds: [],
         funnelIds: [],
