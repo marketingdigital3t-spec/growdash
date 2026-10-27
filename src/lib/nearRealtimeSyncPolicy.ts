@@ -1,6 +1,5 @@
 export type SyncContext = {
   scope: string;
-  navigationKey: string;
 };
 
 /**
@@ -21,12 +20,11 @@ export function backgroundSyncStatus() {
 }
 
 /**
- * A changed account/date scope or app tab must reconcile the selected period
- * before the view reads the cached snapshot. The initial mount keeps the
- * cheaper recent-window refresh because there is no previous context to
- * invalidate.
+ * A changed account/date scope must reconcile the selected period before the
+ * view reads the cached snapshot. Navigating between app routes only changes
+ * presentation; it must not start another Meta/RD request.
  */
 export function shouldForceSyncForContextChange(previous: SyncContext | null, next: SyncContext): boolean {
   if (!previous) return false;
-  return previous.scope !== next.scope || previous.navigationKey !== next.navigationKey;
+  return previous.scope !== next.scope;
 }

@@ -3,7 +3,7 @@ import { BACKGROUND_SYNC_INTERVAL_MS } from "@/hooks/useNearRealtimeSync";
 import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 describe("near realtime sync policy", () => {
-  const base = { scope: "account-a:2026-10-01:2026-10-27", navigationKey: "/" };
+  const base = { scope: "account-a:2026-10-01:2026-10-27" };
 
   it("does not force a full selected-period sync on the initial mount", () => {
     expect(shouldForceSyncForContextChange(null, base)).toBe(false);
@@ -14,8 +14,8 @@ describe("near realtime sync policy", () => {
     expect(shouldForceSyncForContextChange(base, { ...base, scope: "account-a:2026-10-02:2026-10-27" })).toBe(true);
   });
 
-  it("forces a sync when the app tab changes", () => {
-    expect(shouldForceSyncForContextChange(base, { ...base, navigationKey: "/crm" })).toBe(true);
+  it("does not force a provider sync when only the app tab changes", () => {
+    expect(shouldForceSyncForContextChange(base, base)).toBe(false);
   });
 
   it("does not force a duplicate sync when context is unchanged", () => {

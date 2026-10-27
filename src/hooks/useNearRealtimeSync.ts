@@ -57,8 +57,6 @@ interface Params {
   attributionWindow?: string;
   startDate?: Date;
   endDate?: Date;
-  /** Route/query identity. Changing tabs must refresh the selected scope. */
-  navigationKey?: string;
   enabled?: boolean;
 }
 
@@ -71,7 +69,7 @@ interface Params {
  * Assim, os KPIs permanecem visíveis e mudam sem um loader central nem novo
  * backfill do histórico a cada navegação.
  */
-export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, navigationKey = "", enabled = true }: Params = {}) {
+export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef(new Map<string, Promise<void>>());
   const invalidateTimer = useRef<number | null>(null);
@@ -300,7 +298,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
   useEffect(() => {
     if (!enabled) return;
-    const context: SyncContext = { scope, navigationKey };
+    const context: SyncContext = { scope };
     const forceContextSync = shouldForceSyncForContextChange(previousContext.current, context);
     previousContext.current = context;
     // Revalida uma vez ao entrar no escopo. O React Query mantém o último
@@ -313,7 +311,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       window.clearTimeout(initial);
       window.clearInterval(interval);
     };
-  }, [enabled, invalidateLiveQueries, navigationKey, scope]);
+  }, [enabled, invalidateLiveQueries, scope]);
 
   useEffect(() => {
     if (!enabled) return;
