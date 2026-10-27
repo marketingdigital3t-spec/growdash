@@ -204,6 +204,7 @@ export default function GrowdashLayout() {
     funnelIds,
     startDate,
     endDate,
+    navigationKey: `${pathname}${search}`,
     enabled: loadBackgroundData,
   });
 

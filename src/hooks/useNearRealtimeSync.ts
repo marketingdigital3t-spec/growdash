@@ -6,6 +6,7 @@ import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
+import { shouldForceSyncForContextChange, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -53,6 +54,8 @@ interface Params {
   attributionWindow?: string;
   startDate?: Date;
   endDate?: Date;
+  /** Route/query identity. Changing tabs must refresh the selected scope. */
+  navigationKey?: string;
   enabled?: boolean;
 }
 
@@ -65,7 +68,7 @@ interface Params {
  * Assim, os KPIs permanecem visíveis e mudam sem um loader central nem novo
  * backfill do histórico a cada navegação.
  */
-export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
+export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, navigationKey = "", enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef(new Map<string, Promise<void>>());
   const invalidateTimer = useRef<number | null>(null);
@@ -79,6 +82,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
   const activeScope = useRef(scope);
   activeScope.current = scope;
+  const previousContext = useRef<SyncContext | null>(null);
 
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
@@ -253,11 +257,14 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
   useEffect(() => {
     if (!enabled) return;
+    const context: SyncContext = { scope, navigationKey };
+    const forceContextSync = shouldForceSyncForContextChange(previousContext.current, context);
+    previousContext.current = context;
     // Revalida assim que a tela entra. O React Query mantém o último snapshot
     // visível enquanto esta chamada acontece em segundo plano.
     // Cada entrada/recarregamento solicita uma nova tentativa do escopo atual.
     // O lock persistido no backend continua impedindo duplicidade entre abas.
-    const initial = window.setTimeout(() => void refresh(false), INITIAL_SYNC_DELAY_MS);
+    const initial = window.setTimeout(() => void refresh(forceContextSync), forceContextSync ? 0 : INITIAL_SYNC_DELAY_MS);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {
@@ -273,7 +280,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       window.removeEventListener("online", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [enabled, invalidateLiveQueries, refresh]);
+  }, [enabled, invalidateLiveQueries, navigationKey, refresh, scope]);
 
   useEffect(() => {
     if (!enabled) return;
