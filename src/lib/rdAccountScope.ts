@@ -82,3 +82,19 @@ export function resolveLinkedRDFunnelIds(
 
   return linkedFunnels.length ? linkedFunnels.map((funnel) => funnel.id) : [NO_LINKED_RD_FUNNEL_SCOPE_ID];
 }
+
+export function resolveScopedRDFunnelIds<T extends MetaAccount, C extends RDConnection, F extends RDFunnel>(
+  explicitFunnelIds: string[],
+  selectedAccountIds: string[],
+  accounts: T[],
+  connections: C[],
+  funnels: F[],
+) {
+  if (!selectedAccountIds.length) return explicitFunnelIds;
+  const linked = resolveLinkedRDFunnelIds(selectedAccountIds, accounts, connections, funnels);
+  if (linked.includes(NO_LINKED_RD_FUNNEL_SCOPE_ID)) return linked;
+  if (!explicitFunnelIds.length) return linked;
+  const linkedSet = new Set(linked);
+  const narrowed = explicitFunnelIds.filter((id) => linkedSet.has(id));
+  return narrowed.length ? narrowed : linked;
+}

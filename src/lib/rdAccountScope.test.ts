@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_LINKED_RD_FUNNEL_SCOPE_ID, dedupeActiveRDFunnels, resolveLinkedRDFunnelIds } from "./rdAccountScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID, dedupeActiveRDFunnels, resolveLinkedRDFunnelIds, resolveScopedRDFunnelIds } from "./rdAccountScope";
 
 const accounts = [
   { id: "meta-ca02", account_id: "act_1064564169282353" },
@@ -66,5 +66,27 @@ describe("resolveLinkedRDFunnelIds", () => {
       "ranniely-paciente",
       "ste-aluna",
     ]);
+  });
+});
+
+describe("resolveScopedRDFunnelIds", () => {
+  it("narrows a stale explicit all-funnels list to the selected account", () => {
+    expect(resolveScopedRDFunnelIds(
+      ["ranniely-aluna", "ranniely-paciente", "ste-aluna"],
+      ["meta-ca02"],
+      accounts,
+      connections,
+      funnels,
+    )).toEqual(["ranniely-aluna", "ranniely-paciente"]);
+  });
+
+  it("keeps an explicit subset inside the selected account", () => {
+    expect(resolveScopedRDFunnelIds(
+      ["ranniely-paciente"],
+      ["meta-ca02"],
+      accounts,
+      connections,
+      funnels,
+    )).toEqual(["ranniely-paciente"]);
   });
 });
