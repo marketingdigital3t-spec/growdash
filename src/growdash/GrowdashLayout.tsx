@@ -126,7 +126,7 @@ export default function GrowdashLayout() {
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, status: authStatus, errorMessage: authErrorMessage, retrySession, signOut } = useAuth();
   const { data: sidebarProfile } = useQuery({
     queryKey: ["sidebar-profile", user?.id],
     enabled: !!user?.id,
@@ -547,6 +547,12 @@ export default function GrowdashLayout() {
               isCampaignsWorkspace && "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
             )}
           >
+            {authStatus === "degraded" && authErrorMessage && (
+              <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/35 bg-warning/10 px-4 py-3 text-xs font-semibold text-foreground">
+                <span>{authErrorMessage} Os dados protegidos continuam sujeitos à validação da sessão.</span>
+                <button type="button" onClick={() => void retrySession()} className="rounded-lg border border-warning/40 px-3 py-1.5 font-bold transition hover:bg-warning/10">Tentar conexão</button>
+              </div>
+            )}
             <GlobalAnnouncementBanner />
             {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} syncError={backgroundSync.rdSyncError || backgroundSync.syncError} onSyncNow={() => void backgroundSync.refresh(true)} />}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}

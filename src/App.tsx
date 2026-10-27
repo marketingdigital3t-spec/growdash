@@ -195,7 +195,7 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
   // A failed session check is not proof of logout. Keep the public screen
   // available so the user can recover access, but never bounce between it and
   // an authenticated route.
-  if (status === "authenticated") return <Navigate to="/" replace />;
+  if (status === "authenticated" || status === "degraded") return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

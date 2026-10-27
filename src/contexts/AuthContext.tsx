@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getPersistedAuthSession, supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
 import { AUTH_SESSION_TIMEOUT_MS, authSessionErrorMessage, type AccessBootstrapSnapshot } from "@/lib/authAvailability";
 
@@ -11,7 +11,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  status: "hydrating" | "authenticated" | "unauthenticated" | "unavailable";
+  status: "hydrating" | "authenticated" | "degraded" | "unauthenticated" | "unavailable";
   errorMessage: string | null;
   retrySession: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -49,16 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let timeout: number | undefined;
     // Nunca trate um timeout de rede como logout. Isso era a origem de telas de
     // login indevidas quando o token ainda estava sendo hidratado pelo Supabase.
-    const timeout = window.setTimeout(() => {
-      if (active) {
-        setStatus((current) => current === "hydrating" ? "unavailable" : current);
-        setBootstrap((current) => current.status === "hydrating" ? { ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_TIMEOUT", errorMessage: authSessionErrorMessage(new Error("timeout")), retryAvailable: true } : current);
-      }
-    }, SESSION_CHECK_TIMEOUT_MS);
-
-    const applySession = (nextSession: Session | null) => {
+    const applySession = (nextSession: Session | null, degraded = false) => {
       if (!active) return;
       const nextUserId = nextSession?.user.id ?? null;
       // Clear even on the first resolved user: a startup cache can precede
@@ -66,11 +60,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userIdRef.current !== nextUserId) queryClient.clear();
       userIdRef.current = nextUserId;
       setSession(nextSession);
-      setStatus(nextSession ? "authenticated" : "unauthenticated");
-      setErrorMessage(null);
-      setBootstrap((current) => ({ ...current, status: "ready", step: "session", updatedAt: new Date().toISOString(), errorCode: null, errorMessage: null, retryAvailable: true }));
-      window.clearTimeout(timeout);
+      setStatus(nextSession ? (degraded ? "degraded" : "authenticated") : "unauthenticated");
+      const message = degraded ? authSessionErrorMessage(new Error("timeout")) : null;
+      setErrorMessage(message);
+      setBootstrap((current) => ({ ...current, status: "ready", step: "session", updatedAt: new Date().toISOString(), errorCode: degraded ? "AUTH_SESSION_REVALIDATING" : null, errorMessage: message, retryAvailable: true }));
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
+
+    const recoverFromStorage = () => {
+      const cachedSession = getPersistedAuthSession();
+      if (!cachedSession) return false;
+      applySession(cachedSession, true);
+      return true;
+    };
+
+    timeout = window.setTimeout(() => {
+      if (active && !recoverFromStorage()) {
+        setStatus((current) => current === "hydrating" ? "unavailable" : current);
+        setBootstrap((current) => current.status === "hydrating" ? { ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_TIMEOUT", errorMessage: authSessionErrorMessage(new Error("timeout")), retryAvailable: true } : current);
+      }
+    }, SESSION_CHECK_TIMEOUT_MS);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
@@ -84,24 +93,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void withRequestTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS).then(({ data: { session } }) => applySession(session)).catch((error) => {
       if (active) {
-        setStatus("unavailable");
-        const message = authSessionErrorMessage(error);
-        setErrorMessage(message);
-        setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
+        const cachedSession = getPersistedAuthSession();
+        if (cachedSession) {
+          applySession(cachedSession, true);
+        } else {
+          setStatus("unavailable");
+          const message = authSessionErrorMessage(error);
+          setErrorMessage(message);
+          setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
+        }
       }
-      window.clearTimeout(timeout);
+      if (timeout !== undefined) window.clearTimeout(timeout);
     });
 
     return () => {
       active = false;
       subscription.unsubscribe();
-      window.clearTimeout(timeout);
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
   }, [queryClient]);
 
   const retrySession = async () => {
     attemptRef.current += 1;
-    setStatus("hydrating");
+    const cachedSession = getPersistedAuthSession();
+    if (!cachedSession) setStatus("hydrating");
     setErrorMessage(null);
     setBootstrap({ ...createBootstrapSnapshot(attemptRef.current), startedAt: new Date().toISOString() });
     try {
@@ -114,12 +129,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userIdRef.current = nextUserId;
       setSession(data.session);
       setStatus(data.session ? "authenticated" : "unauthenticated");
+      setErrorMessage(null);
       setBootstrap((current) => ({ ...current, status: "ready", updatedAt: new Date().toISOString(), errorCode: null, errorMessage: null }));
     } catch (error) {
-      setStatus("unavailable");
-      const message = authSessionErrorMessage(error);
-      setErrorMessage(message);
-      setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
+      const fallbackSession = cachedSession || getPersistedAuthSession();
+      if (fallbackSession) {
+        setSession(fallbackSession);
+        setStatus("degraded");
+        const message = authSessionErrorMessage(error);
+        setErrorMessage(message);
+        setBootstrap((current) => ({ ...current, status: "ready", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_REVALIDATING", errorMessage: message, retryAvailable: true }));
+      } else {
+        setStatus("unavailable");
+        const message = authSessionErrorMessage(error);
+        setErrorMessage(message);
+        setBootstrap((current) => ({ ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_UNAVAILABLE", errorMessage: message, retryAvailable: true }));
+      }
     }
   };
 

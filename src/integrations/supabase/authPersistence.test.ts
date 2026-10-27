@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAuthStorage, type AuthPersistenceMode } from "./authPersistence";
+import { createAuthStorage, readPersistedSession, type AuthPersistenceMode } from "./authPersistence";
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -43,5 +43,22 @@ describe("auth persistence storage", () => {
     const storage = createAuthStorage(local, session, () => "auto", "auth-token");
 
     expect(storage.getItem("auth-token")).toBe("temporary");
+  });
+
+  it("recovers an unexpired persisted session without trusting malformed or expired data", () => {
+    const storage = memoryStorage();
+    storage.setItem("auth-token", JSON.stringify({
+      access_token: "access",
+      refresh_token: "refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+      user: { id: "user-1" },
+    }));
+
+    expect(readPersistedSession(storage, "auth-token")?.access_token).toBe("access");
+
+    storage.setItem("auth-token", JSON.stringify({ access_token: "access", refresh_token: "refresh", expires_at: 1, user: { id: "user-1" } }));
+    expect(readPersistedSession(storage, "auth-token")).toBeNull();
+    storage.setItem("auth-token", "not-json");
+    expect(readPersistedSession(storage, "auth-token")).toBeNull();
   });
 });

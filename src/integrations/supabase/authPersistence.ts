@@ -1,6 +1,31 @@
+import type { Session } from "@supabase/supabase-js";
+
 export type AuthPersistenceMode = "auto" | "local" | "session";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+/**
+ * Reads the last Supabase session without making a network request. This is
+ * only a recovery hint while Auth is unavailable; protected operations still
+ * require the server to validate the access token.
+ */
+export function readPersistedSession(storage: StorageLike, storageKey: string): Session | null {
+  try {
+    const raw = storage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const candidate = parsed as Partial<Session>;
+    if (typeof candidate.access_token !== "string" || !candidate.access_token) return null;
+    if (typeof candidate.refresh_token !== "string" || !candidate.refresh_token) return null;
+    if (!candidate.user || typeof candidate.user !== "object") return null;
+    if (typeof candidate.expires_at !== "number" || !Number.isFinite(candidate.expires_at)) return null;
+    if (candidate.expires_at <= Math.floor(Date.now() / 1000) + 15) return null;
+    return candidate as Session;
+  } catch {
+    return null;
+  }
+}
 
 export function createMemoryStorage(): StorageLike {
   const values = new Map<string, string>();
