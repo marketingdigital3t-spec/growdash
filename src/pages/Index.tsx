@@ -4,11 +4,9 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
-import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
 import { dedupeCanonicalSales, useSales, type Sale } from "@/hooks/useSales";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
-import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
@@ -140,21 +138,6 @@ const Index = () => {
   const { isError: rdDealsError, error: rdDealsQueryError, isLoading: loadingRDDeals, isFetching: fetchingRDDeals, refetch: refetchRDDeals } = rdDealsQuery;
   const { data: alerts = [] } = useAlerts();
   const { data: eventClasses = [] } = useEventClasses();
-  const syncMeta = useSyncMeta();
-
-  const dashboardAnalyticsScope = useMemo<AnalyticsScope>(() => {
-    const scopedAccounts = visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id));
-    return {
-      adAccountIds: selectedAccountIds.length ? selectedAccountIds : scopedAccountIds,
-      funnelIds: scopedRDfunnelIds,
-      campaignIds: selectedCampaignIds,
-      startDate: businessDateKey(startDate),
-      endDate: businessDateKey(endDate),
-      timezoneByAccount: Object.fromEntries(scopedAccounts.map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
-      attributionWindowByAccount: Object.fromEntries(scopedAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
-    };
-  }, [endDate, scopedAccountIds, scopedRDfunnelIds, selectedAccountIds, selectedCampaignIds, startDate, visibleAccounts]);
-  const dashboardScopeKey = useMemo(() => analyticsScopeFingerprint(dashboardAnalyticsScope), [dashboardAnalyticsScope]);
 
   const { data: activeView, isError: dashboardViewError, refetch: refetchDashboardView } = useGlobalView();
   const { canEdit: canEditWorkspace } = usePermissions();
@@ -247,43 +230,6 @@ const Index = () => {
     reason: dashboardMeta.data.metricAvailability.leads?.reason || dashboardMeta.data.unavailableReason,
     revenueAvailability,
   }), [dashboardMeta.data.metricAvailability.leads, dashboardMeta.data.rowCount, dashboardMeta.data.status, dashboardMeta.data.unavailableReason, dashboardMeta.isLoading, hasMetaSnapshot, revenueAvailability]);
-
-  const handleSync = useCallback(() => {
-    // A mutation já invalida as consultas de insights ao terminar. Refazer a
-    // consulta antes e depois da sincronização só competia por rede e fazia o
-    // dashboard trocar desnecessariamente para estado de carregamento.
-    const syncStart = businessDateKey(startDate);
-    const syncEnd = businessDateKey(endDate);
-    syncMeta.mutate({
-      adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-      adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
-      startDate: syncStart,
-      endDate: syncEnd,
-      includeBreakdowns: true,
-      breakdownStartDate: syncStart,
-      breakdownEndDate: syncEnd,
-      force: true,
-      // Libera os KPIs em até poucos segundos usando o snapshot atual; leads
-      // e distribuição horária continuam em segundo plano e invalidam as
-      // consultas quando os dados persistidos estiverem disponíveis.
-      fast: true,
-    });
-  }, [endDate, scopedAccountIds, selectedAccountIds, startDate, syncMeta]);
-
-  // A newly connected account can legitimately have no local rows until its
-  // first reconciliation. Force one scoped sync once per account/period so the
-  // dashboard never settles permanently on a misleading all-zero snapshot.
-  const autoSyncKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (loadingAdAccounts || syncMeta.isPending || scopedAccountIds.length === 0) return;
-    // Every account/calendar/funnel scope gets one bounded fast refresh. A
-    // cached snapshot is useful for the first paint, but it must not suppress
-    // the scoped Meta/RD reconciliation when the user changes the filters.
-    if (autoSyncKeyRef.current === dashboardScopeKey) return;
-    autoSyncKeyRef.current = dashboardScopeKey;
-    const timer = window.setTimeout(() => handleSync(), 180);
-    return () => window.clearTimeout(timer);
-  }, [dashboardScopeKey, handleSync, loadingAdAccounts, scopedAccountIds.length, syncMeta.isPending]);
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({
     ...view,
@@ -409,7 +355,7 @@ const Index = () => {
       </div>}
 
       <div>
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={{
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading} hasSnapshot={hasMetaSnapshot} metricAvailability={{
           revenue: dashboardMetricAvailability.revenue_gross,
           spend: dashboardMetricAvailability.spend,
           leads: dashboardMetricAvailability.leads,
