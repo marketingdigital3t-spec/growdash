@@ -45,3 +45,8 @@ export function missingHourlyFactKeys(expected: HourlyFactKey[], persisted: Hour
   return expected.filter((row) => !persistedKeys.has(keyOf(row)));
 }
 
+export function staleHourlyAdIds(existingAdIds: string[], incomingAdIds: string[]) {
+  const incoming = new Set(incomingAdIds);
+  return Array.from(new Set(existingAdIds)).filter((adId) => !incoming.has(adId));
+}
+

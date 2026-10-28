@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
-import { filterHourlyFactsByRange, missingHourlyFactKeys, type HourlyFactKey } from "../../../src/lib/hourlySyncContract.ts";
+import { filterHourlyFactsByRange, missingHourlyFactKeys, staleHourlyAdIds, type HourlyFactKey } from "../../../src/lib/hourlySyncContract.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
@@ -300,15 +300,36 @@ Deno.serve(async (req) => {
         const last = new Date(`${endDate}T00:00:00Z`);
         for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
           const date = cursor.toISOString().slice(0, 10);
-          let cleanup = supabaseAdmin.from("insights_hourly").delete()
-            .eq("ad_account_id", account.id).eq("date", date);
-          if (requestedCampaignIds.length) cleanup = cleanup.in("campaign_id", requestedCampaignIds);
           const incoming = [...(incomingByDate.get(date) || new Set<string>())];
-          if (incoming.length) {
-            cleanup = cleanup.not("ad_id", "in", `(${incoming.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",")})`);
+          const existingQuery = supabaseAdmin
+            .from("insights_hourly")
+            .select("ad_id")
+            .eq("ad_account_id", account.id)
+            .eq("date", date);
+          if (requestedCampaignIds.length) existingQuery.in("campaign_id", requestedCampaignIds);
+          const { data: existingRows, error: existingError } = await existingQuery;
+          if (existingError) throw new Error(`leitura da limpeza horária da conta ${account.name}: ${existingError.message}`);
+          const staleIds = staleHourlyAdIds(
+            (existingRows || []).map((row: any) => String(row.ad_id || "")).filter(Boolean),
+            incoming,
+          );
+          if (staleIds.length > 0) {
+            let cleanup = supabaseAdmin.from("insights_hourly").delete()
+              .eq("ad_account_id", account.id).eq("date", date).in("ad_id", staleIds);
+            if (requestedCampaignIds.length) cleanup = cleanup.in("campaign_id", requestedCampaignIds);
+            const { error: hourlyDeleteError } = await cleanup;
+            if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
           }
-          const { error: hourlyDeleteError } = await cleanup;
-          if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
+        }
+        const { data: persistedAfterCleanup, error: postCleanupReadError } = await supabaseAdmin
+          .from("insights_hourly")
+          .select("ad_id,date,hour")
+          .eq("ad_account_id", account.id)
+          .in("date", [...new Set(rows.map((row) => row.date))]);
+        if (postCleanupReadError || missingHourlyFactKeys(rows, (persistedAfterCleanup || []) as HourlyFactKey[]).length > 0) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: a limpeza não preservou todas as linhas horárias gravadas; snapshot anterior preservado.`);
+          continue;
         }
         console.log(`hourly ${account.name}: ${rows.length} rows`);
       } catch (e) {
