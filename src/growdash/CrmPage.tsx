@@ -302,7 +302,6 @@ export default function CrmPage() {
   const crmScopeKey = buildCrmVisualScopeKey({
     accountId: adAccountId,
     accountIds: adAccountIds,
-    funnelIds: selectedFunnelIds,
     startDate: preset === "max" ? null : businessDateKey(startDate),
     endDate: preset === "max" ? null : businessDateKey(endDate),
   });
