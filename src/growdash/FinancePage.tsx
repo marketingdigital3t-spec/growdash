@@ -10,6 +10,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { BACKGROUND_SYNC_INTERVAL_MS } from "@/hooks/useNearRealtimeSync";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
@@ -146,7 +147,7 @@ export default function FinancePage() {
   useEffect(() => {
     if (!accountIdsKey) return;
     void syncFunding.mutateAsync().catch(() => undefined);
-    const interval = window.setInterval(() => { void syncFunding.mutateAsync().catch(() => undefined); }, 5 * 60_000);
+    const interval = window.setInterval(() => { void syncFunding.mutateAsync().catch(() => undefined); }, BACKGROUND_SYNC_INTERVAL_MS);
     return () => window.clearInterval(interval);
     // The account key is the only trigger: mutation identity changes on render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
