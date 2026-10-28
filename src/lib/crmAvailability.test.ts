@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crmBoardSummaryLabel } from "./crmAvailability";
+import { buildCrmMetricAvailability, crmBoardSummaryLabel } from "./crmAvailability";
 
 describe("crmBoardSummaryLabel", () => {
   it("does not expose a zero count while the first CRM snapshot is loading", () => {
@@ -12,5 +12,12 @@ describe("crmBoardSummaryLabel", () => {
 
   it("does not turn an unavailable query into a zero count", () => {
     expect(crmBoardSummaryLabel("unavailable", 0)).toBe("Negociações indisponíveis");
+  });
+
+  it("marks the metrics unavailable when the RD query timed out without a snapshot", () => {
+    expect(buildCrmMetricAvailability({ loading: false, failed: true, hasSnapshot: false, hasRows: false })).toEqual({
+      state: "unavailable",
+      reason: "Não foi possível confirmar os dados do RD Station.",
+    });
   });
 });

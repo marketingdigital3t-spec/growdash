@@ -63,7 +63,7 @@ import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import type { MetricAvailability } from "@/lib/metricAvailability";
-import { crmBoardSummaryLabel } from "@/lib/crmAvailability";
+import { buildCrmMetricAvailability, crmBoardSummaryLabel } from "@/lib/crmAvailability";
 import { SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 import { buildCrmVisualScopeKey } from "@/lib/crmVisualScope";
 
@@ -188,7 +188,7 @@ export default function CrmPage() {
   const canReadCrm = crmPipelineEnabled(!!user);
   // RD remains its own source; global account selection scopes it only through
   // the explicit RD-connection-to-Meta-account mapping in GlobalFiltersContext.
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, dataUpdatedAt: funnelsUpdatedAt, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
   const isTemporaryBackendError = (error: unknown) => error instanceof Error && /Tempo de carregamento excedido|PGRST002|schema cache|503|indisponível/i.test(error.message);
   const backendUnavailable = isTemporaryBackendError(funnelsQueryError);
   const availableFunnels = useMemo(
@@ -233,7 +233,7 @@ export default function CrmPage() {
     dateScope: preset === "max" ? "pipeline" : "period",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
-  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, dataUpdatedAt: salesUpdatedAt, isError: salesError, error: salesQueryError } = useSales({
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, isError: salesError, error: salesQueryError } = useSales({
     adAccountId: accountFilter,
     adAccountIds: accountScopeIds,
     funnelIds: selectedFunnelIds,
@@ -241,7 +241,13 @@ export default function CrmPage() {
     endDate: preset === "max" ? undefined : endDate,
   });
   const { data: attributionInsights = [] } = useInsights({ adAccountIds: accountScopeIds, startDate, endDate, enabled: canReadCrm && accountScopeIds.length > 0 });
-  const { data: firstPartyLeads = [] } = useQuery({
+  const {
+    data: firstPartyLeads = [],
+    isLoading: loadingFirstPartyLeads,
+    isError: firstPartyLeadsError,
+    error: firstPartyLeadsQueryError,
+    dataUpdatedAt: firstPartyLeadsUpdatedAt,
+  } = useQuery({
     queryKey: ["crm_leads", workspace?.id],
     enabled: !!workspace?.id,
     queryFn: async () => {
@@ -296,7 +302,6 @@ export default function CrmPage() {
   // source belongs to the selection.
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
   const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingRDIntegration || loadingFunnels || loadingDeals || loadingSales;
-  const crmUpdatedAt = Math.max(dealsUpdatedAt || 0, funnelsUpdatedAt || 0, salesUpdatedAt || 0);
   // The visual deadline belongs to the user's selected scope. Do not reset
   // it when asynchronous account/funnel resolution changes derived IDs.
   const crmScopeKey = buildCrmVisualScopeKey({
@@ -326,13 +331,22 @@ export default function CrmPage() {
       : salesQueryError instanceof Error
         ? salesQueryError.message
         : "Não foi possível consultar o RD Station.";
-  const crmAvailability: MetricAvailability = isLoadingSelectedScopeForUi || loadingRDIntegration
-    ? (crmUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
-    : crmError
-      ? (crmUpdatedAt ? { state: "partial", reason: "Uma fonte falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: crmErrorMessage })
-      : crmUpdatedAt
-        ? (dealData.length ? { state: "fresh" } : { state: "empty_confirmed" })
-        : { state: "loading" };
+  const rdSnapshotConfirmed = (dealsUpdatedAt || 0) > 0;
+  const crmAvailability: MetricAvailability = buildCrmMetricAvailability({
+    loading: isLoadingSelectedScopeForUi || loadingRDIntegration,
+    failed: Boolean(funnelsError || dealsError || backendUnavailable || (crmVisualTimedOut && !rdSnapshotConfirmed)),
+    hasSnapshot: rdSnapshotConfirmed,
+    hasRows: dealData.length > 0,
+    reason: crmErrorMessage,
+  });
+  const firstPartyAvailability: MetricAvailability = buildCrmMetricAvailability({
+    loading: loadingFirstPartyLeads,
+    failed: firstPartyLeadsError,
+    hasSnapshot: (firstPartyLeadsUpdatedAt || 0) > 0,
+    hasRows: firstPartyLeadsInPeriod.length > 0,
+    reason: firstPartyLeadsQueryError instanceof Error ? firstPartyLeadsQueryError.message : "Não foi possível confirmar os leads recebidos pelo webhook.",
+    noSnapshotReason: "Aguardando a primeira leitura confirmada dos leads recebidos pelo webhook.",
+  });
   const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
   const allDeals = useMemo(() => isChangingAccountScope ? [] : dealData, [dealData, isChangingAccountScope]);
   const canonicalSales = useMemo(() => isChangingAccountScope ? [] : salesData, [isChangingAccountScope, salesData]);
@@ -964,13 +978,13 @@ export default function CrmPage() {
               description={`${number.format(firstPartyLeadsInPeriod.filter((lead: { status?: string }) => lead.status === "new").length)} novos · UTMs preservadas na entrada`}
               icon={<UsersRound className="h-4 w-4" />}
               tone="meta"
-              availability={crmAvailability}
+              availability={firstPartyAvailability}
             />
           </div>
         </section>
       )}
 
-      {crmVisualTimedOut && !crmUpdatedAt && !crmError ? (
+      {crmVisualTimedOut && !rdSnapshotConfirmed && !crmError ? (
         <section role="status" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
           <div className="max-w-lg"><Clock3 className="mx-auto h-9 w-9 text-amber-500" /><h2 className="mt-4 font-black">Sincronização RD aguardando</h2><p className="mt-2 text-sm text-muted-foreground">A consulta do CRM está demorando mais que o limite visual. A Growdash manteve a tela utilizável e continuará a atualização em segundo plano.</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
