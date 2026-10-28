@@ -65,6 +65,7 @@ import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFun
 import type { MetricAvailability } from "@/lib/metricAvailability";
 import { crmBoardSummaryLabel } from "@/lib/crmAvailability";
 import { SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
+import { buildCrmVisualScopeKey } from "@/lib/crmVisualScope";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
@@ -296,9 +297,12 @@ export default function CrmPage() {
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
   const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingRDIntegration || loadingFunnels || loadingDeals || loadingSales;
   const crmUpdatedAt = Math.max(dealsUpdatedAt || 0, funnelsUpdatedAt || 0, salesUpdatedAt || 0);
-  const crmScopeKey = JSON.stringify({
-    accounts: accountScopeIds.slice().sort(),
-    funnels: requestedFunnelIds.slice().sort(),
+  // The visual deadline belongs to the user's selected scope. Do not reset
+  // it when asynchronous account/funnel resolution changes derived IDs.
+  const crmScopeKey = buildCrmVisualScopeKey({
+    accountId: adAccountId,
+    accountIds: adAccountIds,
+    funnelIds: selectedFunnelIds,
     startDate: preset === "max" ? null : businessDateKey(startDate),
     endDate: preset === "max" ? null : businessDateKey(endDate),
   });
