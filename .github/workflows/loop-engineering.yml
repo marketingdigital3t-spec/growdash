@@ -133,9 +133,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -eu
-          response="$(curl -fsSL -X GET "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/growdash/deployments?per_page=20" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H 'Content-Type: application/json')"
-          previous="$(printf '%s' "$response" | jq -r '.result[] | select(.environment == "production") | .id' | head -n 1)"
-          test -n "$previous" && test "$previous" != "null" || { echo "Não foi possível identificar o deployment de produção anterior."; exit 2; }
+          # The API list also contains failed deployment attempts. Rollback
+          # must target the most recent successful production artifact, not
+          # merely the first item returned by the API.
+          previous="$(npx wrangler pages deployment list --project-name growdash --environment production --json \
+            | jq -r '.[] | select(.Status != "Failure") | .Id' | head -n 1)"
+          test -n "$previous" && test "$previous" != "null" || { echo "Não foi possível identificar um deployment de produção bem-sucedido anterior."; exit 2; }
           echo "deployment_id=$previous" >> "$GITHUB_OUTPUT"
 
       - name: Setup Supabase CLI
