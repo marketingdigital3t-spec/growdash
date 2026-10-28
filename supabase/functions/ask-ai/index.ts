@@ -6,6 +6,7 @@ import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFact
 import { fetchWithRetry, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
+import { classifyAiProviderError } from "../../../src/lib/aiProviderError.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,8 +24,8 @@ type Insight = MetaLeadInsight & {
 type ActionRow = MetaLeadAction & { attribution_window?: string | null };
 type Totals = { spend: number; impressions: number; reach: number; clicks: number; leads: number };
 
-function responseError(error: string, status = 400) {
-  return new Response(JSON.stringify({ error }), { status, headers: jsonHeaders });
+function responseError(error: string, status = 400, errorCode?: string, retryable?: boolean) {
+  return new Response(JSON.stringify({ error, ...(errorCode ? { error_code: errorCode } : {}), ...(retryable == null ? {} : { retryable }) }), { status, headers: jsonHeaders });
 }
 function isoDate(value: unknown, fallback: Date) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback;
@@ -502,18 +503,16 @@ ${JSON.stringify(context)}`;
     ];
     const aiResp = await fetchWithRetry(AI_API_URL, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: AI_MODEL, messages, stream: true }) }, { timeoutMs: 20_000, maxAttempts: 3, baseDelayMs: 300 });
     if (!aiResp.ok) {
-      if (aiResp.status === 429) return responseError("Limite de requisições atingido. Tente novamente em instantes.", 429);
-      if (aiResp.status === 402) return responseError("Créditos da IA esgotados. Verifique a franquia do plano.", 402);
+      let providerPayload: unknown = null;
+      try { providerPayload = await aiResp.clone().json(); } catch { /* keep provider payload private and optional */ }
+      const classification = classifyAiProviderError(aiResp.status, providerPayload);
       const providerRequestId = aiResp.headers.get("x-request-id") || aiResp.headers.get("openai-processing-ms") || null;
-      // Do not echo the provider payload or credentials. A 401/403 is a
-      // configuration failure and must remain distinguishable from a
-      // transient backend error so operators can rotate the secret safely.
-      if (aiResp.status === 401 || aiResp.status === 403) {
-        console.error("AI provider authentication failed", { status: aiResp.status, provider_request_id: providerRequestId });
-        return responseError("AI_PROVIDER_AUTH_INVALID", 503);
-      }
-      console.error("AI gateway error", { status: aiResp.status, provider_request_id: providerRequestId });
-      return responseError("Falha ao consultar IA", 500);
+      console.error("AI provider request failed", {
+        status: aiResp.status,
+        classification: classification.code,
+        provider_request_id: providerRequestId,
+      });
+      return responseError(classification.message, classification.status, classification.code, classification.retryable);
     }
     return new Response(aiResp.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-store" } });
   } catch (error) {
