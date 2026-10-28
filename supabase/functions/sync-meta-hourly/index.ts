@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { filterHourlyFactsByRange, missingHourlyFactKeys, type HourlyFactKey } from "../../../src/lib/hourlySyncContract.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
@@ -124,7 +125,7 @@ Deno.serve(async (req) => {
           `?level=ad` +
           `&time_increment=1` +
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
-          `&fields=ad_id,adset_id,campaign_id,spend,clicks,actions` +
+          `&fields=ad_id,adset_id,campaign_id,date_start,date_stop,spend,clicks,actions` +
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
           campaignFilter +
           attributionParam +
@@ -188,7 +189,22 @@ Deno.serve(async (req) => {
           map.set(key, row);
         }
 
-        let rows = [...map.values()];
+        const rangeCheck = filterHourlyFactsByRange(
+          [...map.values()] as HourlyFactKey[],
+          startDate,
+          endDate,
+        );
+        if (rangeCheck.rejected.length > 0) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: a Meta devolveu ${rangeCheck.rejected.length} linhas fora do período solicitado; snapshot horário anterior preservado.`);
+          continue;
+        }
+        let rows = rangeCheck.accepted as Row[];
+        if (rows.length === 0) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: a Meta não devolveu linhas horárias para ${startDate}–${endDate}; snapshot horário anterior preservado.`);
+          continue;
+        }
 
         // Hourly breakdowns can omit configured site events and conversation
         // aliases. Reconcile against the daily canonical snapshot for every
@@ -256,6 +272,24 @@ Deno.serve(async (req) => {
         // Do not erase a valid hourly snapshot before the new one has been
         // written successfully. Keep the campaign scope bounded as well.
         if (persistenceFailed) continue;
+        const persistedQuery = supabaseAdmin
+          .from("insights_hourly")
+          .select("ad_id,date,hour")
+          .eq("ad_account_id", account.id)
+          .in("date", [...new Set(rows.map((row) => row.date))]);
+        if (requestedCampaignIds.length) persistedQuery.in("campaign_id", requestedCampaignIds);
+        const { data: persistedRows, error: persistedReadError } = await persistedQuery;
+        if (persistedReadError) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: não foi possível confirmar a persistência horária; snapshot anterior preservado.`);
+          continue;
+        }
+        const missingKeys = missingHourlyFactKeys(rows, (persistedRows || []) as HourlyFactKey[]);
+        if (missingKeys.length > 0) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: ${missingKeys.length} chaves horárias não foram confirmadas após a escrita; snapshot anterior preservado.`);
+          continue;
+        }
         const incomingByDate = new Map<string, Set<string>>();
         for (const row of rows) {
           const ids = incomingByDate.get(row.date) || new Set<string>();

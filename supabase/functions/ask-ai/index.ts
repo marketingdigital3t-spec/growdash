@@ -504,7 +504,15 @@ ${JSON.stringify(context)}`;
     if (!aiResp.ok) {
       if (aiResp.status === 429) return responseError("Limite de requisições atingido. Tente novamente em instantes.", 429);
       if (aiResp.status === 402) return responseError("Créditos da IA esgotados. Verifique a franquia do plano.", 402);
-      console.error("AI gateway error", aiResp.status, await aiResp.text());
+      const providerRequestId = aiResp.headers.get("x-request-id") || aiResp.headers.get("openai-processing-ms") || null;
+      // Do not echo the provider payload or credentials. A 401/403 is a
+      // configuration failure and must remain distinguishable from a
+      // transient backend error so operators can rotate the secret safely.
+      if (aiResp.status === 401 || aiResp.status === 403) {
+        console.error("AI provider authentication failed", { status: aiResp.status, provider_request_id: providerRequestId });
+        return responseError("AI_PROVIDER_AUTH_INVALID", 503);
+      }
+      console.error("AI gateway error", { status: aiResp.status, provider_request_id: providerRequestId });
       return responseError("Falha ao consultar IA", 500);
     }
     return new Response(aiResp.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-store" } });
