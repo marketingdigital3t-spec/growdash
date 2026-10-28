@@ -3,7 +3,10 @@ import { expect, test } from "@playwright/test";
 // This suite is deliberately unauthenticated. A stored session can make
 // getSession() look healthy while the Auth gateway is unavailable, which was
 // the exact production failure that the authenticated route smoke missed.
-test.use({ storageState: undefined });
+// An explicit empty state is required: `undefined` leaves the project-level
+// storageState in place when CI/local runs provide an authenticated smoke
+// state.
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("autenticação pública — interação e acessibilidade básica", () => {
   test("campos têm nome acessível e os fluxos de senha/cadastro são alcançáveis", async ({ page }) => {
