@@ -83,3 +83,22 @@ independentes. Sem recuperar esses serviços ou fornecer acesso operacional segu
 não é possível provar sincronização Meta/RD real, persistência, RAG/MCP, logs de
 Postgres/Auth, advisors, pooler, publicação de Edge Functions ou deployment do
 Cloudflare.
+
+## Revalidação após a auditoria
+
+- O commit `f2f3895` foi publicado pelo pipeline `40617339988`; migrations,
+  Edge Functions, Sentry, Cloudflare e smoke autenticado passaram.
+- O ajuste de cadência do Growdash Flow foi publicado no commit `0891156` pelo
+  pipeline `40618340755`. A reconciliação automática RD agora usa quinze minutos
+  para cobertura, deduplicação e intervalo, mantendo Realtime para atualizações
+  entre ciclos.
+- O segundo pipeline terminou com sucesso; o smoke autenticado de produção
+  passou em 18 rotas e o smoke das Edge Functions confirmou 401 sem sessão.
+- Depois da publicação, uma sessão real no navegador voltou a exibir
+  `Não foi possível verificar sua sessão`. Com a chave pública configurada, as
+  chamadas a `/auth/v1/settings` e `/rest/v1/ad_accounts` excederam 10 segundos
+  sem resposta. Sem chave, os mesmos endpoints respondem 401 rapidamente; isso
+  separa indisponibilidade do gateway autenticado de uma simples rota inexistente.
+- Portanto, o frontend e a cadência foram publicados, mas a persistência real de
+  Meta/RD, MCP e RAG continua não comprovável enquanto Auth/PostgREST do projeto
+  não responderem a uma sessão válida.
