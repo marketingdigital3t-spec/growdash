@@ -765,7 +765,7 @@ export default function Campaigns() {
     },
   });
   const hierarchyBase = hierarchyBaseQuery.data;
-  const accountAdsets = hierarchyBase?.adsets || [];
+  const accountAdsets = useMemo(() => hierarchyBase?.adsets || [], [hierarchyBase?.adsets]);
   const adsetIds = useMemo(
     () => Array.from(new Set(accountAdsets.map((adset: any) => String(adset.id)).filter(Boolean))),
     [accountAdsets],
@@ -791,7 +791,7 @@ export default function Campaigns() {
       return hydrateCampaignHierarchy({ campaigns: hierarchyBase?.campaigns || [], adsets: accountAdsets, ads }).ads;
     },
   });
-  const accountAds = hierarchyAdsQuery.data || [];
+  const accountAds = useMemo(() => hierarchyAdsQuery.data || [], [hierarchyAdsQuery.data]);
   const isLoadingAdsets = hierarchyBaseQuery.isLoading || hierarchyBaseQuery.isFetching;
   const isLoadingAds = hierarchyBaseQuery.isLoading || hierarchyBaseQuery.isFetching || hierarchyAdsQuery.isLoading || hierarchyAdsQuery.isFetching;
   const hierarchyAdsetsState = {

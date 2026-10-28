@@ -40,6 +40,7 @@ import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnec
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useHubSpotOAuth } from "@/hooks/useHubSpotOAuth";
 import { CRMLeadWebhookCard } from "@/components/settings/CRMLeadWebhookCard";
+import { parsePlausibleDate } from "@/lib/safeDate";
 
 const tabs = [
   ["paid", "Tráfego pago"], ["social", "Mídia social"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
@@ -67,8 +68,8 @@ function safeText(value: unknown, fallback = "") {
 function relativeDate(value?: unknown) {
   const normalizedValue = safeText(value);
   if (!normalizedValue) return "Nunca sincronizado";
-  const date = new Date(normalizedValue);
-  return Number.isNaN(date.getTime()) ? "Data indisponível" : formatDistanceToNow(date, { locale: ptBR, addSuffix: true });
+  const date = parsePlausibleDate(normalizedValue);
+  return date ? formatDistanceToNow(date, { locale: ptBR, addSuffix: true }) : "Data indisponível";
 }
 
 function rdConnectionPresentation(connection: { status?: string | null; last_success_at?: string | null; last_error?: string | null } | null) {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Activity, AlertTriangle, CalendarRange, Database, KeyRound, Loader2, MapPin, RefreshCw } from "lucide-react";
-import { format, isValid, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DuplicatesCard } from "@/components/data-health/DuplicatesCard";
 import { RevenueDriftCard } from "@/components/data-health/RevenueDriftCard";
@@ -24,6 +24,7 @@ import { shouldFetchNextPage } from "@/lib/pagination";
 import { businessDateKey } from "@/lib/businessDate";
 import { withRequestTimeout } from "@/lib/resilience";
 import { dataHealthScopeKey, resolveDataHealthState, throwOnQueryError } from "@/lib/dataHealth";
+import { parsePlausibleDate } from "@/lib/safeDate";
 
 interface HealthData {
   orphanSales: number;
@@ -40,8 +41,8 @@ const DATA_HEALTH_TIMEOUT_MS = 15_000;
 
 function formatSafeDate(value: string | Date | null | undefined, pattern: string) {
   if (!value) return "não informada";
-  const date = value instanceof Date ? value : parseISO(value);
-  return isValid(date) ? format(date, pattern, { locale: ptBR }) : "data inválida";
+  const date = parsePlausibleDate(value);
+  return date ? format(date, pattern, { locale: ptBR }) : "não informada";
 }
 
 function useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; funnelIds: string[]; startDate: Date; endDate: Date }) {

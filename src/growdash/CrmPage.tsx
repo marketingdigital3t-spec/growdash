@@ -64,6 +64,7 @@ import CrmAIWorkspace from "./CrmAIWorkspace";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import type { MetricAvailability } from "@/lib/metricAvailability";
 import { crmBoardSummaryLabel } from "@/lib/crmAvailability";
+import { SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
@@ -295,6 +296,20 @@ export default function CrmPage() {
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
   const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingRDIntegration || loadingFunnels || loadingDeals || loadingSales;
   const crmUpdatedAt = Math.max(dealsUpdatedAt || 0, funnelsUpdatedAt || 0, salesUpdatedAt || 0);
+  const crmScopeKey = JSON.stringify({
+    accounts: accountScopeIds.slice().sort(),
+    funnels: requestedFunnelIds.slice().sort(),
+    startDate: preset === "max" ? null : businessDateKey(startDate),
+    endDate: preset === "max" ? null : businessDateKey(endDate),
+  });
+  const [crmVisualTimedOut, setCrmVisualTimedOut] = useState(false);
+  useEffect(() => {
+    setCrmVisualTimedOut(false);
+    if (!isLoadingSelectedScope || crmUpdatedAt > 0) return;
+    const timer = window.setTimeout(() => setCrmVisualTimedOut(true), SYNC_UI_DEADLINE_MS);
+    return () => window.clearTimeout(timer);
+  }, [crmScopeKey, crmUpdatedAt, isLoadingSelectedScope]);
+  const isLoadingSelectedScopeForUi = isLoadingSelectedScope && !crmVisualTimedOut;
   const crmError = adAccountsError || funnelsError || dealsError || salesError;
   const crmErrorMessage = adAccountsQueryError instanceof Error
     ? adAccountsQueryError.message
@@ -305,7 +320,7 @@ export default function CrmPage() {
       : salesQueryError instanceof Error
         ? salesQueryError.message
         : "Não foi possível consultar o RD Station.";
-  const crmAvailability: MetricAvailability = isLoadingSelectedScope || loadingRDIntegration
+  const crmAvailability: MetricAvailability = isLoadingSelectedScopeForUi || loadingRDIntegration
     ? (crmUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
     : crmError
       ? (crmUpdatedAt ? { state: "partial", reason: "Uma fonte falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: crmErrorMessage })
@@ -949,7 +964,11 @@ export default function CrmPage() {
         </section>
       )}
 
-      {funnelsError && !backendUnavailable ? (
+      {crmVisualTimedOut && !crmUpdatedAt && !crmError ? (
+        <section role="status" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
+          <div className="max-w-lg"><Clock3 className="mx-auto h-9 w-9 text-amber-500" /><h2 className="mt-4 font-black">Sincronização RD aguardando</h2><p className="mt-2 text-sm text-muted-foreground">A consulta do CRM está demorando mais que o limite visual. A Growdash manteve a tela utilizável e continuará a atualização em segundo plano.</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
+        </section>
+      ) : funnelsError && !backendUnavailable ? (
         <section role="alert" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
           <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar os funis RD</h2><p className="mt-2 text-sm text-muted-foreground">{funnelsQueryError instanceof Error ? funnelsQueryError.message : "A consulta dos funis falhou. Verifique a conexão RD e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchFunnels()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
@@ -957,7 +976,7 @@ export default function CrmPage() {
         <section role="status" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
           <div className="max-w-lg"><Clock3 className="mx-auto h-9 w-9 text-amber-500" /><h2 className="mt-4 font-black">Sincronização RD aguardando</h2><p className="mt-2 text-sm text-muted-foreground">O serviço de dados está temporariamente indisponível. A Growdash manteve o shell utilizável e tentará novamente quando a conexão voltar.</p><Button className="mt-4" variant="outline" onClick={() => void refetchFunnels()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
-      ) : isLoadingSelectedScope ? <CRMLoading /> : dealsError ? (
+      ) : isLoadingSelectedScopeForUi ? <CRMLoading /> : dealsError ? (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar as negociações</h2><p className="mt-2 text-sm text-muted-foreground">{dealsQueryError instanceof Error ? dealsQueryError.message : "A consulta do CRM falhou. Verifique seu acesso ao funil e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
@@ -987,7 +1006,7 @@ export default function CrmPage() {
         />
       )}
 
-      {!funnelsError && !isLoadingSelectedScope && !dealsError && !deals.length && view !== "ai" && (
+      {!funnelsError && !isLoadingSelectedScopeForUi && !dealsError && !deals.length && view !== "ai" && (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">{crmEmptyState({ hasFunnels: !!connectedFunnels.length, hasOwnIntegration: rdEnabled })}</p></div>
         </section>

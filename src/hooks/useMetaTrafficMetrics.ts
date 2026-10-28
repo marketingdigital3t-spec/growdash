@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
@@ -13,6 +13,12 @@ import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } fro
 import { resolveMetaSnapshotDuringRefresh } from "@/lib/metaSnapshot";
 import { resolveMetaLoadingState } from "@/lib/metaLoading";
 import { withRequestTimeout } from "@/lib/resilience";
+
+// A slow PostgREST read must not leave the Dashboard's KPI cards in a
+// perpetual loading state. This is a visual deadline only: React Query keeps
+// the provider request alive and a persisted snapshot/Realtime update can
+// still replace the unavailable state when it arrives.
+const META_VISUAL_DEADLINE_MS = 4_500;
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -127,6 +133,22 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     hasUsableSnapshot: rows.length > 0,
   });
   const isLoading = loadingState.isLoading;
+  const visualScopeKey = JSON.stringify({
+    accounts: effectiveAccountIds.slice().sort(),
+    campaigns: (scope.campaignIds || []).slice().sort(),
+    startDate: scope.startDate,
+    endDate: scope.endDate,
+    attributionWindow,
+    timezone: scope.timezone || null,
+  });
+  const [visualTimedOut, setVisualTimedOut] = useState(false);
+  useEffect(() => {
+    setVisualTimedOut(false);
+    if (!isLoading || rows.length > 0) return;
+    const timer = window.setTimeout(() => setVisualTimedOut(true), META_VISUAL_DEADLINE_MS);
+    return () => window.clearTimeout(timer);
+  }, [isLoading, rows.length, visualScopeKey]);
+  const uiIsLoading = isLoading && !visualTimedOut;
   const coverageComplete = accounts.isSuccess
     && scopedAccounts.length > 0
     && scopedAccounts.length === effectiveAccountIds.length
@@ -166,8 +188,8 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
       actionsErrorReason: actions.error instanceof Error ? actions.error.message : actions.error ? String(actions.error) : actionCoverageReason,
       breakdowns: breakdowns.data,
     }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null, scopeConfirmed: effectiveInsightScopeConfirmed, coverageReason });
-    return isLoading ? { ...base, status: "syncing" as const } : base;
-  }, [actionCoverageReason, actions.error, attributionWindow, breakdowns.data, canonicalLeadScopeAvailable, coverageComplete, coverageReason, effectiveActions, effectiveInsightScopeConfirmed, errors, isLoading, persistedCanonicalScope, rows, scope.timezone, scopedAccounts, syncedAt]);
+    return uiIsLoading ? { ...base, status: "syncing" as const } : base;
+  }, [actionCoverageReason, actions.error, attributionWindow, breakdowns.data, canonicalLeadScopeAvailable, coverageComplete, coverageReason, effectiveActions, effectiveInsightScopeConfirmed, errors, persistedCanonicalScope, rows, scope.timezone, scopedAccounts, syncedAt, uiIsLoading]);
   const snapshotScopeKey = useMemo(() => JSON.stringify({
     accounts: effectiveAccountIds.slice().sort(),
     campaigns: (scope.campaignIds || []).slice().sort(),
@@ -181,7 +203,7 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   const snapshotResolution = resolveMetaSnapshotDuringRefresh({
     current: computedData,
     previous: previousSnapshot?.scopeKey === snapshotScopeKey ? previousSnapshot.data : undefined,
-    isRefreshing: isLoading,
+    isRefreshing: uiIsLoading,
     sameScope: previousSnapshot?.scopeKey === snapshotScopeKey,
     previousUsable: Boolean(previousSnapshot?.data.available || previousSnapshot?.data.metricAvailability.spend?.available),
   });
@@ -197,5 +219,5 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   }, [computedData, snapshotScopeKey]);
   const metrics = useMemo(() => metaMetricContract(data), [data]);
   const snapshotPreserved = snapshotResolution.preserved;
-  return { data, metrics, isLoading: isLoading && !snapshotPreserved, insightsLoading: (insights.isPending || accounts.isPending) && !snapshotPreserved, actionsLoading: (actions.isPending || syncCoverage.isPending) && !snapshotPreserved, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
+  return { data, metrics, isLoading: uiIsLoading && !snapshotPreserved, insightsLoading: (insights.isPending || accounts.isPending) && !snapshotPreserved && !visualTimedOut, actionsLoading: (actions.isPending || syncCoverage.isPending) && !snapshotPreserved, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
 }

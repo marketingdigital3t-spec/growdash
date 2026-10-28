@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parsePlausibleDate } from "@/lib/safeDate";
 
 type Status = "connected" | "disconnected" | "unknown" | string | null | undefined;
 
@@ -19,12 +20,8 @@ interface Props {
 }
 
 function fmtDate(iso?: string | null) {
-  if (!iso) return null;
-  try {
-    return format(new Date(iso), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  } catch {
-    return null;
-  }
+  const date = parsePlausibleDate(iso);
+  return date ? format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : null;
 }
 
 function instructions(code: number | null | undefined, message?: string | null): string {
@@ -55,8 +52,9 @@ export function AccountConnectionStatus({
   const needsReconnect = !isConnected;
   const lastSuccess = fmtDate(lastSuccessAt);
   const lastAttempt = fmtDate(lastAttemptAt);
-  const tokenExpiry = fmtDate(tokenExpiresAt);
-  const tokenExpiring = tokenExpiresAt ? new Date(tokenExpiresAt).getTime() < Date.now() + 30 * 86_400_000 : false;
+  const tokenExpiryDate = parsePlausibleDate(tokenExpiresAt);
+  const tokenExpiry = tokenExpiryDate ? format(tokenExpiryDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : null;
+  const tokenExpiring = tokenExpiryDate ? tokenExpiryDate.getTime() < Date.now() + 30 * 86_400_000 : false;
 
   const badge = (
     <span
