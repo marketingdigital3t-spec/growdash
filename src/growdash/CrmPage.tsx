@@ -306,12 +306,15 @@ export default function CrmPage() {
     endDate: preset === "max" ? null : businessDateKey(endDate),
   });
   const [crmVisualTimedOut, setCrmVisualTimedOut] = useState(false);
+  const crmLoadingRef = useRef(isLoadingSelectedScope);
+  crmLoadingRef.current = isLoadingSelectedScope;
   useEffect(() => {
     setCrmVisualTimedOut(false);
-    if (!isLoadingSelectedScope || crmUpdatedAt > 0) return;
-    const timer = window.setTimeout(() => setCrmVisualTimedOut(true), SYNC_UI_DEADLINE_MS);
+    const timer = window.setTimeout(() => {
+      if (crmLoadingRef.current) setCrmVisualTimedOut(true);
+    }, SYNC_UI_DEADLINE_MS);
     return () => window.clearTimeout(timer);
-  }, [crmScopeKey, crmUpdatedAt, isLoadingSelectedScope]);
+  }, [crmScopeKey]);
   const isLoadingSelectedScopeForUi = isLoadingSelectedScope && !crmVisualTimedOut;
   const crmError = adAccountsError || funnelsError || dealsError || salesError;
   const crmErrorMessage = adAccountsQueryError instanceof Error
