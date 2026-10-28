@@ -5,6 +5,7 @@ import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } fro
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 import { civilDateRangeToUtc, CRM_LEAD_STATUSES, decodeMcpCursor, encodeMcpCursor, isValidCivilDate, isValidDateRange, isValidUuid, parseMcpLimit } from "../_shared/mcpContract.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
+import { buildMetaTrafficScope } from "../_shared/metaTrafficScope.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
 const corsHeaders = {
@@ -197,7 +198,7 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     source: "Meta Marketing API snapshots",
     retrieved_at: new Date().toISOString(),
     retrieval: { mode: "structured_facts", sync_state_table: "meta_sync_scope_state", historical_rows_are_not_fallback: true },
-    scope: { account_ids: accountIds, campaign_ids: campaignIds, start_date: startDate, end_date: endDate, attribution_window_by_account: Object.fromEntries((accounts || []).map((account: any) => [account.id, account.attribution_window || "account_default"])), timezone_by_account: Object.fromEntries((accounts || []).map((account: any) => [account.id, account.timezone_name || "America/Sao_Paulo"])) },
+    scope: buildMetaTrafficScope(authorizedAccounts, accountIds, campaignIds, startDate, endDate),
     status: !allInsightsConfirmed ? "unavailable" : allActionsConfirmed ? "available" : "partial",
     coverage_by_account: accountCoverage,
     metrics: {
