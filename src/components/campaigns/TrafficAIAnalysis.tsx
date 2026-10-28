@@ -3,7 +3,7 @@ import { Bot, CalendarRange, Loader2, RefreshCw, ShieldCheck, Sparkles, Triangle
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,7 +41,7 @@ export function TrafficAIAnalysis({ accountId, accountName, startDate, endDate, 
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("Sua sessão expirou. Entre novamente para usar a IA.");
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-ai`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/ask-ai`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({

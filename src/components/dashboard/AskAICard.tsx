@@ -6,7 +6,7 @@ import { Sparkles, Send, Loader2, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { businessDateKey } from "@/lib/businessDate";
@@ -42,7 +42,7 @@ export function AskAICard(scope?: { accountIds: string[]; startDate: string; end
     try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess?.session?.access_token;
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-ai`;
+      const url = `${SUPABASE_URL}/functions/v1/ask-ai`;
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
