@@ -65,6 +65,7 @@ import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas
 import { isCompatibleFlow } from "@/components/GrowdashFlow/excalidrawAdapter";
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate, normalizeSqlTrafficFunnelElements } from "@/components/GrowdashFlow/utils/templates";
+import { RD_AUTO_SYNC_INTERVAL_MS } from "@/lib/rdAutoSyncPolicy";
 
 const ExcalidrawFlowEditor = lazy(() => import("@/components/GrowdashFlow/ExcalidrawFlowEditor").then(({ ExcalidrawFlowEditor: Editor }) => ({ default: Editor })));
 const WorkflowEditor = lazy(() => import("@/growdash/automations/WorkflowEditor").then(({ WorkflowEditor: Editor }) => ({ default: Editor })));
@@ -149,13 +150,13 @@ function FlowDataScopeSync() {
     if (isAlreadyRunning) return;
     // A multi-funnel scope is only fresh as of its oldest successful funnel.
     const lastSuccess = matchingRows.map((row) => row.last_success_at).filter(Boolean).sort()[0];
-    const hasFreshCoverage = rdConfirmed && lastSuccess && Date.now() - new Date(lastSuccess).getTime() < 5 * 60_000;
+    const hasFreshCoverage = rdConfirmed && lastSuccess && Date.now() - new Date(lastSuccess).getTime() < RD_AUTO_SYNC_INTERVAL_MS;
     if (hasFreshCoverage) return;
 
     let active = true;
     const syncRD = async () => {
       if (!active || rdSyncInFlightRef.current || !navigator.onLine || document.visibilityState === "hidden") return;
-      if (Date.now() - rdRecentSyncAtRef.current < 5 * 60_000) return;
+      if (Date.now() - rdRecentSyncAtRef.current < RD_AUTO_SYNC_INTERVAL_MS) return;
       rdRecentSyncAtRef.current = Date.now();
       rdSyncInFlightRef.current = true;
       setRdSyncRequestInFlight(true);
@@ -194,7 +195,7 @@ function FlowDataScopeSync() {
       }
     };
     const timer = window.setTimeout(() => void syncRD(), 0);
-    const interval = window.setInterval(() => void syncRD(), 5 * 60_000);
+    const interval = window.setInterval(() => void syncRD(), RD_AUTO_SYNC_INTERVAL_MS);
     const onFocus = () => void syncRD();
     window.addEventListener("focus", onFocus);
     window.addEventListener("online", onFocus);
