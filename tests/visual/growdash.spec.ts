@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+// This test intentionally exercises the public login screen. Keep it isolated
+// from the project-level authenticated smoke state when one is configured.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 async function authenticate(page: import("@playwright/test").Page) {
   const email = process.env.E2E_EMAIL;
   const password = process.env.E2E_PASSWORD;
