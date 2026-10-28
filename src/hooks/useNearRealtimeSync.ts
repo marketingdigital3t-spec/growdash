@@ -7,6 +7,7 @@ import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
 import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
+import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -108,9 +109,11 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     );
 
     const storageKey = `${STORAGE_PREFIX}:${scope}`;
-    const previousAttempt = Number(window.localStorage.getItem(storageKey) || 0);
+    let storage: Storage | null = null;
+    try { storage = window.localStorage; } catch { /* private mode can block storage access */ }
+    const previousAttempt = readBackgroundSyncAttempt(storage, storageKey);
     if (!force && Date.now() - previousAttempt < LOCAL_DEDUP_WINDOW_MS) return;
-    window.localStorage.setItem(storageKey, String(Date.now()));
+    recordBackgroundSyncAttempt(storage, storageKey);
 
     const task = withInFlightScope(inFlight.current, scope, async () => {
       try {
