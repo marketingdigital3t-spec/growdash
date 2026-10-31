@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
+import { isWahaSelfMessage } from "../_shared/whatsappMessage.ts";
 import { scheduleWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -35,6 +36,10 @@ Deno.serve(async (req) => {
     return json({ received: true, ignored: "non_message" });
   }
   const message = (payload.payload || payload) as Record<string, unknown>;
+  if (isWahaSelfMessage(message, payload.me?.id)) {
+    await admin.from("whatsapp_webhook_events").update({ status: "ignored", processed_at: new Date().toISOString() }).eq("provider", "waha").eq("external_event_id", eventId);
+    return json({ received: true, ignored: "from_me" });
+  }
   const from = String((message.from || (message._data as any)?.from || "")).replace(/@c\.us$/, "");
   const id = String(message.id || eventId);
   const body = textFromMessage(message);
