@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BadgeDollarSign,
+  BrainCircuit,
   Building2,
   Cable,
   CalendarDays,
@@ -190,6 +191,14 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Conecte números oficiais e centralize conversas, resumos e anotações.",
         metrics: [],
         highlights: ["Vários números", "Inbox oficial", "Resumo e anotações"],
+      },
+      {
+        label: "Treinamento dos agentes",
+        path: "/treinamento-agentes",
+        icon: BrainCircuit,
+        description: "Cadastre o conhecimento separado de cada expert para a IA atender com contexto.",
+        metrics: [],
+        highlights: ["Conhecimento por expert", "Instruções de qualificação", "Handoff para vendedor"],
       },
       {
         label: "Leads incompletos",

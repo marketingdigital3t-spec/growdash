@@ -36,7 +36,11 @@ Deno.serve(async (req) => {
   const history = (messages || []).reverse().map((item) => ({ role: item.direction === "outbound" ? "assistant" : "user", content: item.body || "[mídia]" }));
   const key = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
   if (!key) return json({ error: "AI_API_KEY não configurada" }, 503);
-  const prompt = `${agent.system_prompt}\n\nContexto de operação: responda em português-Brasil, uma pergunta por vez, não invente dados. Se precisar de humano, escreva [HANDOFF].\nConhecimento: ${JSON.stringify(agent.knowledge || {})}`;
+  const storedKnowledge = agent.knowledge && typeof agent.knowledge === "object" ? agent.knowledge as Record<string, unknown> : {};
+  const knowledge = storedKnowledge.version === 1 && typeof storedKnowledge.content === "string"
+    ? storedKnowledge.content
+    : JSON.stringify(storedKnowledge);
+  const prompt = `${agent.system_prompt}\n\nContexto de operação: responda em português-Brasil, uma pergunta por vez, não invente dados. Se precisar de humano, escreva [HANDOFF].\nConhecimento do expert:\n${knowledge}`;
   const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: agent.model || "gpt-4o-mini", temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) return json({ error: payload?.error?.message || "Falha no agente" }, 502);

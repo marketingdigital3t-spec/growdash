@@ -62,6 +62,7 @@ const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBran
 const PublicExpertQuestionnaire = lazyWithRetry(() => import("@/pages/PublicExpertQuestionnaire"), "public-expert-questionnaire");
 const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
 const WhatsApp = lazyWithRetry(() => import("@/pages/WhatsApp"), "whatsapp");
+const AgentTrainingPage = lazyWithRetry(() => import("@/growdash/AgentTrainingPage"), "agent-training");
 const QuadroPage = lazyWithRetry(() => import("@/growdash/QuadroPage"), "quadro");
 const LegalPage = lazyWithRetry(() => import("@/pages/LegalPage"), "legal");
 
@@ -349,6 +350,7 @@ export default function App() {
                     <Route path="agentes" element={<RequirePage page="agents"><AgentsOfficePage /></RequirePage>} />
                     <Route path="gestor-trafego" element={<RequirePage page="agents"><TrafficAgentPage /></RequirePage>} />
                     <Route path="whatsapp" element={<RequirePage page="integrations">{analytics(<WhatsApp />)}</RequirePage>} />
+                    <Route path="treinamento-agentes" element={<RequirePage page="integrations">{analytics(<AgentTrainingPage />)}</RequirePage>} />
                     <Route path="quadro" element={<ResilientRoute><QuadroPage /></ResilientRoute>} />
                     <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="life-sim" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
