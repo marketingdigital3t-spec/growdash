@@ -10,7 +10,7 @@ const sdrBundle = readFileSync(
 describe("SDR connection-scoped inbox contract", () => {
   it("keeps the connection selector and defaults it to a real WhatsApp connection", () => {
     expect(sdrBundle).toContain("whatsApps:connections=[]");
-    expect(sdrBundle).toContain("connections.find(A=>A.isDefault)||connections[0]");
+    expect(sdrBundle).toContain("connections.find(A=>String(A.status).toUpperCase()===\"CONNECTED\"&&A.isDefault)||connections.find(A=>String(A.status).toUpperCase()===\"CONNECTED\")");
     expect(sdrBundle).toContain("Selecione uma conexão");
   });
 
@@ -20,6 +20,7 @@ describe("SDR connection-scoped inbox contract", () => {
   });
 
   it("filters realtime tickets by the selected WhatsApp id", () => {
-    expect(sdrBundle).toContain("!q||String(b.whatsappId)===String(q)");
+    expect(sdrBundle).toContain("q&&String(b.whatsappId)===String(q)");
+    expect(sdrBundle).toContain("filteredTickets=q?p.filter(O=>String(O.whatsappId)===String(q)):[]");
   });
 });
