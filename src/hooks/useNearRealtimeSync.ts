@@ -6,7 +6,7 @@ import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
-import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
+import { backgroundSyncStatus, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
 
 // Realtime database writes keep visible data current. The external Meta/RD
@@ -82,6 +82,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const startDateKey = startDate ? businessDateKey(startDate, timezone || undefined) : "today";
   const endDateKey = endDate ? businessDateKey(endDate, timezone || undefined) : "today";
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
+  const historicalScope = shouldUseSelectedPeriodSync(startDateKey, endDateKey, timezone);
   const activeScope = useRef(scope);
   activeScope.current = scope;
   const refreshRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
@@ -136,8 +137,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           fast: true,
           // A manual action must reconcile the exact visible calendar. The
           // five-minute worker keeps using the cheaper recent watermark.
-          syncMode: force ? "selected_period" as const : "recent_window" as const,
-          recentHours: force ? undefined : RECENT_SYNC_WINDOW_HOURS,
+          syncMode: force || historicalScope ? "selected_period" as const : "recent_window" as const,
+          recentHours: force || historicalScope ? undefined : RECENT_SYNC_WINDOW_HOURS,
           realtime: true,
           force,
         };
@@ -293,7 +294,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       }
     });
     return task;
-  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, queryClient, scope, startDate, startDateKey, timezone]);
+  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, historicalScope, invalidateLiveQueries, queryClient, scope, startDate, startDateKey, timezone]);
 
   // Keep the timer attached to the current callback without restarting it on
   // every render when a parent supplies a new array reference.
@@ -308,13 +309,13 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     // snapshot visível enquanto esta chamada acontece em segundo plano; novas
     // reconciliações automáticas acontecem somente no ciclo de quinze minutos.
     // O lock persistido no backend continua impedindo duplicidade entre abas.
-    const initial = window.setTimeout(() => void refreshRef.current?.(forceContextSync), forceContextSync ? 0 : INITIAL_SYNC_DELAY_MS);
+    const initial = window.setTimeout(() => void refreshRef.current?.(forceContextSync || historicalScope), forceContextSync || historicalScope ? 0 : INITIAL_SYNC_DELAY_MS);
     const interval = window.setInterval(() => void refreshRef.current?.(false), BACKGROUND_SYNC_INTERVAL_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(interval);
     };
-  }, [enabled, invalidateLiveQueries, scope]);
+  }, [enabled, historicalScope, invalidateLiveQueries, scope]);
 
   useEffect(() => {
     if (!enabled) return;

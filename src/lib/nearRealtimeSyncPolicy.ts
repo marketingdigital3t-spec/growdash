@@ -1,3 +1,5 @@
+import { businessDateKey } from "@/lib/businessDate";
+
 export type SyncContext = {
   scope: string;
 };
@@ -27,4 +29,16 @@ export function backgroundSyncStatus() {
 export function shouldForceSyncForContextChange(previous: SyncContext | null, next: SyncContext): boolean {
   if (!previous) return false;
   return previous.scope !== next.scope;
+}
+
+/** A recent provider window cannot confirm a selected historical interval. */
+export function shouldUseSelectedPeriodSync(
+  startDate: string | undefined,
+  endDate: string | undefined,
+  timezone?: string,
+  now = new Date(),
+) {
+  if (!startDate || !endDate || startDate === "today" || endDate === "today") return false;
+  const today = businessDateKey(now, timezone);
+  return startDate !== today || endDate !== today;
 }

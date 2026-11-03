@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BACKGROUND_SYNC_INTERVAL_MS } from "@/hooks/useNearRealtimeSync";
-import { backgroundSyncStatus, shouldForceSyncForContextChange, SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
+import { backgroundSyncStatus, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS } from "@/lib/nearRealtimeSyncPolicy";
 
 describe("near realtime sync policy", () => {
   const base = { scope: "account-a:2026-10-01:2026-10-27" };
@@ -20,6 +20,12 @@ describe("near realtime sync policy", () => {
 
   it("does not force a duplicate sync when context is unchanged", () => {
     expect(shouldForceSyncForContextChange(base, base)).toBe(false);
+  });
+
+  it("uses the selected period when the initial scope is historical", () => {
+    const now = new Date("2026-11-03T12:00:00-03:00");
+    expect(shouldUseSelectedPeriodSync("2026-10-30", "2026-10-30", "America/Sao_Paulo", now)).toBe(true);
+    expect(shouldUseSelectedPeriodSync("2026-11-03", "2026-11-03", "America/Sao_Paulo", now)).toBe(false);
   });
 
   it("releases the shell after five seconds while preserving the snapshot", () => {
