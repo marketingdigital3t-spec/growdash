@@ -193,10 +193,10 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Vários números", "Inbox oficial", "Resumo e anotações"],
       },
       {
-        label: "Treinamento dos agentes",
+        label: "Inteligência dos agentes",
         path: "/treinamento-agentes",
         icon: BrainCircuit,
-        description: "Cadastre o conhecimento separado de cada expert para a IA atender com contexto.",
+        description: "Gerencie conhecimento, PDFs, follow-ups e o fluxo de atendimento de cada expert.",
         metrics: [],
         highlights: ["Conhecimento por expert", "Instruções de qualificação", "Handoff para vendedor"],
       },

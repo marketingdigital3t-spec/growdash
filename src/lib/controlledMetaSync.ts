@@ -21,6 +21,19 @@ export function controlledSyncErrorMessage(
   return `${code}: ${stringifyControlledError(source) || `${functionName} failed`}`;
 }
 
+export function controlledFunctionError(
+  functionName: string,
+  status: number,
+  payload: Record<string, unknown> | null,
+) {
+  const source = payload?.error ?? `${functionName} failed with HTTP ${status}`;
+  const errorCode = String(payload?.error_code || classifySyncErrorCode(`${status} ${stringifyControlledError(source)}`) as SyncErrorCode);
+  return {
+    error: `${errorCode}: ${stringifyControlledError(source) || `${functionName} failed with HTTP ${status}`}`,
+    data: { ...(payload || {}), status: payload?.status || "failed", error_code: errorCode },
+  };
+}
+
 /** A partial Insights run may still have persisted useful daily facts. Always
  * attempt the independent action/leads block unless Insights itself failed. */
 export function canRunSelectedMetaLeadSync(insights: MetaSyncResult) {

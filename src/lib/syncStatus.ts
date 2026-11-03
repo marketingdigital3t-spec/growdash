@@ -3,6 +3,8 @@ export type SyncBlock = {
   success?: boolean;
   error?: string;
   errors?: string[];
+  /** Edge Functions historically returned this as either a count or details. */
+  accounts?: unknown;
 };
 
 export type SyncAccountResult = {
@@ -12,12 +14,13 @@ export type SyncAccountResult = {
 };
 
 /** Preserve provider/account diagnostics when an Edge Function only exposes a generic status. */
-export function collectSyncWarnings(block: SyncBlock & { warnings?: string[]; accounts?: SyncAccountResult[] }) {
+export function collectSyncWarnings(block: SyncBlock & { warnings?: string[] }) {
+  const accountResults = Array.isArray(block.accounts) ? block.accounts as SyncAccountResult[] : [];
   const messages = [
     ...(block.error ? [block.error] : []),
     ...(block.errors || []),
     ...(block.warnings || []),
-    ...(block.accounts || []).flatMap((account) => [
+    ...accountResults.flatMap((account) => [
       ...(account.errors || []).map((message) => account.account ? `${account.account}: ${message}` : message),
       ...(account.error ? [account.account ? `${account.account}: ${account.error}` : account.error] : []),
     ]),

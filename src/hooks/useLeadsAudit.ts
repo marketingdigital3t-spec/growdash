@@ -40,7 +40,9 @@ export function useLeadsAudit({ adAccountId, startDate, endDate }: Params) {
     queryFn: async (): Promise<AuditLead[]> => {
       let q = supabase
         .from("rd_deals")
-        .select("id, rd_deal_id, contact_name, contact_email, lead_state, lead_state_source, lead_created_at, raw")
+        // The normalized phone/state columns cover this report. Selecting
+        // `raw` here would download the complete RD payload for every lead.
+        .select("id, rd_deal_id, contact_name, contact_email, contact_phone, lead_state, lead_state_source, lead_created_at")
         .gte("lead_created_at", startISO)
         .lte("lead_created_at", endISO)
         .order("lead_created_at", { ascending: false });
@@ -55,9 +57,23 @@ export function useLeadsAudit({ adAccountId, startDate, endDate }: Params) {
         if (!data || data.length < PAGE) break;
       }
 
+      const incompleteIds = all
+        .filter((row) => !row.contact_name || !row.contact_phone || !row.lead_state)
+        .map((row) => row.id)
+        .filter(Boolean);
+      const rawById = new Map<string, Record<string, any>>();
+      for (let from = 0; from < incompleteIds.length; from += PAGE) {
+        const { data, error } = await supabase
+          .from("rd_deals")
+          .select("id,raw")
+          .in("id", incompleteIds.slice(from, from + PAGE));
+        if (error) throw error;
+        for (const row of data || []) if (row.raw && typeof row.raw === "object") rawById.set(row.id, row.raw);
+      }
+
       return all.map((r: any) => {
-        const raw = r.raw || {};
-        const wa =
+        const raw = rawById.get(r.id) || {};
+        const wa = r.contact_phone ||
           raw?._contacts?.[0]?.phones?.[0]?.whatsapp_full_internacional ||
           raw?._contacts?.[0]?.phones?.[0]?.phone ||
           raw?.contact?.phones?.[0]?.phone ||

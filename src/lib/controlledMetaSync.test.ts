@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRunSelectedMetaLeadSync, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "./controlledMetaSync";
+import { canRunSelectedMetaLeadSync, controlledFunctionError, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "./controlledMetaSync";
 
 describe("selected Meta sync blocks", () => {
   it("runs leads after a partial Insights response", () => {
@@ -25,5 +25,12 @@ describe("selected Meta sync blocks", () => {
       error_code: "PROVIDER_TIMEOUT",
       errors: ["Meta excedeu 90s; snapshot anterior preservado."],
     })).toBe("PROVIDER_TIMEOUT: [\"Meta excedeu 90s; snapshot anterior preservado.\"]");
+  });
+
+  it("preserves an HTTP provider failure when the Edge Function returns no JSON", () => {
+    expect(controlledFunctionError("rd-sync-deals", 504, null)).toEqual({
+      error: "PROVIDER_TIMEOUT: rd-sync-deals failed with HTTP 504",
+      data: { status: "failed", error_code: "PROVIDER_TIMEOUT" },
+    });
   });
 });

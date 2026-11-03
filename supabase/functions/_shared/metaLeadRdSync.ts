@@ -1,4 +1,5 @@
 import { executeRDWrite } from "./rdWrite.ts";
+import { fetchWithTimeout, remainingSyncTimeoutMs } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 type AdminClient = any;
 
@@ -72,6 +73,49 @@ const TRACKING_FIELDS = [
 function clean(value: unknown): string | null {
   const text = value == null ? "" : String(value).trim();
   return text || null;
+}
+
+/** Hydrate names when a Meta lead payload contains only immutable IDs. */
+async function enrichLeadFromCatalog(admin: AdminClient, input: MetaLead): Promise<MetaLead> {
+  const lead = { ...input };
+  try {
+    if (lead.ad_id && (!clean(lead.ad_name) || !clean(lead.adset_id) || !clean(lead.campaign_id))) {
+      const { data } = await admin.from("ads").select("id,name,adset_id").eq("id", lead.ad_id).maybeSingle();
+      if (data) {
+        lead.ad_name ||= data.name || null;
+        lead.adset_id ||= data.adset_id || null;
+      }
+    }
+    if (lead.adset_id && (!clean(lead.adset_name) || !clean(lead.campaign_id))) {
+      const { data } = await admin.from("adsets").select("id,name,campaign_id").eq("id", lead.adset_id).maybeSingle();
+      if (data) {
+        lead.adset_name ||= data.name || null;
+        lead.campaign_id ||= data.campaign_id || null;
+      }
+    }
+    if (lead.campaign_id && !clean(lead.campaign_name)) {
+      const { data } = await admin.from("campaigns").select("id,name").eq("id", lead.campaign_id).maybeSingle();
+      if (data) lead.campaign_name ||= data.name || null;
+    }
+  } catch {
+    // The immutable IDs and original lead remain usable when the catalog is
+    // temporarily unavailable; attribution will be repaired on the next run.
+  }
+  return lead;
+}
+
+async function persistLeadCatalogNames(admin: AdminClient, lead: MetaLead) {
+  if (!lead.meta_lead_id) return;
+  const patch = {
+    campaign_id: lead.campaign_id,
+    adset_id: lead.adset_id,
+    ad_id: lead.ad_id,
+    campaign_name: lead.campaign_name,
+    adset_name: lead.adset_name,
+    ad_name: lead.ad_name,
+  };
+  if (!Object.values(patch).some((value) => clean(value))) return;
+  await admin.from("meta_leads").update(patch).eq("meta_lead_id", lead.meta_lead_id);
 }
 
 function norm(value: unknown): string {
@@ -225,8 +269,12 @@ function noteBody(lead: MetaLead): string {
   return lines.join("\n");
 }
 
-async function providerDealReadback(token: string, rdDealId: string, expectedFields: any[] | null) {
-  const response = await fetch(`https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(rdDealId)}?token=${encodeURIComponent(token)}`);
+async function providerDealReadback(token: string, rdDealId: string, expectedFields: any[] | null, deadlineAt?: number) {
+  const response = await fetchWithTimeout(
+    `https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(rdDealId)}?token=${encodeURIComponent(token)}`,
+    {},
+    remainingSyncTimeoutMs(deadlineAt ?? Number.POSITIVE_INFINITY),
+  );
   if (!response.ok) return false;
   if (!expectedFields?.length) return true;
   const payload = await response.json().catch(() => ({}));
@@ -257,7 +305,7 @@ function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score:
   return { match: true, score: (emailMatches && phoneMatches ? 30 : emailMatches ? 20 : 10) - distance / 1e12 };
 }
 
-async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal): Promise<TrackingResult> {
+async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal, deadlineAt?: number): Promise<TrackingResult> {
   if (!deal.rd_connection_id) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_missing" };
   const trackingComplete = leadHasCompleteTracking(lead);
 
@@ -310,6 +358,7 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
       method: "POST",
       path: "/activities",
       body: { deal_id: deal.rd_deal_id, type: "note", description: noteBody(lead) },
+      deadlineAt,
     });
     result.note = noteWrite.skipped ? "skipped" : "written";
 
@@ -327,11 +376,12 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
         method: "PUT",
         path: `/deals/${encodeURIComponent(deal.rd_deal_id)}`,
         body: { deal: { deal_custom_fields: patchedFields } },
+        deadlineAt,
       });
       result.custom_fields = fieldWrite.skipped ? "skipped" : "written";
     }
 
-    result.verified = await providerDealReadback(String(connection.api_token), deal.rd_deal_id, patchedFields);
+    result.verified = await providerDealReadback(String(connection.api_token), deal.rd_deal_id, patchedFields, deadlineAt);
     if (!result.verified) {
       result.status = "failed";
       result.error = "RD readback did not confirm the tracking update";
@@ -349,7 +399,12 @@ async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLea
     .eq("meta_lead_id", metaLeadId)
     .maybeSingle();
   if (error) throw error;
-  return data || null;
+  if (!data) return null;
+  const enriched = await enrichLeadFromCatalog(admin, data);
+  if (enriched.campaign_name !== data.campaign_name || enriched.adset_name !== data.adset_name || enriched.ad_name !== data.ad_name || enriched.adset_id !== data.adset_id || enriched.campaign_id !== data.campaign_id) {
+    await persistLeadCatalogNames(admin, enriched);
+  }
+  return enriched;
 }
 
 async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boolean): Promise<RdDeal[]> {
@@ -452,14 +507,14 @@ async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLe
     .map((item: any) => item.lead)[0] || null;
 }
 
-export async function syncMetaLeadToRD(admin: AdminClient, metaLeadId: string) {
+export async function syncMetaLeadToRD(admin: AdminClient, metaLeadId: string, deadlineAt?: number) {
   try {
     const lead = await loadLead(admin, metaLeadId);
     if (!lead) return { status: "skipped", reason: "meta_lead_not_found" };
     const deals = await findDealsForLead(admin, lead);
     if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
     const results = [];
-    for (const deal of deals.slice(0, 3)) results.push(await writeAttribution(admin, lead, deal));
+    for (const deal of deals.slice(0, 3)) results.push(await writeAttribution(admin, lead, deal, deadlineAt));
     return { status: results.some((item) => item.status === "written") ? "written" : results[0]?.status || "skipped", results };
   } catch (error) {
     return { status: "failed", error: error instanceof Error ? error.message : String(error) };
@@ -481,7 +536,7 @@ export async function syncCrmLeadToRD(admin: AdminClient, crmLeadId: string) {
     if (!row) return { status: "skipped", reason: "crm_lead_not_found" };
     if (!row.email && !row.phone) return { status: "skipped", reason: "crm_contact_identifier_missing" };
     if (!row.campaign_id && !row.ad_id && !row.campaign_name && !row.ad_name) return { status: "skipped", reason: "meta_referral_missing" };
-    const lead: MetaLead = {
+    const lead = await enrichLeadFromCatalog(admin, {
       meta_lead_id: row.meta_lead_id || `crm:${row.id}`,
       ad_account_id: row.ad_account_id,
       campaign_id: row.campaign_id || null,
@@ -499,7 +554,7 @@ export async function syncCrmLeadToRD(admin: AdminClient, crmLeadId: string) {
       phone: row.phone || null,
       created_time: row.first_received_at || row.last_received_at || new Date().toISOString(),
       raw: row.payload || null,
-    };
+    });
     const deals = await findDealsForLead(admin, lead);
     if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
     const results = [];
@@ -522,7 +577,7 @@ export async function syncRDDealToMeta(admin: AdminClient, connectionId: string,
     if (!deal) return { status: "skipped", reason: "rd_deal_not_found" };
     const lead = await findLeadForDeal(admin, deal as RdDeal);
     if (!lead) return { status: "skipped", reason: "meta_lead_not_found" };
-    return await writeAttribution(admin, lead, deal as RdDeal);
+    return await writeAttribution(admin, await enrichLeadFromCatalog(admin, lead), deal as RdDeal);
   } catch (error) {
     return { status: "failed", error: error instanceof Error ? error.message : String(error) };
   }

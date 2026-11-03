@@ -46,4 +46,9 @@ describe("sync status", () => {
       accounts: [{ account: "Conta teste", error: "Permissão leads_retrieval ausente" }],
     })).toEqual(["Conta teste: Permissão leads_retrieval ausente"]);
   });
+
+  it("ignores numeric account counts instead of throwing while collecting warnings", () => {
+    expect(collectSyncWarnings({ status: "failed", accounts: 2, error: "Meta indisponível" }))
+      .toEqual(["Meta indisponível"]);
+  });
 });

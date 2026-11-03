@@ -22,6 +22,12 @@ preservada em `whatsapp_conversations.attribution`. Valor ausente permanece `nul
 
 Todo número nasce em `human`. A troca de modo exige ação explícita de owner/admin.
 
+Na tela de WhatsApp, owner/admin também pode usar o controle global **Ativar IA em todos** ou
+**Desativar IA em todos**. A ação atualiza o `mode` de todos os números do workspace para `ai`
+ou `human`, respectivamente. Ao desativar, follow-ups pendentes são cancelados. Números sem
+`agent_id` continuam sem resposta automática, e conversas já transferidas para humano (`handoff_status`
+diferente de `none`) não são reabertas automaticamente.
+
 ## Visibilidade
 
 Owner/admin vê todos os números e conversas do workspace. Outro membro vê somente o número

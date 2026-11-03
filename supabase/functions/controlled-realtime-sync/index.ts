@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { canRunSelectedMetaLeadSync, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
+import { canRunSelectedMetaLeadSync, controlledFunctionError, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
 import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
 import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
 import { aggregateSyncStatus, finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
@@ -511,7 +511,12 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
       if (response.status === 409 && data?.status === "already_running") {
         return { data: { ...data, success: true, status: "running" } };
       }
-      last = { error: data?.error || `${name} failed with HTTP ${response.status}`, data };
+      const normalized = controlledFunctionError(
+        name,
+        response.status,
+        data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : null,
+      );
+      last = normalized;
       // A Postgres statement timeout is produced after the database has
       // already cancelled the transaction. Retrying immediately only makes
       // another worker contend for the same funnel and can leave an orphaned

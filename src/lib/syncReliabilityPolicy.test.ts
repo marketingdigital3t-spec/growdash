@@ -12,6 +12,7 @@ import {
   leadSyncCooldownMs,
   shouldThrottleLeadSync,
   selectRotatingRDSyncTargets,
+  remainingSyncTimeoutMs,
 } from "./syncReliabilityPolicy";
 
 describe("sync reliability policy", () => {
@@ -43,6 +44,11 @@ describe("sync reliability policy", () => {
 
     expect(result).toBeInstanceOf(DOMException);
     expect(result.name).toBe("AbortError");
+  });
+
+  it("caps provider calls by the remaining sync deadline", () => {
+    expect(remainingSyncTimeoutMs(Date.parse("2026-10-26T19:00:08.000Z"), 12_000, Date.parse("2026-10-26T19:00:00.000Z"))).toBe(8_000);
+    expect(remainingSyncTimeoutMs(Date.parse("2026-10-26T18:59:59.000Z"), 12_000, Date.parse("2026-10-26T19:00:00.000Z"))).toBe(1);
   });
 
   it("keeps recent lead sync bounded and leaves subscriptions to the durable path", () => {

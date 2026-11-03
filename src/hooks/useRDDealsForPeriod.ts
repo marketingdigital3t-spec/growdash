@@ -148,8 +148,11 @@ export function resolveRDServerScope(funnelIds: string[] = [], accountIds: strin
   return { kind: "none" as const, ids: [] as string[] };
 }
 
+// Keep the normal CRM payload limited to normalized fields. `raw` contains
+// the complete RD response and can be hundreds of megabytes across a
+// workspace; detail screens that need it must load it explicitly.
 const FIELDS =
-  "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, source, campaign, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_campaign_name, meta_adset_name, meta_ad_name, meta_form_name, meta_platform, meta_placement, meta_is_organic, meta_attribution_status, meta_attribution_method, manual_tracking, manual_tracking_updated_at, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, raw, updated_at";
+  "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, source, campaign, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_campaign_name, meta_adset_name, meta_ad_name, meta_form_name, meta_platform, meta_placement, meta_is_organic, meta_attribution_status, meta_attribution_method, manual_tracking, manual_tracking_updated_at, contact_name, contact_email, contact_phone, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
   const { user } = useAuth();
@@ -347,10 +350,18 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * escopos na mesma tela.
  */
 export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, dateScope = "pipeline", enabled = true }: RDCRMQueryScope) {
+  const { user } = useAuth();
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
   const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean))).sort();
   const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
+  const dateCacheKey = dateScope === "period" && startDate && endDate
+    ? `${businessDateKey(startDate)}:${businessDateKey(endDate)}`
+    : "pipeline";
+  const cacheKey = user?.id
+    ? `growdash:rd-crm-deals:${user.id}:${dateScope}:${dateCacheKey}:${funnelScope}:${selectedAccountIds.join(",") || "all"}`
+    : "";
+  const cachedDeals = readLocalCache<RDDealLite[]>(cacheKey);
   const query = useQuery({
     queryKey: ["rd_crm_deals", funnelScope, selectedAccountIds.join(","), dateScope, dateScope === "period" && startDate ? businessDateKey(startDate) : null, dateScope === "period" && endDate ? businessDateKey(endDate) : null],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
@@ -358,49 +369,56 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
       if (rdScope.error) throw rdScope.error;
       const periodBounds = dateScope === "period" ? rdLeadCreatedAtRange(startDate, endDate) : null;
       const pageSize = 1_000;
-      let all: RDDealLite[] = [];
+      const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
+      const scopeFilters = [
+        usableFunnelIds.length ? `rd_funnel_id.in.(${usableFunnelIds.join(",")})` : "",
+        // Account-only rows are valid only when they have no funnel yet. Do
+        // not reintroduce stale deals from a different local RD pipeline.
+        usableFunnelIds.length && selectedAccountIds.length
+          ? `and(ad_account_id.in.(${selectedAccountIds.join(",")}),rd_funnel_id.is.null)`
+          : selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "",
+      ].filter(Boolean);
+      const applyScope = (query: any) => {
+        if (scopeFilters.length > 1) return query.or(scopeFilters.join(","));
+        if (usableFunnelIds.length) return query.in("rd_funnel_id", usableFunnelIds);
+        if (selectedAccountIds.length) return query.in("ad_account_id", selectedAccountIds);
+        return query;
+      };
+      const rangeBuilders = periodBounds
+        ? [
+          (query: any) => query.gte("lead_created_at", periodBounds.start).lte("lead_created_at", periodBounds.end),
+          (query: any) => query.gte("closed_at", periodBounds.start).lte("closed_at", periodBounds.end),
+          (query: any) => query.is("closed_at", null).gte("stage_updated_at", periodBounds.start).lte("stage_updated_at", periodBounds.end),
+        ]
+        : [(query: any) => query];
+      const all: RDDealLite[] = [];
 
-      // Continue until Supabase returns a short page. A fixed page ceiling
-      // silently hid older negotiations for larger RD pipelines.
-      for (let page = 0; ; page += 1) {
-        let query = supabase
-          .from("rd_deals")
-          .select(FIELDS)
-          .order("stage_updated_at", { ascending: false, nullsFirst: false })
-          .order("lead_created_at", { ascending: false, nullsFirst: false });
-        if (periodBounds) {
-          // Match RD Station's calendar semantics: open deals are included
-          // by creation date, while won deals are included by closing date
-          // (falling back to the stage transition for legacy rows).
-          query = query.or(
-            `and(lead_created_at.gte.${periodBounds.start},lead_created_at.lte.${periodBounds.end}),and(closed_at.gte.${periodBounds.start},closed_at.lte.${periodBounds.end}),and(closed_at.is.null,stage_updated_at.gte.${periodBounds.start},stage_updated_at.lte.${periodBounds.end})`,
-          );
+      // Read each indexed timestamp range separately. A single OR over
+      // lead_created_at/closed_at/stage_updated_at made PostgREST fall back
+      // to a broad scan while RD synchronization was writing the same table,
+      // so entering CRM could time out until a manual sync warmed the cache.
+      for (const buildRange of rangeBuilders) {
+        for (let page = 0; ; page += 1) {
+          let query = supabase
+            .from("rd_deals")
+            .select(FIELDS)
+            .order("stage_updated_at", { ascending: false, nullsFirst: false })
+            .order("lead_created_at", { ascending: false, nullsFirst: false });
+          query = applyScope(buildRange(query));
+          const from = page * pageSize;
+          const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), RD_ANALYTICS_TIMEOUT_MS);
+          if (error) throw error;
+          const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
+            ...deal,
+            rd_campaign_name: deal.last_touch_utm_campaign
+              ?? deal.first_touch_utm_campaign
+              ?? deal.utm_campaign
+              ?? deal.campaign
+              ?? null,
+          }));
+          all.push(...batch);
+          if (batch.length < pageSize) break;
         }
-        const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
-        const scopeFilters = [
-          usableFunnelIds.length ? `rd_funnel_id.in.(${usableFunnelIds.join(",")})` : "",
-          // Account-only rows are valid only when they have no funnel yet. Do
-          // not reintroduce stale deals from a different local RD pipeline.
-          usableFunnelIds.length && selectedAccountIds.length
-            ? `and(ad_account_id.in.(${selectedAccountIds.join(",")}),rd_funnel_id.is.null)`
-            : selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "",
-        ].filter(Boolean);
-        if (scopeFilters.length > 1) query = query.or(scopeFilters.join(","));
-        else if (usableFunnelIds.length) query = query.in("rd_funnel_id", usableFunnelIds);
-        else if (selectedAccountIds.length) query = query.in("ad_account_id", selectedAccountIds);
-        const from = page * pageSize;
-        const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), RD_ANALYTICS_TIMEOUT_MS);
-        if (error) throw error;
-        const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
-          ...deal,
-          rd_campaign_name: deal.last_touch_utm_campaign
-            ?? deal.first_touch_utm_campaign
-            ?? deal.utm_campaign
-            ?? deal.campaign
-            ?? null,
-        }));
-        all = all.concat(batch);
-        if (batch.length < pageSize) break;
       }
 
       const scoped = periodBounds
@@ -412,11 +430,15 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
           dateRule: "created_at_for_open_closed_at_for_won",
         }))
         : all;
-      return dedupeRDDeals(scoped);
+      const result = dedupeRDDeals(scoped);
+      writeLocalCache(cacheKey, result);
+      return result;
     },
+    initialData: cachedDeals,
+    initialDataUpdatedAt: cachedDeals ? 0 : undefined,
     staleTime: 5 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,
-    refetchOnMount: false,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedDeals)),
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
     retry: 0,

@@ -26,7 +26,7 @@ type SyncResponse = {
   success?: boolean;
   status?: "success" | "partial" | "failed" | "blocked" | "stale_snapshot";
   synced?: number;
-  accounts?: number;
+  accounts?: number | Array<{ account?: string; error?: string; errors?: string[] }>;
   errors?: string[];
   needs_reauth?: boolean;
   error?: string;
@@ -37,7 +37,6 @@ type SyncResponse = {
   warnings?: string[];
   block_status?: { insights?: string; leads?: string; hourly?: string };
   coverage?: Record<string, unknown>;
-  accounts?: Array<{ account?: string; error?: string; errors?: string[] }>;
 };
 
 async function invokeSyncFunction(name: string, body: Record<string, unknown>, options: { allowPartial?: boolean } = {}): Promise<SyncResponse> {

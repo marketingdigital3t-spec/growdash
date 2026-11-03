@@ -1,4 +1,5 @@
 import { resolveRDConnection, type RDConnection } from "./rdConnection.ts";
+import { fetchWithTimeout, remainingSyncTimeoutMs } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 type AdminClient = {
   from: (table: string) => any;
@@ -19,6 +20,8 @@ export type RDWriteInput = {
   method: "POST" | "PUT" | "PATCH";
   path: string;
   body?: Record<string, unknown>;
+  deadlineAt?: number;
+  timeoutMs?: number;
 };
 
 export type RDWriteResult = {
@@ -143,16 +146,21 @@ export async function executeRDWrite(input: RDWriteInput): Promise<RDWriteResult
   let lastError = "";
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      response = await fetch(providerUrl(input.path, connection.api_token!), {
+      response = await fetchWithTimeout(providerUrl(input.path, connection.api_token!), {
         method: input.method,
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: input.method === "POST" || input.method === "PUT" || input.method === "PATCH"
           ? JSON.stringify(input.body ?? {})
           : undefined,
-      });
+      }, remainingSyncTimeoutMs(input.deadlineAt ?? Number.POSITIVE_INFINITY, input.timeoutMs ?? 12_000));
       responseBody = await response.json().catch(() => null);
       if (response.status !== 429) break;
-      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      if (Number.isFinite(input.deadlineAt) && input.deadlineAt! <= Date.now()) break;
+      const retryDelayMs = Math.min(
+        500 * (attempt + 1),
+        remainingSyncTimeoutMs(input.deadlineAt ?? Number.POSITIVE_INFINITY, 500 * (attempt + 1)),
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Falha de rede ao chamar o RD Station.";
       break;

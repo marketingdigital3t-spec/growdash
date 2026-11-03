@@ -280,6 +280,7 @@ function leadAttributionFingerprint(row: Partial<LeadRow>): string {
 }
 
 async function hydrateMissingAttribution(
+  admin: any,
   rows: LeadRow[],
   token: string,
   formNames: Map<string, string>,
@@ -328,6 +329,36 @@ async function hydrateMissingAttribution(
       await Promise.all(ids.slice(i, i + 4).map(task));
     }
   };
+  // Recent lead syncs may intentionally skip the remote ad catalog. Reuse the
+  // durable catalog already mirrored by sync-meta-insights so IDs from the
+  // lead payload still resolve to the adset and ad names.
+  const catalogAdIds = [...new Set(rows.map((row) => row.ad_id).filter(Boolean).map(String))];
+  const catalogAdsetIds = [...new Set(rows.map((row) => row.adset_id).filter(Boolean).map(String))];
+  const catalogCampaignIds = [...new Set(rows.map((row) => row.campaign_id).filter(Boolean).map(String))];
+  for (let i = 0; i < catalogAdIds.length; i += 500) {
+    try {
+      const { data } = await admin.from("ads").select("id,name,adset_id").in("id", catalogAdIds.slice(i, i + 500));
+      for (const ad of data || []) {
+        if (ad?.id && ad?.name) adNames.set(String(ad.id), String(ad.name));
+        if (ad?.adset_id) catalogAdsetIds.push(String(ad.adset_id));
+      }
+    } catch { /* best effort; Graph hydration below remains available */ }
+  }
+  for (let i = 0; i < catalogAdsetIds.length; i += 500) {
+    try {
+      const { data } = await admin.from("adsets").select("id,name,campaign_id").in("id", catalogAdsetIds.slice(i, i + 500));
+      for (const adset of data || []) {
+        if (adset?.id && adset?.name) adsetNames.set(String(adset.id), String(adset.name));
+        if (adset?.campaign_id) catalogCampaignIds.push(String(adset.campaign_id));
+      }
+    } catch { /* best effort */ }
+  }
+  for (let i = 0; i < catalogCampaignIds.length; i += 500) {
+    try {
+      const { data } = await admin.from("campaigns").select("id,name").in("id", catalogCampaignIds.slice(i, i + 500));
+      for (const campaign of data || []) if (campaign?.id && campaign?.name) campaignNames.set(String(campaign.id), String(campaign.name));
+    } catch { /* best effort */ }
+  }
   for (const row of rows) {
     const raw = row.raw && typeof row.raw === "object" ? row.raw as any : {};
     row.campaign_name ||= usableAttributionText(raw.campaign_name || raw.meta_campaign_name);
@@ -960,7 +991,7 @@ Deno.serve(async (req) => {
             placement: row.placement,
             attribution_status: row.attribution_status,
           })]));
-          await hydrateMissingAttribution(existingRows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
+          await hydrateMissingAttribution(admin, existingRows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
           const changedRows = existingRows.filter((row: any) => before.get(String(row.meta_lead_id)) !== JSON.stringify({
             campaign_name: row.campaign_name,
             adset_name: row.adset_name,
@@ -987,7 +1018,8 @@ Deno.serve(async (req) => {
             if (hasExceededSyncDeadline(deadlineAt)) {
               throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
             }
-            await syncMetaLeadToRD(admin, String(row.meta_lead_id));
+            const trackingResult = await syncMetaLeadToRD(admin, String(row.meta_lead_id), deadlineAt);
+            if (trackingResult.status === "failed" && trackingResult.error) formErrors.push(`lead ${row.meta_lead_id}: ${trackingResult.error}`);
           }
         }
 
@@ -1101,7 +1133,7 @@ Deno.serve(async (req) => {
           // versions return only immutable IDs on /<form>/leads. Resolve the
           // missing names from the canonical Graph objects before persistence;
           // IDs remain the only matching key and failures stay partial.
-          await hydrateMissingAttribution(rows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
+          await hydrateMissingAttribution(admin, rows, token, formNames, adNames, adsetNames, campaignNames, executionPolicy.deliveryFields);
 
           // Enrich rows still missing state via RD deals (match by email only — rd_deals has no phone column)
           const missing = rows.filter((x) => !x.lead_state && x.email);
@@ -1153,7 +1185,8 @@ Deno.serve(async (req) => {
               // fingerprint is unchanged; webhooks and explicit reconciliation
               // still handle newly arrived or repaired attribution.
               if (existingTrackingById.get(String(row.meta_lead_id)) === leadAttributionFingerprint(row)) continue;
-              await syncMetaLeadToRD(admin, String(row.meta_lead_id));
+              const trackingResult = await syncMetaLeadToRD(admin, String(row.meta_lead_id), deadlineAt);
+              if (trackingResult.status === "failed" && trackingResult.error) formErrors.push(`lead ${row.meta_lead_id}: ${trackingResult.error}`);
             }
           }
         }

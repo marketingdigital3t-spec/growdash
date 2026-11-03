@@ -96,6 +96,11 @@ export function hasExceededSyncDeadline(deadlineAt: number, now = Date.now()) {
   return now >= deadlineAt;
 }
 
+export function remainingSyncTimeoutMs(deadlineAt: number, requestTimeoutMs = 12_000, now = Date.now()) {
+  if (!Number.isFinite(deadlineAt)) return requestTimeoutMs;
+  return Math.max(1, Math.min(requestTimeoutMs, deadlineAt - now));
+}
+
 /**
  * Automatic lead polling is deliberately less frequent than UI refreshes.
  * Webhooks remain available for immediate delivery; this gate only prevents

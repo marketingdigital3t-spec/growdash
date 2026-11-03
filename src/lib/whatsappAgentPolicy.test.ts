@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import { buildRannielyMediaHandoffSummary, getRannielyGreeting, isWhatsAppImage, RANNIELY_POLICY, splitWhatsAppReply } from "../../supabase/functions/_shared/whatsappAgentPolicy";
+
+describe("WhatsApp agent media policy", () => {
+  it("detects image messages from provider type or MIME metadata", () => {
+    expect(isWhatsAppImage("image", {})).toBe(true);
+    expect(isWhatsAppImage("text", { mimetype: "image/jpeg" })).toBe(true);
+    expect(isWhatsAppImage("text", { _data: { mimeType: "image/png" } })).toBe(true);
+    expect(isWhatsAppImage("text", { mimetype: "application/pdf" })).toBe(false);
+  });
+
+  it("splits only explicit long replies into at most two WhatsApp messages", () => {
+    expect(splitWhatsAppReply("Uma mensagem curta")).toEqual(["Uma mensagem curta"]);
+    expect(splitWhatsAppReply("Primeira parte [BREAK] Segunda parte [BREAK] Excesso")).toEqual(["Primeira parte", "Segunda parte Excesso"]);
+  });
+
+  it("uses the Sao Paulo greeting for the current local time", () => {
+    expect(getRannielyGreeting(new Date("2026-11-03T11:00:00Z"))).toBe("Bom dia");
+    expect(getRannielyGreeting(new Date("2026-11-03T15:00:00Z"))).toBe("Boa tarde");
+    expect(getRannielyGreeting(new Date("2026-11-03T21:00:00Z"))).toBe("Boa noite");
+  });
+
+  it("keeps the Ranniely flow focused on consent, authorized negotiation and human evaluation", () => {
+    expect(RANNIELY_POLICY).toContain("FILTRO 1 — OBRIGATÓRIO ANTES DE MENCIONAR OU PEDIR FOTO");
+    expect(RANNIELY_POLICY).toContain("quando você gostaria de realizar a Harmonização de Glúteos?");
+    expect(RANNIELY_POLICY).toContain("Alphaville–SP ou em Araguaína–TO");
+    expect(RANNIELY_POLICY).toContain("qual seria seu próximo passo?");
+    expect(RANNIELY_POLICY).toContain("Não apresente uma lista nem diga que está aplicando um formulário");
+    expect(RANNIELY_POLICY).toContain("Evite “pergunta 1”");
+    expect(RANNIELY_POLICY).toContain("somente depois de respostas compatíveis e interesse claro");
+    expect(RANNIELY_POLICY).toContain("preço, condição, desconto, parcelamento e prazo escritos no conhecimento autorizado");
+    expect(RANNIELY_POLICY).toContain("Não abra a conversa com preço");
+    expect(RANNIELY_POLICY).toContain("no máximo duas tentativas humanas e curtas");
+    expect(RANNIELY_POLICY).toContain("a Dra. não recebe comissão");
+    expect(RANNIELY_POLICY).toContain("Se a cliente recusar de forma clara");
+    expect(RANNIELY_POLICY).toContain("NUNCA: agende ligação");
+    expect(RANNIELY_POLICY).toContain("O atendimento acontece nesta conversa");
+    expect(RANNIELY_POLICY).toContain("responda primeiro ao que a cliente acabou de dizer");
+    expect(RANNIELY_POLICY).toContain("[BREAK]");
+    expect(RANNIELY_POLICY).toContain("avançar nas cinco respostas do filtro");
+    expect(RANNIELY_POLICY).toContain("quantidade, condição e validade");
+    expect(RANNIELY_POLICY).toContain("não faça elogios físicos");
+    expect(RANNIELY_POLICY).toContain("Não prometa prazo de retorno");
+    expect(RANNIELY_POLICY).toContain("Nunca apresente preço, faixa, volume ou condição comercial espontaneamente");
+    expect(RANNIELY_POLICY).toContain("05:00–11:59 “Bom dia”");
+    expect(RANNIELY_POLICY).not.toContain("qual sua disponibilidade de dias e horários para conversarmos");
+    expect(RANNIELY_POLICY).toContain("[HANDOFF]");
+  });
+
+  it("creates an actionable internal handoff summary for a received photo", () => {
+    const summary = buildRannielyMediaHandoffSummary("wamid-123");
+    expect(summary).toContain("ENCAMINHAMENTO PARA DRA. RANNIELY");
+    expect(summary).toContain("mensagem wamid-123");
+    expect(summary).toContain("não confirmação de compra");
+    expect(summary).toContain("Dra. Ranniely avaliar profissionalmente");
+  });
+});
