@@ -36,6 +36,9 @@ describe("WhatsApp agent media policy", () => {
     expect(RANNIELY_POLICY).toContain("NUNCA: agende ligação");
     expect(RANNIELY_POLICY).toContain("O atendimento acontece nesta conversa");
     expect(RANNIELY_POLICY).toContain("responda primeiro ao que a cliente acabou de dizer");
+    expect(RANNIELY_POLICY).toContain("nunca a cliente");
+    expect(RANNIELY_POLICY).toContain("Nunca diga “sou a [nome da cliente]”");
+    expect(RANNIELY_POLICY).toContain("somente para chamá-la, nunca para se identificar");
     expect(RANNIELY_POLICY).toContain("[BREAK]");
     expect(RANNIELY_POLICY).toContain("avançar nas cinco respostas do filtro");
     expect(RANNIELY_POLICY).toContain("quantidade, condição e validade");
