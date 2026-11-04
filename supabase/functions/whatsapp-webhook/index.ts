@@ -6,6 +6,16 @@ import { scheduleWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+function parseSafeDate(timestamp: unknown): string {
+  const num = Number(timestamp);
+  if (Number.isFinite(num) && num > 0) {
+    const ms = num < 1e11 ? num * 1000 : num;
+    return new Date(ms).toISOString();
+  }
+  return new Date().toISOString();
+}
 
 async function validSignature(rawBody: string, header: string | null) {
   const secret = Deno.env.get("WHATSAPP_APP_SECRET") ?? Deno.env.get("META_APP_SECRET") ?? "";
@@ -61,6 +71,26 @@ Deno.serve(async (req) => {
       if (!number) continue;
       const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
       for (const message of value.messages || []) {
+        // Idempotência por wamid: cada entrega da Meta só é processada uma única vez.
+        // A segunda entrega colide na constraint UNIQUE(provider, external_event_id) e encerra com duplicate.
+        const messageId = String(message.id || "").trim();
+        const messageRaw = JSON.stringify(message);
+        const messageHash = await sha256(messageRaw);
+        const externalId = messageId || `meta-${messageHash}`;
+        const { error: eventError } = await admin.from("whatsapp_webhook_events").insert({
+          workspace_id: number.workspace_id,
+          provider: "official_meta",
+          external_event_id: externalId,
+          event_type: String(message.type || "message"),
+          payload_sha256: messageHash,
+          payload: message,
+          status: "received",
+        });
+        if (eventError?.code === "23505") {
+          results.push({ event_id: externalId, status: "duplicate" });
+          continue;
+        }
+
         const contact = (value.contacts || []).find((item: any) => item.wa_id === message.from);
         const text = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || null;
         const referralTracking = extractMetaMessagingAttribution(message, "whatsapp");
@@ -83,10 +113,11 @@ Deno.serve(async (req) => {
           });
           await syncCrmLeadToRD(admin, String(crmLead.id));
         }
-        const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: new Date(Number(message.timestamp || 0) * 1000).toISOString(), updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
+        const messageDate = parseSafeDate(message.timestamp);
+        const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: messageDate, updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
         if (!conversation) continue;
-        await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: new Date(Number(message.timestamp || 0) * 1000).toISOString() }, { onConflict: "wamid" });
-        await scheduleWhatsAppFollowups(admin, { workspaceId: number.workspace_id, whatsappNumberId: number.id, conversationId: conversation.id, agentId: number.agent_id, inboundAt: new Date(Number(message.timestamp || 0) * 1000).toISOString() });
+        await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: messageDate }, { onConflict: "wamid" });
+        await scheduleWhatsAppFollowups(admin, { workspaceId: number.workspace_id, whatsappNumberId: number.id, conversationId: conversation.id, agentId: number.agent_id, inboundAt: messageDate });
         if (number.mode !== "human" && number.agent_id && internalSecret.length >= 24) {
           await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-agent-reply`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-internal-secret": internalSecret }, body: JSON.stringify({ conversation_id: conversation.id, trigger_message_id: message.id }) });
         }

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -11,9 +12,9 @@ Deno.serve(async (req) => {
   const cronHeader = req.headers.get("x-cron-secret") || "";
   if (cronHeader) {
     const { data: config } = await admin.schema("private").from("daily_incremental_sync_config").select("cron_secret").eq("singleton", true).maybeSingle();
-    cronAuthorized = !!config?.cron_secret && cronHeader === config.cron_secret;
+    cronAuthorized = !!config?.cron_secret && secretsMatch(cronHeader, config.cron_secret);
   }
-  if (!(expected.length >= 24 && provided === expected) && !cronAuthorized) return json({ error: "Não autorizado" }, 401);
+  if (!(expected.length >= 24 && secretsMatch(provided, expected)) && !cronAuthorized) return json({ error: "Não autorizado" }, 401);
   const now = new Date().toISOString();
   const { data: due, error: dueError } = await admin.from("whatsapp_followups").select("id,workspace_id,conversation_id,whatsapp_number_id,agent_id,sequence_no").eq("status", "pending").lte("scheduled_at", now).order("scheduled_at").limit(100);
   if (dueError) return json({ error: "Fila de follow-ups indisponível", error_code: "WHATSAPP_FOLLOWUP_QUEUE_UNAVAILABLE" }, 503);

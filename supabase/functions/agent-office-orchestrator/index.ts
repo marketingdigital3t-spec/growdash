@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -16,14 +17,15 @@ async function resolveCaller(req: Request) {
   const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
   const cronHeader = req.headers.get("x-cron-secret");
   const secret = Deno.env.get("AGENT_OFFICE_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-  let validCron = Boolean(secret && cronHeader === secret);
+  let validCron = Boolean(secret && secretsMatch(cronHeader, secret));
   // The scheduled job currently sources its secret from the private sync
   // ledger. Keep that contract valid without exposing the value to clients.
   if (!validCron && cronHeader) {
     const { data: config } = await admin.schema("private").from("daily_incremental_sync_config").select("cron_secret").eq("singleton", true).maybeSingle();
-    validCron = Boolean(config?.cron_secret && cronHeader === config.cron_secret);
+    validCron = Boolean(config?.cron_secret && secretsMatch(cronHeader, config.cron_secret));
   }
-  if (bearer === serviceKey || validCron) return { kind: "system" as const, userId: null };
+  const isService = Boolean(serviceKey && secretsMatch(bearer, serviceKey));
+  if (isService || validCron) return { kind: "system" as const, userId: null };
   if (!bearer) return null;
   const caller = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || serviceKey, { global: { headers: { Authorization: `Bearer ${bearer}` } } });
   const { data: { user } } = await caller.auth.getUser();

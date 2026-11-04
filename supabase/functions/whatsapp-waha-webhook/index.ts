@@ -5,6 +5,14 @@ import { scheduleWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+function secretsMatch(received: string | null | undefined, expected: string | null | undefined) {
+  const a = new TextEncoder().encode(String(received ?? ""));
+  const b = new TextEncoder().encode(String(expected ?? ""));
+  if (!a.length || a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
 
 function textFromMessage(message: Record<string, unknown>) {
   const body = message.body;
@@ -16,7 +24,11 @@ function textFromMessage(message: Record<string, unknown>) {
 
 Deno.serve(async (req) => {
   const expected = Deno.env.get("WAHA_WEBHOOK_SECRET") || "";
-  if (expected && req.headers.get("x-growdash-waha-secret") !== expected) return json({ error: "Não autorizado" }, 401);
+  // Falha fechada: sem segredo configurado não se aceita evento nenhum. Com o
+  // guard antigo ("se houver segredo, confira"), um ambiente mal configurado
+  // aceitava qualquer POST como mensagem recebida.
+  if (!expected) return json({ error: "Webhook não configurado" }, 503);
+  if (!secretsMatch(req.headers.get("x-growdash-waha-secret"), expected)) return json({ error: "Não autorizado" }, 401);
   if (req.method !== "POST") return json({ received: true });
   const raw = await req.text();
   const payload = JSON.parse(raw || "{}");
@@ -25,8 +37,11 @@ Deno.serve(async (req) => {
   if (!sessionName) return json({ received: true, ignored: "session_missing" });
   const { data: number } = await admin.from("whatsapp_numbers").select("id,workspace_id,ad_account_id,provider,mode,agent_id,waha_session_name").eq("waha_session_name", sessionName).maybeSingle();
   if (!number) return json({ received: true, ignored: "session_unknown" });
-  const eventId = String(payload.id || payload.event || payload.timestamp || crypto.randomUUID());
   const payloadHash = await sha256(raw);
+  // ID precisa ser determinístico: randomUUID() nunca colide, então cada
+  // reentrega virava evento novo; usar só payload.event colide entre eventos
+  // distintos e descarta mensagem válida. O hash do corpo resolve os dois casos.
+  const eventId = String(payload.id || payload.payload?.id || payload.payload?.messageId || "").trim() || `waha-${payloadHash}`;
   const { error: eventError } = await admin.from("whatsapp_webhook_events").insert({ workspace_id: number.workspace_id, provider: "waha", external_event_id: eventId, event_type: String(payload.event || "message"), payload_sha256: payloadHash, payload, status: "received" });
   if (eventError?.code === "23505") return json({ received: true, duplicate: true });
   if (eventError) return json({ error: eventError.message }, 500);

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -37,9 +38,9 @@ function nextOccurrence(expression: string, timezone: string, from: Date) {
 async function validCron(req: Request) {
   const supplied = req.headers.get("x-cron-secret") || "";
   const configured = Deno.env.get("WORKFLOW_SCHEDULER_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-  if (configured && supplied === configured) return true;
+  if (configured && secretsMatch(supplied, configured)) return true;
   const { data } = await admin.schema("private").from("daily_incremental_sync_config").select("cron_secret").eq("singleton", true).maybeSingle();
-  return Boolean(data?.cron_secret && supplied === data.cron_secret);
+  return Boolean(data?.cron_secret && secretsMatch(supplied, data.cron_secret));
 }
 
 Deno.serve(async (req) => {

@@ -19,6 +19,13 @@ export function sanitizeQuestion(value: unknown, maxLength = 4000) {
   return cleanText(value, maxLength);
 }
 
+// Entrada de cliente não pode carregar marcadores de controle do fluxo: sem
+// isto, quem escreve no WhatsApp consegue forçar handoff, quebrar o funil ou
+// injetar instrução no prompt do agente.
+export function neutralizeCommandMarkers(value: unknown, maxLength = 4000) {
+  return cleanText(value, maxLength).replace(/\[\s*[A-Z_]{3,}\s*\]/g, "");
+}
+
 export function sanitizeConversationHistory(value: unknown, maxMessages = 6, maxMessageLength = 1200): SafeConversationMessage[] {
   if (!Array.isArray(value)) return [];
   return value

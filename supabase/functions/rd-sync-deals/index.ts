@@ -17,14 +17,15 @@ const corsHeaders = {
 };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function bearerRole(authHeader: string) {
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  try {
-    const payload = token.split(".")[1];
-    return payload ? JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))).role : null;
-  } catch {
-    return null;
-  }
+// Comparação constant-time: segredos não podem ser comparados com ===, que
+// vaza informação pelo tempo de resposta. Mesmo padrão do sales-webhook.
+function secretsMatch(received: string | null | undefined, expected: string | null | undefined) {
+  const a = new TextEncoder().encode(String(received ?? ""));
+  const b = new TextEncoder().encode(String(expected ?? ""));
+  if (!a.length || a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
 }
 
 function normalize(s: string) {
@@ -645,17 +646,21 @@ Deno.serve(async (req) => {
 
     // Internal path (cron/orchestrator): trust supplied user_id only when the
     // caller proves either the service role or the configured cron secret.
+    // O papel NUNCA é inferido do payload de um JWT: o payload não é assinado
+    // neste ponto e qualquer chamador poderia forjar {"role":"service_role"}.
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const suppliedCronSecret = req.headers.get("x-cron-secret") ||
-      (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "");
-    const bearerIsServiceRole = bearerRole(authHeader) === "service_role";
-    const isServiceCall = !!(
-      cron_trigger &&
-      service_user_id &&
-      ((serviceKey && authHeader === `Bearer ${serviceKey}`) || bearerIsServiceRole ||
-        (cronSecret && suppliedCronSecret === cronSecret))
-    );
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const suppliedCronSecret = req.headers.get("x-cron-secret")?.trim() || bearerToken;
+    const isServiceRoleKey = !!serviceKey && secretsMatch(bearerToken, serviceKey);
+    const isCronSecret = await (async () => {
+      if (!suppliedCronSecret) return false;
+      const { data: secretIsValid, error: secretError } = await admin.rpc(
+        "verify_daily_incremental_sync_secret",
+        { candidate: suppliedCronSecret },
+      );
+      return !secretError && secretIsValid === true;
+    })();
+    const isServiceCall = Boolean(cron_trigger && service_user_id && (isServiceRoleKey || isCronSecret));
 
     if (isServiceCall) {
       userId = String(service_user_id);

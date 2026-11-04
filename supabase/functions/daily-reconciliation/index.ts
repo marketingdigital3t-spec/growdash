@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -53,8 +54,8 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
   const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-  const isService = Boolean(bearer && bearer === SERVICE_ROLE);
-  const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  const isService = Boolean(bearer && secretsMatch(bearer, SERVICE_ROLE));
+  const isCron = Boolean(cronSecret && secretsMatch(req.headers.get("x-cron-secret"), cronSecret));
   if (!isService && !isCron) {
     console.warn("daily-reconciliation: unauthorized caller", {
       hasBearer: Boolean(bearer),

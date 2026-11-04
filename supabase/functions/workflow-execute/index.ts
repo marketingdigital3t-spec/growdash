@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { resumeWorkflow } from "../_shared/workflowResume.ts";
 import { getFreshGoogleToken } from "../_shared/googleToken.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
@@ -19,7 +20,7 @@ type Definition = { id?: string; name?: string; version?: number; nodes: Node[];
 type QueueItem = { nodeId: string; key: string; loopContext?: { item: unknown; index: number; items: unknown[] } };
 
 const INTERNAL_SECRET = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
-const isInternalCall = (req: Request) => INTERNAL_SECRET.length >= 24 && req.headers.get("x-growdash-automation-secret") === INTERNAL_SECRET;
+const isInternalCall = (req: Request) => INTERNAL_SECRET.length >= 24 && secretsMatch(req.headers.get("x-growdash-automation-secret"), INTERNAL_SECRET);
 const sleep = (milliseconds: number) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 const integrationFor = async (admin: any, userId: string, provider: string, providerAccountId?: string | null) => {
   let query = admin.from("integrations").select("id,api_token,token_expires_at,provider_account_id").eq("user_id", userId).eq("provider", provider).eq("is_active", true);
