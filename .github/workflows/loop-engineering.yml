@@ -225,7 +225,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
-          supabase secrets set --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
+          supabase secrets set --yes --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
           # Keep gateway JWT verification aligned with supabase/config.toml.
           # Only cron/webhook functions intentionally accept requests without a
           # Supabase JWT; authenticated sync functions must be rejected at the
