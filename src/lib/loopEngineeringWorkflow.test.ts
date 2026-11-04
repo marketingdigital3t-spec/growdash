@@ -27,7 +27,7 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}");
     expect(workflow).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
     expect(workflow).toContain("supabase db push --linked --yes");
-    expect(workflow).toContain("supabase functions deploy");
+    expect(workflow).toContain('supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha');
     expect(workflow).toContain("wrangler pages deploy dist --project-name growdash");
     expect(workflow).toContain("Smoke Edge Functions and production HTTP");
     expect(workflow).toContain("Smoke authenticated production browser");
