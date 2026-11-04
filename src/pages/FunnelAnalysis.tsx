@@ -812,11 +812,12 @@ export default function FunnelAnalysis() {
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">Escopos separados:</span> campanhas Meta filtram o tráfego pago pelos IDs reais; UTM RD filtra os negócios do CRM pelos valores persistidos. A seleção não cruza nomes entre fontes. {periodAnalytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no período selecionado.
             </div>
+            {/* Preserve a confirmed sales snapshot when the lead read times out. */}
             <FunnelKPIs
               a={periodAnalytics}
               rdLeads={periodAnalytics.totalLeads}
               rdLeadsLoading={loadingPeriodDeals}
-              rdLeadsError={!!periodDealsError}
+              rdLeadsError={Boolean(periodDealsError) && periodAnalytics.totalLeads === 0}
               trafficSpend={mediaMetrics.spend}
               metaLeads={mediaMetrics.metaLeads}
               metaLeadsAvailable={funnelMeta.data.available && (funnelMeta.data.metricAvailability.leads?.available ?? false)}
