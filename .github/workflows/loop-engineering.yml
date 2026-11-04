@@ -233,7 +233,7 @@ jobs:
           for fn in controlled-realtime-sync sync-meta-insights sync-meta-hourly sync-meta-leads sync-meta-balance rd-sync-deals meta-traffic-mcp; do
             supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha
           done
-          for fn in daily-incremental-sync meta-webhook; do
+          for fn in daily-incremental-sync meta-webhook whatsapp-agent-reply; do
             supabase functions deploy "$fn" --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
           done
 
