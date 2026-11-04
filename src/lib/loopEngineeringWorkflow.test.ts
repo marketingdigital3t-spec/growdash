@@ -22,7 +22,7 @@ describe("loop engineering workflow", () => {
     expect(workflow).toContain("SENTRY_ORG: ${{ vars.SENTRY_ORG }}");
     expect(workflow).toContain("SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}");
     expect(workflow).toContain("SENTRY_DSN: ${{ secrets.SENTRY_DSN }}");
-    expect(workflow).toContain("supabase secrets set --project-ref cixnvosxqlacjbpymjha");
+    expect(workflow).toContain("supabase secrets set --yes --project-ref cixnvosxqlacjbpymjha");
     expect(workflow).toContain("base64 --decode | gzip -d > .auth/growdash.json");
     expect(workflow).toContain("SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}");
     expect(workflow).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
