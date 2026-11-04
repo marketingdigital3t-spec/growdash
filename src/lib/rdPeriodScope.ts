@@ -5,6 +5,31 @@ type RDPeriodDealIdentity = {
   ad_account_id?: string | null;
 };
 
+type RDPeriodDealFilters = {
+  source?: string;
+  campaignIds?: string[];
+  state?: string;
+  owner?: string;
+  product?: string;
+};
+
+/** Applies the funnel screen's local filters to the indexed period snapshot. */
+export function filterRDPeriodDeals<T extends RDPeriodDealIdentity & {
+  utm_source?: string | null;
+  utm_campaign?: string | null;
+  lead_state?: string | null;
+  deal_owner_name?: string | null;
+  rd_product_name?: string | null;
+}>(deals: T[], filters: RDPeriodDealFilters) {
+  return deals.filter((deal) => (
+    (!filters.source || filters.source === "all" || deal.utm_source === filters.source)
+      && (!filters.campaignIds?.length || filters.campaignIds.includes(deal.utm_campaign || ""))
+      && (!filters.state || filters.state === "all" || deal.lead_state === filters.state)
+      && (!filters.owner || filters.owner === "all" || deal.deal_owner_name === filters.owner)
+      && (!filters.product || filters.product === "all" || deal.rd_product_name === filters.product)
+  ));
+}
+
 /**
  * Merges the lead-period snapshot with the canonical won-period snapshot.
  *

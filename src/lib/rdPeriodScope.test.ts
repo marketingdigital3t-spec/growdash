@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeRDPeriodDeals } from "./rdPeriodScope";
+import { filterRDPeriodDeals, mergeRDPeriodDeals } from "./rdPeriodScope";
 
 const deal = (overrides: Record<string, unknown> = {}) => ({
   id: "local-1",
@@ -11,6 +11,15 @@ const deal = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("RD period deal scope", () => {
+  it("applies the same source and CRM filters after the indexed snapshot loads", () => {
+    const result = filterRDPeriodDeals([
+      deal({ rd_deal_id: "keep", utm_source: "meta", utm_campaign: "launch", lead_state: "SP", deal_owner_name: "Ana", rd_product_name: "Curso" }),
+      deal({ rd_deal_id: "drop", utm_source: "organico", utm_campaign: "other", lead_state: "RJ", deal_owner_name: "Bia", rd_product_name: "Mentoria" }),
+    ], { source: "meta", campaignIds: ["launch"], state: "SP", owner: "Ana", product: "Curso" });
+
+    expect(result.map((row) => row.rd_deal_id)).toEqual(["keep"]);
+  });
+
   it("unites period leads with sales closed in the period without collapsing connections", () => {
     const result = mergeRDPeriodDeals(
       [deal({ id: "open", rd_deal_id: "open-deal" }), deal({ id: "connection-a", rd_deal_id: "same-id", rd_connection_id: "connection-a" })],

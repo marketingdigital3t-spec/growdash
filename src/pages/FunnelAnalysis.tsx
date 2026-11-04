@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate } from "@/hooks/useRDDeals";
-import { useRDWonDealsForPeriod, type RDDealLite } from "@/hooks/useRDDealsForPeriod";
+import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate, type RDDeal } from "@/hooks/useRDDeals";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod, type RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,7 +46,7 @@ import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
 import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
-import { mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
+import { filterRDPeriodDeals, mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
 import { buildFunnelCampaignOptions, splitFunnelCampaignSelection } from "@/lib/funnelCampaignOptions";
 
 const blockHelp = {
@@ -189,17 +189,14 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
-  // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
-  const { data: periodDeals = [], isLoading: loadingPeriodDeals, isFetched: periodDealsFetched, isFetching: fetchingPeriodDeals, isError: periodDealsIsError, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDeals({
+  // O recorte RD usa a consulta indexada/cached de período. A consulta antiga
+  // montava um OR amplo em três timestamps e podia deixar a página presa em
+  // "Carregando" enquanto o PostgREST varria o funil inteiro.
+  const { data: periodDeals = [], isLoading: loadingPeriodDeals, isFetched: periodDealsFetched, isFetching: fetchingPeriodDeals, isError: periodDealsIsError, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDealsForPeriod({
     funnelIds: funnelScopeIds,
     adAccountIds: selectedAccountIds,
     startDate,
     endDate,
-    source: selectedSource,
-    campaigns: selectedUtmCampaigns,
-    state: selectedState,
-    owner: selectedOwner,
-    product: selectedProduct,
     enabled: funnelScopeIds.length > 0,
   });
 
@@ -310,8 +307,15 @@ export default function FunnelAnalysis() {
   // A mesma regra operacional do CRM vale para relatórios: o lote legado de
   // "Leads Antigos do Junior" do funil Aluna não pode reaparecer ao escolher
   // todas as contas e inflar distribuição, KPIs ou conversão.
+  const filteredPeriodDeals = useMemo(() => filterRDPeriodDeals(periodDeals, {
+    source: selectedSource,
+    campaignIds: selectedUtmCampaigns,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+  }), [periodDeals, selectedOwner, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
   const operationalDeals = useMemo(() => filterOperationalRDDeals(deals, activeFunnels), [activeFunnels, deals]);
-  const operationalPeriodDeals = useMemo(() => filterOperationalRDDeals(periodDeals, activeFunnels), [activeFunnels, periodDeals]);
+  const operationalPeriodDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodDeals as unknown as RDDeal[], activeFunnels), [activeFunnels, filteredPeriodDeals]);
   const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
   const filteredPeriodClosedDeals = useMemo(() => periodClosedDeals.filter((deal) => (
     (selectedSource === "all" || deal.utm_source === selectedSource)
