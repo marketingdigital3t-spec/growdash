@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRannielyMediaHandoffSummary, getRannielyGreeting, isWhatsAppImage, RANNIELY_POLICY, splitWhatsAppReply } from "../../supabase/functions/_shared/whatsappAgentPolicy";
+import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_POLICY, splitWhatsAppReply } from "../../supabase/functions/_shared/whatsappAgentPolicy";
 
 describe("WhatsApp agent media policy", () => {
   it("detects image messages from provider type or MIME metadata", () => {
@@ -18,6 +18,13 @@ describe("WhatsApp agent media policy", () => {
     expect(getRannielyGreeting(new Date("2026-11-03T11:00:00Z"))).toBe("Bom dia");
     expect(getRannielyGreeting(new Date("2026-11-03T15:00:00Z"))).toBe("Boa tarde");
     expect(getRannielyGreeting(new Date("2026-11-03T21:00:00Z"))).toBe("Boa noite");
+  });
+
+  it("keeps the configured agent name separate from the customer name", () => {
+    expect(isRannielyAgentContext("Mariana", "atendimento comercial", "Paciente Modelo de Harmonização de Glúteos")).toBe(true);
+    expect(buildRannielyIdentityContext("Mariana")).toContain("aqui é Mariana, do atendimento da Dra. Ranniely");
+    expect(buildRannielyIdentityContext("Mariana")).toContain("Nunca use o nome da cliente");
+    expect(isRannielyAgentContext("Mariana", "atendimento comercial", "produto sem relação")).toBe(false);
   });
 
   it("keeps the Ranniely flow focused on consent, authorized negotiation and human evaluation", () => {

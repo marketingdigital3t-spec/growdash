@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
-import { buildRannielyMediaHandoffSummary, getRannielyGreeting, isWhatsAppImage, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
+import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const internal = (req: Request) => {
@@ -46,7 +46,11 @@ Deno.serve(async (req) => {
   if (!number || number.mode === "human" || !number.agent_id) return json({ skipped: true, reason: "human_mode" });
   const { data: agent } = await admin.from("whatsapp_agents").select("id,name,system_prompt,model,knowledge,handoff_rules,status,mode").eq("id", number.agent_id).eq("status", "active").maybeSingle();
   if (!agent) return json({ skipped: true, reason: "agent_inactive" });
-  const isRanniely = /ranniely/i.test(String(agent.name || ""));
+  const storedKnowledge = agent.knowledge && typeof agent.knowledge === "object" ? agent.knowledge as Record<string, unknown> : {};
+  const knowledge = storedKnowledge.version === 1 && typeof storedKnowledge.content === "string"
+    ? storedKnowledge.content
+    : JSON.stringify(storedKnowledge);
+  const isRanniely = isRannielyAgentContext(agent.name, agent.system_prompt, knowledge);
   const { data: messages, error: messagesError } = await admin.from("whatsapp_messages").select("id,direction,body,message_type,raw,sent_at").eq("conversation_id", conversation.id).order("sent_at", { ascending: false }).limit(30);
   if (messagesError) return json({ error: "Histórico da conversa indisponível", error_code: "WHATSAPP_HISTORY_UNAVAILABLE" }, 503);
   const history = (messages || []).reverse().map((item) => ({ role: item.direction === "outbound" ? "assistant" : "user", content: item.body || "[mídia]" }));
@@ -64,10 +68,6 @@ Deno.serve(async (req) => {
   }
   const key = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
   if (!key) return json({ error: "AI_API_KEY não configurada" }, 503);
-  const storedKnowledge = agent.knowledge && typeof agent.knowledge === "object" ? agent.knowledge as Record<string, unknown> : {};
-  const knowledge = storedKnowledge.version === 1 && typeof storedKnowledge.content === "string"
-    ? storedKnowledge.content
-    : JSON.stringify(storedKnowledge);
   const triggerContext = triggerMessage
     ? `Mensagem que disparou esta resposta: tipo=${String(triggerMessage.message_type || "text")}; conteúdo=${triggerMessage.body || "[mídia]"}.`
     : "Mensagem disparadora não identificada; use somente o histórico disponível.";
@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
   const timeContext = isRanniely
     ? `\nCONTEXTO DE HORÁRIO: agora são ${new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date())} em São Paulo. Se precisar iniciar uma saudação, use exatamente “${getRannielyGreeting()}”. Não use outra saudação por hábito.`
     : "";
-  const prompt = `${agent.system_prompt}\n\nContexto de operação: responda em português-Brasil, uma pergunta por vez, não invente dados. Se precisar de humano, escreva [HANDOFF].\nConhecimento do expert:\n${knowledge}${flowContext}${isRanniely ? `\n${RANNIELY_POLICY}${timeContext}` : ""}`;
+  const identityContext = isRanniely ? buildRannielyIdentityContext(agent.name) : "";
+  const prompt = `${agent.system_prompt}\n\nContexto de operação: responda em português-Brasil, uma pergunta por vez, não invente dados. Se precisar de humano, escreva [HANDOFF].\nConhecimento do expert:\n${knowledge}${flowContext}${isRanniely ? `\n${RANNIELY_POLICY}${identityContext}${timeContext}` : ""}`;
   const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: agent.model || "gpt-4o-mini", temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) return json({ error: payload?.error?.message || "Falha no agente" }, 502);
