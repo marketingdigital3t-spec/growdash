@@ -337,7 +337,8 @@ async function hydrateMissingAttribution(
   const catalogCampaignIds = [...new Set(rows.map((row) => row.campaign_id).filter(Boolean).map(String))];
   for (let i = 0; i < catalogAdIds.length; i += 500) {
     try {
-      const { data } = await admin.from("ads").select("id,name,adset_id").in("id", catalogAdIds.slice(i, i + 500));
+      const { data, error } = await admin.from("ads").select("id,name,adset_id").in("id", catalogAdIds.slice(i, i + 500));
+      if (error) throw error;
       for (const ad of data || []) {
         if (ad?.id && ad?.name) adNames.set(String(ad.id), String(ad.name));
         if (ad?.adset_id) catalogAdsetIds.push(String(ad.adset_id));
@@ -346,7 +347,8 @@ async function hydrateMissingAttribution(
   }
   for (let i = 0; i < catalogAdsetIds.length; i += 500) {
     try {
-      const { data } = await admin.from("adsets").select("id,name,campaign_id").in("id", catalogAdsetIds.slice(i, i + 500));
+      const { data, error } = await admin.from("adsets").select("id,name,campaign_id").in("id", catalogAdsetIds.slice(i, i + 500));
+      if (error) throw error;
       for (const adset of data || []) {
         if (adset?.id && adset?.name) adsetNames.set(String(adset.id), String(adset.name));
         if (adset?.campaign_id) catalogCampaignIds.push(String(adset.campaign_id));
@@ -355,7 +357,8 @@ async function hydrateMissingAttribution(
   }
   for (let i = 0; i < catalogCampaignIds.length; i += 500) {
     try {
-      const { data } = await admin.from("campaigns").select("id,name").in("id", catalogCampaignIds.slice(i, i + 500));
+      const { data, error } = await admin.from("campaigns").select("id,name").in("id", catalogCampaignIds.slice(i, i + 500));
+      if (error) throw error;
       for (const campaign of data || []) if (campaign?.id && campaign?.name) campaignNames.set(String(campaign.id), String(campaign.name));
     } catch { /* best effort */ }
   }
