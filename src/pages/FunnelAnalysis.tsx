@@ -733,8 +733,8 @@ export default function FunnelAnalysis() {
   // They now hydrate independently and the visible period remains truthful
   // until they arrive.
   const initialDataLoading = !funnelsFetched
-    || (funnelScopeIds.length > 0 && !periodDealsFetched)
-    || (funnelScopeIds.length > 0 && !periodClosedDealsFetched);
+    || (funnelScopeIds.length > 0 && !periodDealsFetched && !periodDealsIsError && periodDeals.length === 0)
+    || (funnelScopeIds.length > 0 && !periodClosedDealsFetched && !periodClosedDealsIsError && periodClosedDeals.length === 0);
   const rdPeriodError = periodDealsIsError || periodClosedDealsIsError;
   const rdPeriodErrorMessage = [periodDealsError, periodClosedDealsError]
     .map((error) => error instanceof Error ? error.message : error ? String(error) : "")
