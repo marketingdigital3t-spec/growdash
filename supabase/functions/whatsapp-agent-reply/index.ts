@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
-import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
+import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, containsRannielySchedulingIntent, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const internal = (req: Request) => {
@@ -32,6 +32,14 @@ async function claimHandoff(admin: any, conversationId: string, summary: string)
     .maybeSingle();
   if (error) throw error;
   return Boolean(data);
+}
+
+async function generateAgentReply(key: string, model: string, prompt: string, history: Array<{ role: "assistant" | "user"; content: string }>) {
+  const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) return { error: payload?.error?.message || "Falha no agente" };
+  const text = String(payload.choices?.[0]?.message?.content || "").trim();
+  return text ? { text } : { error: "O agente não retornou texto" };
 }
 
 Deno.serve(async (req) => {
@@ -79,11 +87,24 @@ Deno.serve(async (req) => {
     : "";
   const identityContext = isRanniely ? buildRannielyIdentityContext(agent.name) : "";
   const prompt = `${agent.system_prompt}\n\nContexto de operação: responda em português-Brasil, uma pergunta por vez, não invente dados. Se precisar de humano, escreva [HANDOFF].\nConhecimento do expert:\n${knowledge}${flowContext}${isRanniely ? `\n${RANNIELY_POLICY}${identityContext}${timeContext}` : ""}`;
-  const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: agent.model || "gpt-4o-mini", temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) return json({ error: payload?.error?.message || "Falha no agente" }, 502);
-  const text = String(payload.choices?.[0]?.message?.content || "").trim();
-  if (!text) return json({ error: "O agente não retornou texto" }, 502);
+  let generated = await generateAgentReply(key, agent.model || "gpt-4o-mini", prompt, history);
+  if (generated.error) return json({ error: generated.error }, 502);
+  let text = generated.text!;
+  if (isRanniely && containsRannielySchedulingIntent(text)) {
+    const correctivePrompt = `${prompt}\n\nBLOQUEIO DE AGENDA: a resposta anterior tentou falar de agenda, dia ou horário e não será enviada. Gere novamente somente a próxima pergunta do funil de qualificação ou a explicação autorizada dos valores. Não use qualquer linguagem de agenda, horários, manhã/tarde, consulta, ligação ou reserva.`;
+    generated = await generateAgentReply(key, agent.model || "gpt-4o-mini", correctivePrompt, history);
+    if (generated.error) return json({ error: generated.error }, 502);
+    text = generated.text!;
+    if (containsRannielySchedulingIntent(text)) {
+      const summary = "Resposta automática bloqueada: tentativa de iniciar agenda ou horário.";
+      if (!await claimHandoff(admin, conversation.id, summary)) return json({ skipped: true, reason: "handoff_requested" });
+      const providerMessageId = await sendMessage(number, conversation.wa_contact_id, RANNIELY_HANDOFF_ACK);
+      await admin.from("whatsapp_messages").insert({ workspace_id: conversation.workspace_id, conversation_id: conversation.id, wamid: providerMessageId, direction: "outbound", message_type: "text", body: RANNIELY_HANDOFF_ACK, status: "sent" });
+      await admin.from("whatsapp_conversations").update({ last_outbound_at: new Date().toISOString(), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", conversation.id);
+      await cancelWhatsAppFollowups(admin, conversation.id);
+      return json({ handoff: true, blocked_scheduling: true, summary, provider_message_id: providerMessageId });
+    }
+  }
   if (text.includes("[HANDOFF]")) {
     const handoffSummary = text.replace(/\[HANDOFF\]/g, "").trim().slice(0, 2000) || "Avaliação humana necessária.";
     if (!isRanniely) {
