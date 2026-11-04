@@ -43,8 +43,62 @@ export const RANNIELY_FUNNEL_QUESTIONS = [
   "Você sabe que o procedimento envolve investimento?",
 ] as const;
 
+const RANNIELY_QUESTION_PATTERNS = [
+  /o que.{0,80}(?:busca|gostaria|quer).{0,60}(?:melhorar|mudar|transformar).{0,40}gl[uú]teos|o que.{0,80}(?:melhorar|mudar).{0,40}regi[aã]o dos gl[uú]teos/i,
+  /momento.{0,60}pr[oó]xima turma.{0,40}paciente modelo/i,
+  /qual faixa.{0,40}faturamento mensal/i,
+  /se for aprovada.{0,80}comparecer presencialmente.{0,50}data combinada/i,
+  /voc[eê] sabe que.{0,60}envolve investimento/i,
+];
+
+export function getRannielyNextQuestionIndex(history: Array<{ role: "assistant" | "user"; content: string }>) {
+  const answered = new Set<number>();
+  history.forEach((message, index) => {
+    if (message.role !== "assistant") return;
+    const questionIndex = RANNIELY_QUESTION_PATTERNS.findIndex((pattern) => pattern.test(message.content));
+    if (questionIndex >= 0 && history.slice(index + 1).some((next) => next.role === "user")) answered.add(questionIndex);
+  });
+  const nextIndex = RANNIELY_FUNNEL_QUESTIONS.findIndex((_, index) => !answered.has(index));
+  if (nextIndex >= 0) return nextIndex;
+  const latestInboundIndex = history.findLastIndex((message) => message.role === "user");
+  return history.slice(latestInboundIndex + 1).some((message) => message.role === "assistant" && /50\s*ml[\s\S]*100\s*ml/i.test(message.content))
+    ? RANNIELY_FUNNEL_QUESTIONS.length + 1
+    : RANNIELY_FUNNEL_QUESTIONS.length;
+}
+
+function normalizeRannielyText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function containsRannielyLeadEcho(reply: string, latestInbound: string) {
+  const stopWords = new Set(["a", "ao", "aos", "as", "com", "da", "das", "de", "do", "dos", "e", "em", "eu", "me", "na", "no", "o", "os", "pra", "para", "por", "que", "se", "um", "uma", "voce"]);
+  const leadWords = normalizeRannielyText(latestInbound).split(" ").filter((word) => word.length > 2 && !stopWords.has(word));
+  const replyWords = new Set(normalizeRannielyText(reply).split(" "));
+  if (leadWords.length < 2) return false;
+  if (leadWords.length <= 4) return leadWords.every((word) => replyWords.has(word));
+  for (let index = 0; index <= leadWords.length - 4; index++) {
+    if (leadWords.slice(index, index + 4).every((word) => replyWords.has(word))) return true;
+  }
+  return false;
+}
+
+export function buildRannielyFallbackReply(nextQuestionIndex: number) {
+  const nextQuestion = RANNIELY_FUNNEL_QUESTIONS[nextQuestionIndex];
+  if (nextQuestion) return `Entendi. ${nextQuestion}`;
+  if (nextQuestionIndex === RANNIELY_FUNNEL_QUESTIONS.length) return "Para você ter clareza: 50 ml ficam em R$ 6.000 e 100 ml ficam em R$ 12.000. Esse investimento faz sentido para você?";
+  return "Entendi. Quer que eu esclareça alguma dúvida sobre as informações que já te passei?";
+}
+
+export function needsRannielyReplyCorrection(reply: string, latestInbound: string, nextQuestionIndex: number) {
+  if (containsRannielySchedulingIntent(reply) || containsRannielyLeadEcho(reply, latestInbound)) return true;
+  const required = RANNIELY_FUNNEL_QUESTIONS[nextQuestionIndex];
+  if (required) return !normalizeRannielyText(reply).includes(normalizeRannielyText(required));
+  if (nextQuestionIndex === RANNIELY_FUNNEL_QUESTIONS.length) return !/50\s*ml[\s\S]*100\s*ml/i.test(reply);
+  return false;
+}
+
 export function containsRannielySchedulingIntent(text: string) {
-  return /consultar\s+(?:a\s+)?agenda|\bagend(?:a|ar|amento|ada|ado)\b|qualquer\s+dia|\bhor[aá]rio(?:s)?\b|\b(?:marcar|reservar)\s+(?:um|uma)?\s*(?:hor[aá]rio|consulta|vaga)|\b(?:manhã|tarde)\b\s+(?:funciona|é\s+melhor|serve)|\b(?:prefere|melhor)\b[^.!?]{0,40}\b(?:manhã|tarde)\b/i.test(text);
+  return /\b(?:consultar|verificar|checar|olhar|confirmar)\s+(?:a\s+)?agenda|\bagend(?:a|ar|amento|ada|ado|amentos)\b|\bhor[aá]rio(?:s)?\b|\b(?:qualquer|melhor)\s+dia\b|\b(?:combinar|escolher|definir)\b[^.!?]{0,50}\b(?:dia|per[ií]odo|hor[aá]rio|agenda)\b|\b(?:qual|quais)\b[^.!?]{0,35}\b(?:dia|per[ií]odo|hor[aá]rio|manh[aã]|tarde)\b|\b(?:disponibilidade|manh[aã]|tarde)\b[^.!?]{0,40}\b(?:conversar|atender|agenda|hor[aá]rio|consulta)\b|\b(?:ligar|liga[cç][aã]o|chamada|reuni[aã]o|marcar|reservar)\b/i.test(text);
 }
 
 export const RANNIELY_POLICY = `
@@ -63,7 +117,7 @@ CONVERSA CONTÍNUA PELO WHATSAPP:
 - Teste apenas abordagens previamente aprovadas pela equipe. O principal sinal de sucesso é avançar nas cinco respostas do funil, não apenas obter qualquer resposta.
 
 FUNIL DE QUALIFICAÇÃO — OBRIGATÓRIO ANTES DE MENCIONAR OU PEDIR FOTO:
-Faça estas cinco perguntas nesta ordem, uma por mensagem. Não apresente uma lista nem diga que está aplicando um formulário. Depois de cada resposta, acolha brevemente o que a cliente disse e siga de modo natural:
+Faça estas cinco perguntas nesta ordem, uma por mensagem. Não apresente uma lista nem diga que está aplicando um formulário. Depois de cada resposta, use somente um acolhimento curto e siga para a próxima etapa:
 1. “O que você mais busca melhorar com a Harmonização de Glúteos?”
 2. “Em que momento você está em relação à próxima turma de paciente modelo?” Aceite respostas abertas como pesquisando, interessada ou pronta para avançar; não peça data nem horário.
 3. “Qual faixa representa melhor seu faturamento mensal?” Aceite resposta aberta e não invente faixas.
@@ -71,9 +125,12 @@ Faça estas cinco perguntas nesta ordem, uma por mensagem. Não apresente uma li
 5. “Você sabe que o procedimento envolve investimento?” Depois da resposta, informe exatamente: “Para você ter clareza: 50 ml ficam em R$ 6.000 e 100 ml ficam em R$ 12.000.” Confirme se esse investimento faz sentido antes de pedir qualquer foto.
 
 REGRAS DE CONVERSA DO FUNIL:
-- Seja caloroso, simples e natural; use o nome da cliente quando estiver disponível e reflita uma palavra da resposta antes da próxima pergunta.
-- Use transições humanas como “Entendi, você está buscando…” ou “Obrigada por me contar; vamos respeitar seu tempo”, escolhendo a frase conforme a resposta. Evite “pergunta 1”, respostas copiadas, excesso de emojis e entusiasmo artificial.
+- Seja caloroso, simples e natural. O backend calcula a próxima etapa olhando o histórico; faça somente a pergunta indicada no contexto atual.
+- Nunca repita, copie ou parafraseie o conteúdo da última mensagem da cliente. Use no máximo um acolhimento curto (“Entendi.” ou “Obrigada por me contar.”) antes da próxima pergunta.
+- Não repita uma pergunta já respondida, mesmo que uma mensagem anterior do agente a tenha repetido. Respostas como “Sim” contam como resposta à pergunta imediatamente anterior; avance para a próxima pergunta pendente.
+- Evite “pergunta 1”, respostas copiadas, excesso de emojis e entusiasmo artificial.
 - Não pressione, não repita pergunta já respondida e não peça foto antes de obter as cinco respostas e confirmar o investimento.
+- Não pergunte cidade, dia, período, manhã/tarde, disponibilidade ou horário; não proponha que consultor combine horário. A conversa segue por mensagem no WhatsApp.
 - Se a resposta vier incompleta, peça apenas a parte que falta. Se vier ambígua, confirme com uma pergunta curta.
 - Se a cliente pedir foto antes do funil, explique que primeiro precisa confirmar se o atendimento faz sentido para ela e retome a próxima pergunta.
 - “Data combinada” é uma condição futura definida pela equipe depois da aprovação; nunca significa que o agente pode consultar ou marcar agenda.

@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
-import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, containsRannielySchedulingIntent, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
+import { buildRannielyFallbackReply, buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, getRannielyGreeting, getRannielyNextQuestionIndex, isRannielyAgentContext, isWhatsAppImage, needsRannielyReplyCorrection, RANNIELY_FUNNEL_QUESTIONS, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const internal = (req: Request) => {
@@ -79,8 +79,10 @@ Deno.serve(async (req) => {
   const triggerContext = triggerMessage
     ? `Mensagem que disparou esta resposta: tipo=${String(triggerMessage.message_type || "text")}; conteúdo=${triggerMessage.body || "[mídia]"}.`
     : "Mensagem disparadora não identificada; use somente o histórico disponível.";
+  const nextQuestionIndex = isRanniely ? getRannielyNextQuestionIndex(history) : -1;
+  const nextQuestion = RANNIELY_FUNNEL_QUESTIONS[nextQuestionIndex];
   const flowContext = isRanniely
-    ? `\nCONTEXTO ATUAL DO FLUXO:\n- handoff_status=${conversation.handoff_status || "none"}\n- ${triggerContext}\n- Leia o histórico antes de responder e avance somente uma etapa por mensagem.`
+    ? `\nCONTEXTO ATUAL DO FLUXO (calculado do histórico, fonte de verdade):\n- handoff_status=${conversation.handoff_status || "none"}\n- ${triggerContext}\n- Próxima etapa=${nextQuestionIndex < RANNIELY_FUNNEL_QUESTIONS.length ? `pergunta ${nextQuestionIndex + 1} de ${RANNIELY_FUNNEL_QUESTIONS.length}` : nextQuestionIndex === RANNIELY_FUNNEL_QUESTIONS.length ? "informar valores autorizados e confirmar investimento" : "continuação após informar valores"}.\n- Próxima pergunta obrigatória=${nextQuestion || "já concluiu as perguntas obrigatórias; continue a conversa sem repetir o funil"}\n- Responda ao conteúdo atual com uma frase curta de acolhimento, sem repetir nem parafrasear a cliente; faça a pergunta obrigatória exatamente como escrita acima e não volte a etapas respondidas.`
     : "";
   const timeContext = isRanniely
     ? `\nCONTEXTO DE HORÁRIO: agora são ${new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date())} em São Paulo. Se precisar iniciar uma saudação, use exatamente “${getRannielyGreeting()}”. Não use outra saudação por hábito.`
@@ -90,20 +92,12 @@ Deno.serve(async (req) => {
   let generated = await generateAgentReply(key, agent.model || "gpt-4o-mini", prompt, history);
   if (generated.error) return json({ error: generated.error }, 502);
   let text = generated.text!;
-  if (isRanniely && containsRannielySchedulingIntent(text)) {
-    const correctivePrompt = `${prompt}\n\nBLOQUEIO DE AGENDA: a resposta anterior tentou falar de agenda, dia ou horário e não será enviada. Gere novamente somente a próxima pergunta do funil de qualificação ou a explicação autorizada dos valores. Não use qualquer linguagem de agenda, horários, manhã/tarde, consulta, ligação ou reserva.`;
+  if (isRanniely && !text.includes("[HANDOFF]") && needsRannielyReplyCorrection(text, triggerMessage?.body || "", nextQuestionIndex)) {
+    const correctivePrompt = `${prompt}\n\nCORREÇÃO OBRIGATÓRIA: a resposta anterior violou o contexto. Gere outra resposta com no máximo um acolhimento curto e a pergunta obrigatória exatamente como escrita no contexto. Não repita nem parafraseie a mensagem da cliente. Não pergunte cidade, dia, período, disponibilidade ou horário; não consulte agenda nem prometa que alguém combinará horário.`;
     generated = await generateAgentReply(key, agent.model || "gpt-4o-mini", correctivePrompt, history);
     if (generated.error) return json({ error: generated.error }, 502);
     text = generated.text!;
-    if (containsRannielySchedulingIntent(text)) {
-      const summary = "Resposta automática bloqueada: tentativa de iniciar agenda ou horário.";
-      if (!await claimHandoff(admin, conversation.id, summary)) return json({ skipped: true, reason: "handoff_requested" });
-      const providerMessageId = await sendMessage(number, conversation.wa_contact_id, RANNIELY_HANDOFF_ACK);
-      await admin.from("whatsapp_messages").insert({ workspace_id: conversation.workspace_id, conversation_id: conversation.id, wamid: providerMessageId, direction: "outbound", message_type: "text", body: RANNIELY_HANDOFF_ACK, status: "sent" });
-      await admin.from("whatsapp_conversations").update({ last_outbound_at: new Date().toISOString(), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", conversation.id);
-      await cancelWhatsAppFollowups(admin, conversation.id);
-      return json({ handoff: true, blocked_scheduling: true, summary, provider_message_id: providerMessageId });
-    }
+    if (!text.includes("[HANDOFF]") && needsRannielyReplyCorrection(text, triggerMessage?.body || "", nextQuestionIndex)) text = buildRannielyFallbackReply(nextQuestionIndex);
   }
   if (text.includes("[HANDOFF]")) {
     const handoffSummary = text.replace(/\[HANDOFF\]/g, "").trim().slice(0, 2000) || "Avaliação humana necessária.";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, containsRannielySchedulingIntent, getRannielyGreeting, isRannielyAgentContext, isWhatsAppImage, RANNIELY_FUNNEL_QUESTIONS, RANNIELY_POLICY, splitWhatsAppReply } from "../../supabase/functions/_shared/whatsappAgentPolicy";
+import { buildRannielyFallbackReply, buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, containsRannielyLeadEcho, containsRannielySchedulingIntent, getRannielyGreeting, getRannielyNextQuestionIndex, isRannielyAgentContext, isWhatsAppImage, needsRannielyReplyCorrection, RANNIELY_FUNNEL_QUESTIONS, RANNIELY_POLICY, splitWhatsAppReply } from "../../supabase/functions/_shared/whatsappAgentPolicy";
 
 describe("WhatsApp agent media policy", () => {
   it("detects image messages from provider type or MIME metadata", () => {
@@ -44,8 +44,31 @@ describe("WhatsApp agent media policy", () => {
   it("blocks scheduling language without blocking ordinary greetings", () => {
     expect(containsRannielySchedulingIntent("Vou consultar a agenda e te digo o melhor horário.")).toBe(true);
     expect(containsRannielySchedulingIntent("Qualquer dia da semana funciona para você?")).toBe(true);
+    expect(containsRannielySchedulingIntent("Qual o melhor dia e período para você?")).toBe(true);
+    expect(containsRannielySchedulingIntent("Qual período costuma ser melhor para você: manhã ou tarde?")).toBe(true);
+    expect(containsRannielySchedulingIntent("Vou passar nossa conversa para o consultor combinar o melhor horário com você.")).toBe(true);
     expect(containsRannielySchedulingIntent("Boa tarde! O que você mais busca melhorar?")).toBe(false);
     expect(containsRannielySchedulingIntent("Se for aprovada, você consegue comparecer presencialmente na data combinada?")).toBe(false);
+  });
+
+  it("calculates the next unanswered question from a repeated legacy conversation", () => {
+    const history = [
+      { role: "assistant" as const, content: "Quando puder, me conta o que você gostaria de melhorar na região dos glúteos para eu dar sequência à sua pré-avaliação." },
+      { role: "user" as const, content: "Sim" },
+      { role: "assistant" as const, content: "O que você gostaria de melhorar na região dos glúteos?" },
+      { role: "user" as const, content: "Aumentar o glúteo" },
+      { role: "assistant" as const, content: "Em qual cidade e estado você está?" },
+      { role: "user" as const, content: "Osasco" },
+      { role: "assistant" as const, content: "Qual o melhor dia e período para você?" },
+      { role: "user" as const, content: "Sábado" },
+      { role: "assistant" as const, content: "Qual período costuma ser melhor para você: manhã ou tarde?" },
+      { role: "user" as const, content: "Tarde" },
+    ];
+    expect(getRannielyNextQuestionIndex(history)).toBe(1);
+    expect(containsRannielyLeadEcho("Entendi, você quer aumentar o glúteo. Em que momento você está em relação à próxima turma de paciente modelo?", "Aumentar o glúteo")).toBe(true);
+    expect(needsRannielyReplyCorrection("Não consegui consultar a agenda agora. Qual dia funciona?", "Tarde", 1)).toBe(true);
+    expect(needsRannielyReplyCorrection("Entendi. Em que momento você está em relação à próxima turma de paciente modelo?", "Tarde", 1)).toBe(false);
+    expect(buildRannielyFallbackReply(1)).toBe("Entendi. Em que momento você está em relação à próxima turma de paciente modelo?");
   });
 
   it("keeps the Ranniely flow focused on consent, authorized negotiation and human evaluation", () => {
