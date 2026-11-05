@@ -30,6 +30,7 @@ Auditar e corrigir o backend da Growdash com evidência de código, teste local 
 15. Valores monetários de Meta/RD/vendas usam parser locale-aware; valor ausente ou inválido permanece nulo/indisponível e nunca vira zero silenciosamente.
 16. O pipeline deve publicar todas as Edge Functions versionadas, validar o catálogo contra o checkout e exercitar cada função alterada; uma allowlist manual não é fonte de verdade.
 17. Jobs globais (`daily_incremental_sync_runs`, `job_runs` e `sync_backfill_runs`) precisam de índice parcial único e tratamento explícito de `23505`; SELECT seguido de INSERT não é lock.
+18. O CRM é um espelho do pipeline atual do RD: a conta Meta selecionada resolve o vínculo `conta Meta → rd_account_connections → rd_funnels`, e o quadro deve consultar o pipeline completo. O período civil limita os indicadores, não pode esconder negociações abertas do quadro. A sincronização parcial deve preservar o último snapshot e continuar recuperável por cursor.
 
 ## Invariantes de correção
 
@@ -45,6 +46,7 @@ Auditar e corrigir o backend da Growdash com evidência de código, teste local 
 - A superfície de rede é deny-by-default para URLs informadas por usuários; limites de tamanho são verificados antes de decodificar ou armazenar conteúdo.
 - Valores financeiros preservam `null` quando não há fonte confiável; parsing brasileiro e americano é coberto por regressão.
 - Campos de atribuição Meta só são gravados quando vieram do payload, catálogo ou API autorizada; ausência permanece nula.
+- A tela CRM nunca pode transformar “sem negócios criados no período” em “pipeline vazio”: quadro, indicadores e estado de sincronização são contratos separados e devem exibir a origem/recorte de cada número.
 - Toda mudança tem teste de regressão e passa por testes, TypeScript, lint, build, diff check, GitHub, Supabase/Edge Functions, Cloudflare e navegador autenticado.
 
 ## Método de execução
