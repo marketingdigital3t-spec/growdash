@@ -3,12 +3,4 @@ name = "growdash"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-07-16"
 
-# O build do Cloudflare Pages roda sobre a árvore instalada pelo bun. O comando
-# customizado que reinstalava `@rolldown/binding-linux-x64-gnu@1.2.3` sobre essa
-# árvore conflitava com o `rolldown@1.2.16` exigido pelo vite e quebrava o
-# build com "Cannot read properties of null (reading 'edgesOut')". O bun.lock
-# já fixa o binding correto para cada plataforma, então basta rodar o vite.
-[build]
-command = "npx -y -p node@22 node node_modules/vite/bin/vite.js build"
-
 [env.production]
