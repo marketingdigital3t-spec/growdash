@@ -29,6 +29,7 @@ Auditar e corrigir o backend da Growdash com evidência de código, teste local 
 14. URLs configuráveis devem rejeitar IPv4/IPv6 alternativos, hosts privados e downloads sem limite antes de alocar o buffer.
 15. Valores monetários de Meta/RD/vendas usam parser locale-aware; valor ausente ou inválido permanece nulo/indisponível e nunca vira zero silenciosamente.
 16. O pipeline deve publicar todas as Edge Functions versionadas, validar o catálogo contra o checkout e exercitar cada função alterada; uma allowlist manual não é fonte de verdade.
+17. Jobs globais (`daily_incremental_sync_runs`, `job_runs` e `sync_backfill_runs`) precisam de índice parcial único e tratamento explícito de `23505`; SELECT seguido de INSERT não é lock.
 
 ## Invariantes de correção
 
