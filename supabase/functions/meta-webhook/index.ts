@@ -3,6 +3,7 @@ import { syncCrmLeadToRD, syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts"
 import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { classifySyncErrorCode, redactSyncErrorMessage } from "../../../src/lib/syncContract.ts";
+import { normalizeMetaPlatform, normalizeMetaPlacement } from "../_shared/metaDeliveryNormalization.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -350,10 +351,10 @@ Deno.serve(async (req) => {
             adset_name: lead.adset_name ?? null,
             ad_name: lead.ad_name ?? null,
             form_name: lead.form_name ?? null,
-            platform: lead.platform ?? lead.site_source_name ?? lead.publisher_platform ?? null,
-            placement: lead.placement ?? lead.platform_position ?? null,
+            platform: normalizeMetaPlatform(lead.platform ?? lead.site_source_name ?? lead.publisher_platform) || "Meta Ads",
+            placement: normalizeMetaPlacement(lead.placement ?? lead.platform_position) || null,
             is_organic: typeof lead.is_organic === "boolean" ? lead.is_organic : null,
-            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id && lead.form_id && lead.campaign_name && lead.adset_name && lead.ad_name && lead.form_name && (lead.platform || lead.site_source_name || lead.publisher_platform) && (lead.placement || lead.platform_position) ? "captured" : "partial",
+            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id && lead.form_id && lead.campaign_name && lead.adset_name && lead.ad_name && lead.form_name ? "captured" : "partial",
             raw: lead,
           }, { onConflict: "meta_lead_id" });
           if (leadError) throw leadError;

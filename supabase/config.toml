@@ -122,6 +122,14 @@ verify_jwt = false
 [functions.daily-reconciliation]
 verify_jwt = false
 
+# Reparo em lote de atribuição de leads (platform/placement, nomes via catálogo,
+# vínculo lead↔deal). Chamada pelo daily-reconciliation com Bearer da service role,
+# que é um JWT assinado — por isso verify_jwt = true segue funcionando, como já
+# ocorre em sync-meta-leads e sync-meta-insights, invocados pelo mesmo invokeFn.
+# A função tem segunda barreira própria (secretsMatch em service role / cron secret).
+[functions.repair-lead-attribution]
+verify_jwt = true
+
 [functions.workflow-execute]
 verify_jwt = true
 

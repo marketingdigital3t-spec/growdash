@@ -111,6 +111,20 @@ Deno.serve(async (req) => {
     return { processed: upserted, metadata: r.data as any };
   }));
 
+  // 2.6) Reconciliar e reparar atribuição de leads Meta e negociações RD.
+  // O reparo vive na Edge Function repair-lead-attribution (normalização de
+  // platform/placement, hidratação de nomes via catálogo, vínculo lead↔deal e
+  // retry dos leads que chegaram antes do deal). Aqui só a invocamos.
+  results.push(await runJob("reconcile-unlinked-leads", async () => {
+    const r = await invokeFn("repair-lead-attribution", { days: 30, limit: 200 });
+    if (!r.ok) throw new Error(`repair-lead-attribution failed: ${r.status} ${JSON.stringify(r.data)}`);
+    const data = (r.data as any) || {};
+    return {
+      processed: Number(data.totalRepaired ?? 0) + Number(data.dealsLinked ?? 0),
+      metadata: data,
+    };
+  }));
+
   // 3) Retry Meta sync for accounts with errors or stale syncs (>24h)
   results.push(await runJob("meta-sync-retry", async () => {
     const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();

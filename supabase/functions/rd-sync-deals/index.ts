@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
+import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
 import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
@@ -2196,6 +2197,26 @@ Deno.serve(async (req) => {
       snapshotDuplicateCount = localIds.length - localIdSet.size;
       if (snapshotMissingIds.length || snapshotDuplicateCount > 0) {
         analyticsRangeComplete = false;
+      }
+    }
+
+    // Reconciliar negociações que chegaram sem meta_lead_id contra os meta_leads existentes
+    if (funnel.rd_connection_id) {
+      try {
+        const { data: unattributedDeals } = await admin
+          .from("rd_deals")
+          .select("rd_deal_id")
+          .eq("rd_connection_id", funnel.rd_connection_id)
+          .is("meta_lead_id", null)
+          .or("contact_email.not.is.null,contact_phone.not.is.null")
+          .order("updated_at", { ascending: false })
+          .limit(30);
+        for (const unattributed of unattributedDeals || []) {
+          if (Date.now() >= runtimeDeadline - 5000) break;
+          await syncRDDealToMeta(admin, funnel.rd_connection_id, String(unattributed.rd_deal_id));
+        }
+      } catch (attError) {
+        console.warn("[rd-sync-deals] Falha ao tentar reconciliação tardia com meta_leads:", attError);
       }
     }
 

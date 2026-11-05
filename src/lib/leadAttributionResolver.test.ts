@@ -22,7 +22,7 @@ describe("resolveLeadAttribution", () => {
     expect(result).toMatchObject({ method: "utm", status: "attributed", adId: "ad-1" });
   });
 
-  it("preserva os detalhes capturados no lead mesmo sem breakdown de insights", () => {
+  it("preserva os detalhes capturados no lead e normaliza plataforma mesmo sem breakdown de insights", () => {
     const result = resolveLeadAttribution({
       ad_account_id: "acc-1",
       meta_campaign_id: "camp-1",
@@ -34,18 +34,19 @@ describe("resolveLeadAttribution", () => {
       meta_form_id: "form-1",
       meta_form_name: "Formulário do lead",
       meta_platform: "ig",
-      meta_placement: null,
+      meta_placement: "instagram_stories",
       meta_is_organic: false,
     }, []);
     expect(result).toMatchObject({
-      status: "partial",
+      status: "attributed",
+      method: "meta_id",
       campaignName: "Campanha do lead",
       adsetName: "Conjunto do lead",
       adName: "Anúncio do lead",
       formId: "form-1",
       formName: "Formulário do lead",
-      platform: "ig",
-      placement: null,
+      platform: "Instagram",
+      placement: "Stories",
       isOrganic: false,
     });
   });

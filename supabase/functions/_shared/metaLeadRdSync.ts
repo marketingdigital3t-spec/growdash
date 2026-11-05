@@ -1,5 +1,11 @@
 import { executeRDWrite } from "./rdWrite.ts";
 import { fetchWithTimeout, remainingSyncTimeoutMs } from "../../../src/lib/syncReliabilityPolicy.ts";
+import {
+  normalizeMetaPlatform,
+  normalizeMetaPlacement,
+  extractPhoneVariants,
+  phonesMatch,
+} from "./metaDeliveryNormalization.ts";
 
 type AdminClient = any;
 
@@ -19,6 +25,7 @@ type MetaLead = {
   is_organic: boolean | null;
   email: string | null;
   phone: string | null;
+  full_name?: string | null;
   created_time: string;
   raw: Record<string, unknown> | null;
 };
@@ -43,6 +50,7 @@ type RdDeal = {
   meta_is_organic?: boolean | null;
   meta_attribution_method?: string | null;
   meta_attribution_status?: string | null;
+  contact_name?: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   lead_created_at: string | null;
@@ -159,10 +167,12 @@ function trackingFingerprint(lead: MetaLead): string {
 
 function attributionMethod(deal: RdDeal, lead: MetaLead) {
   const emailMatches = Boolean(normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email));
-  const phoneMatches = Boolean(normalizePhone(lead.phone) && normalizePhone(lead.phone) === normalizePhone(deal.contact_phone));
+  const phoneMatches = Boolean(phonesMatch(lead.phone, deal.contact_phone));
   if (emailMatches && phoneMatches) return "meta_form_email_phone_exact";
   if (emailMatches) return "meta_form_email_exact";
   if (phoneMatches) return "meta_form_phone_exact";
+  const nameMatches = Boolean(clean(lead.full_name) && clean(deal.contact_name) && norm(lead.full_name) === norm(deal.contact_name));
+  if (nameMatches) return "meta_form_name_match";
   return deal.meta_attribution_method || "meta_lead_webhook";
 }
 
@@ -181,8 +191,10 @@ async function mirrorAttribution(admin: AdminClient, deal: RdDeal, lead: MetaLea
   const meta_adset_name = value(lead.adset_name, deal.meta_adset_name);
   const meta_ad_name = value(lead.ad_name, deal.meta_ad_name);
   const meta_form_name = value(lead.form_name, deal.meta_form_name);
-  const meta_platform = value(lead.platform, deal.meta_platform);
-  const meta_placement = value(lead.placement, deal.meta_placement);
+  const rawPlatform = value(lead.platform, deal.meta_platform);
+  const rawPlacement = value(lead.placement, deal.meta_placement);
+  const meta_platform = normalizeMetaPlatform(rawPlatform) || (lead.meta_lead_id ? "Meta Ads" : null);
+  const meta_placement = normalizeMetaPlacement(rawPlacement) || null;
   const meta_is_organic = typeof lead.is_organic === "boolean" ? lead.is_organic : deal.meta_is_organic ?? null;
   const hasAny = Boolean(meta_campaign_id || meta_adset_id || meta_ad_id || meta_form_id || meta_campaign_name || meta_adset_name || meta_ad_name || meta_form_name || meta_platform || meta_placement);
   const complete = Boolean(meta_campaign_id && meta_adset_id && meta_ad_id && meta_form_id && meta_campaign_name && meta_adset_name && meta_ad_name && meta_form_name && meta_platform && meta_placement);
@@ -296,13 +308,25 @@ function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score:
   const metaIdMatches = Boolean(clean(lead.meta_lead_id) && clean(lead.meta_lead_id) === clean(deal.meta_lead_id));
   if (metaIdMatches) return { match: true, score: 100 };
   const emailMatches = !!normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email);
-  const phoneMatches = !!normalizePhone(lead.phone) && normalizePhone(lead.phone) === normalizePhone(deal.contact_phone);
-  if (!emailMatches && !phoneMatches) return { match: false, score: 0 };
+  const phoneMatches = phonesMatch(lead.phone, deal.contact_phone);
+  const normLeadName = norm(lead.full_name || "");
+  const normDealName = norm(deal.contact_name || "");
+  const nameMatches = Boolean(
+    normLeadName.length >= 6 &&
+    normDealName.length >= 6 &&
+    normLeadName.split(/\s+/).length >= 2 &&
+    normDealName.split(/\s+/).length >= 2 &&
+    normLeadName === normDealName
+  );
+  if (!emailMatches && !phoneMatches && !nameMatches) return { match: false, score: 0 };
   const leadAt = dateOf(lead.created_time);
   const dealAt = dateOf(deal.lead_created_at || deal.stage_updated_at || deal.closed_at);
   const distance = leadAt != null && dealAt != null ? Math.abs(leadAt - dealAt) : 0;
+  // Se for apenas por nome, limite de 30 dias para evitar falso-positivo de homônimos
+  if (!emailMatches && !phoneMatches && nameMatches && distance > 30 * 24 * 60 * 60 * 1000) return { match: false, score: 0 };
   if (distance > 180 * 24 * 60 * 60 * 1000) return { match: false, score: 0 };
-  return { match: true, score: (emailMatches && phoneMatches ? 30 : emailMatches ? 20 : 10) - distance / 1e12 };
+  const baseScore = (emailMatches && phoneMatches ? 40 : emailMatches ? 30 : phoneMatches ? 25 : 15);
+  return { match: true, score: baseScore - distance / 1e12 };
 }
 
 async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal, deadlineAt?: number): Promise<TrackingResult> {
@@ -395,7 +419,7 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
 async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLead | null> {
   const { data, error } = await admin
     .from("meta_leads")
-    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
+    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw")
     .eq("meta_lead_id", metaLeadId)
     .maybeSingle();
   if (error) throw error;
@@ -411,7 +435,7 @@ async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boo
   const candidates: RdDeal[] = [];
   const email = normalizeEmail(lead.email);
   const phone = normalizePhone(lead.phone);
-  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
+  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_name,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
   const applyScope = (query: any) => scoped && lead.ad_account_id ? query.eq("ad_account_id", lead.ad_account_id) : query;
   if (lead.meta_lead_id) {
     const { data, error } = await applyScope(admin.from("rd_deals").select(select))
@@ -428,19 +452,28 @@ async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boo
     candidates.push(...(data || []));
   }
   if (phone) {
-    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
-      .eq("contact_phone", phone)
-      .limit(100);
-    if (error) throw error;
-    candidates.push(...(data || []));
-    if (!(data || []).length) {
+    const phoneVariants = extractPhoneVariants(phone);
+    for (const variant of phoneVariants.slice(0, 4)) {
+      const { data, error } = await applyScope(admin.from("rd_deals").select(select))
+        .eq("contact_phone", variant)
+        .limit(50);
+      if (!error && data) candidates.push(...data);
+    }
+    if (!candidates.length) {
       const { data: formatted, error: formattedError } = await applyScope(admin.from("rd_deals").select(select))
         .not("contact_phone", "is", null)
         .order("lead_created_at", { ascending: false })
-        .limit(5000);
-      if (formattedError) throw formattedError;
-      candidates.push(...(formatted || []).filter((deal: RdDeal) => normalizePhone(deal.contact_phone) === phone));
+        .limit(2000);
+      if (!formattedError && formatted) {
+        candidates.push(...(formatted || []).filter((deal: RdDeal) => phonesMatch(deal.contact_phone, phone)));
+      }
     }
+  }
+  if (lead.full_name && norm(lead.full_name).length >= 6) {
+    const { data: byName } = await applyScope(admin.from("rd_deals").select(select))
+      .ilike("contact_name", `%${lead.full_name.trim()}%`)
+      .limit(20);
+    if (byName) candidates.push(...byName);
   }
   return candidates;
 }
@@ -463,7 +496,7 @@ async function queryLeadsForDeal(admin: AdminClient, deal: RdDeal, scoped: boole
   const candidates: MetaLead[] = [];
   const email = normalizeEmail(deal.contact_email);
   const phone = normalizePhone(deal.contact_phone);
-  const select = "meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw";
+  const select = "meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw";
   const applyScope = (query: any) => scoped && deal.ad_account_id ? query.eq("ad_account_id", deal.ad_account_id) : query;
   if (deal.meta_lead_id) {
     const { data, error } = await applyScope(admin.from("meta_leads").select(select))
@@ -480,19 +513,28 @@ async function queryLeadsForDeal(admin: AdminClient, deal: RdDeal, scoped: boole
     candidates.push(...(data || []));
   }
   if (phone) {
-    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
-      .eq("phone", phone)
-      .limit(100);
-    if (error) throw error;
-    candidates.push(...(data || []));
-    if (!(data || []).length) {
+    const phoneVariants = extractPhoneVariants(phone);
+    for (const variant of phoneVariants.slice(0, 4)) {
+      const { data, error } = await applyScope(admin.from("meta_leads").select(select))
+        .eq("phone", variant)
+        .limit(50);
+      if (!error && data) candidates.push(...data);
+    }
+    if (!candidates.length) {
       const { data: formatted, error: formattedError } = await applyScope(admin.from("meta_leads").select(select))
         .not("phone", "is", null)
         .order("created_time", { ascending: false })
-        .limit(5000);
-      if (formattedError) throw formattedError;
-      candidates.push(...(formatted || []).filter((lead: MetaLead) => normalizePhone(lead.phone) === phone));
+        .limit(2000);
+      if (!formattedError && formatted) {
+        candidates.push(...(formatted || []).filter((lead: MetaLead) => phonesMatch(lead.phone, phone)));
+      }
     }
+  }
+  if (deal.contact_name && norm(deal.contact_name).length >= 6) {
+    const { data: byName } = await applyScope(admin.from("meta_leads").select(select))
+      .ilike("full_name", `%${deal.contact_name.trim()}%`)
+      .limit(20);
+    if (byName) candidates.push(...byName);
   }
   return candidates;
 }

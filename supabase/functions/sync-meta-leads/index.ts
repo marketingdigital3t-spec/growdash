@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
+import { normalizeMetaPlatform, normalizeMetaPlacement } from "../_shared/metaDeliveryNormalization.ts";
 import { attributionStatus, classifySyncErrorCode, normalizeAttribution, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { fetchWithTimeout, hasExceededSyncDeadline, isMetaApplicationRateLimitError, leadSyncCooldownMs, leadSyncExecutionPolicy, META_AD_CATALOG_PAGE_SIZE, shouldThrottleLeadSync, SYNC_LEAD_RUN_BUDGET_MS } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
@@ -368,14 +369,12 @@ async function hydrateMissingAttribution(
     row.adset_name ||= usableAttributionText(raw.adset_name || raw.meta_adset_name);
     row.ad_name ||= usableAttributionText(raw.ad_name || raw.meta_ad_name);
     row.form_name ||= usableAttributionText(raw.form_name || raw.meta_form_name);
-    row.platform ||= usableAttributionText(raw.platform || raw.site_source_name || raw.publisher_platform);
-    row.placement ||= usableAttributionText(raw.placement || raw.platform_position);
+    row.platform = normalizeMetaPlatform(row.platform || raw.platform || raw.site_source_name || raw.publisher_platform) || "Meta Ads";
+    row.placement = normalizeMetaPlacement(row.placement || raw.placement || raw.platform_position) || null;
     row.campaign_name = usableAttributionText(row.campaign_name);
     row.adset_name = usableAttributionText(row.adset_name);
     row.ad_name = usableAttributionText(row.ad_name);
     row.form_name = usableAttributionText(row.form_name);
-    row.platform = usableAttributionText(row.platform);
-    row.placement = usableAttributionText(row.placement);
   }
   // Delivery enrichment is independent per lead. Keep a small bounded
   // concurrency so a form with hundreds of leads does not spend the entire
@@ -394,8 +393,10 @@ async function hydrateMissingAttribution(
     // removes the lead or its campaign hierarchy.
     const delivery = await getLeadDelivery(id);
     for (const row of deliveryRowsById.get(id) || []) {
-      row.platform ||= usableAttributionText(delivery?.platform || delivery?.site_source_name || delivery?.publisher_platform);
-      row.placement ||= usableAttributionText(delivery?.placement || delivery?.platform_position);
+      const plat = delivery?.platform || delivery?.site_source_name || delivery?.publisher_platform;
+      if (plat) row.platform = normalizeMetaPlatform(plat) || row.platform;
+      const place = delivery?.placement || delivery?.platform_position;
+      if (place) row.placement = normalizeMetaPlacement(place) || row.placement;
       if (row.is_organic == null && typeof delivery?.is_organic === "boolean") row.is_organic = delivery.is_organic;
     }
   });
@@ -427,9 +428,9 @@ async function hydrateMissingAttribution(
     row.adset_name ||= row.adset_id ? adsetNames.get(String(row.adset_id)) || null : null;
     row.ad_name ||= row.ad_id ? adNames.get(String(row.ad_id)) || null : null;
     row.form_name ||= row.form_id ? formNames.get(String(row.form_id)) || null : null;
-    row.platform ||= usableAttributionText((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform);
-    row.placement ||= usableAttributionText((row.raw as any)?.platform_position || (row.raw as any)?.placement);
-    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id && row.form_id && row.campaign_name && row.adset_name && row.ad_name && row.form_name && row.platform && row.placement
+    row.platform = normalizeMetaPlatform(row.platform || (row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform) || "Meta Ads";
+    row.placement = normalizeMetaPlacement(row.placement || (row.raw as any)?.platform_position || (row.raw as any)?.placement) || null;
+    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id && row.form_id && row.campaign_name && row.adset_name && row.ad_name && row.form_name
       ? "captured"
       : "partial";
   }
@@ -981,6 +982,15 @@ Deno.serve(async (req) => {
         const existingTrackingById = new Map<string, string>(
           (existingLeads || []).map((row: any) => [String(row.meta_lead_id), leadAttributionFingerprint(row)]),
         );
+        const leadIdList = (existingLeads || []).map((row: any) => String(row.meta_lead_id)).filter(Boolean);
+        const linkedLeadIdSet = new Set<string>();
+        for (let i = 0; i < leadIdList.length; i += 500) {
+          const { data: linkedRows } = await admin
+            .from("rd_deals")
+            .select("meta_lead_id")
+            .in("meta_lead_id", leadIdList.slice(i, i + 500));
+          for (const lr of linkedRows || []) if (lr.meta_lead_id) linkedLeadIdSet.add(String(lr.meta_lead_id));
+        }
         if (existingLeadsError) {
           formErrors.push(`catalog repair: ${existingLeadsError.message}`);
         } else if (existingLeads?.length) {
@@ -1183,12 +1193,14 @@ Deno.serve(async (req) => {
               if (hasExceededSyncDeadline(deadlineAt)) {
                 throw new Error(`Sincronização Meta excedeu ${Math.round(SYNC_LEAD_RUN_BUDGET_MS / 1000)}s; snapshot anterior preservado.`);
               }
-              // The scheduled worker rereads an attribution lookback. Do not
-              // repeat the expensive RD lookup/write when the lead's tracking
-              // fingerprint is unchanged; webhooks and explicit reconciliation
-              // still handle newly arrived or repaired attribution.
-              if (existingTrackingById.get(String(row.meta_lead_id)) === leadAttributionFingerprint(row)) continue;
+              // The scheduled worker rereads an attribution lookback. If the
+              // tracking fingerprint is unchanged AND the lead is already linked
+              // to an RD deal, skip it. If the deal arrived after the lead, retry
+              // the match so the deal receives its attribution.
+              const alreadyLinked = linkedLeadIdSet.has(String(row.meta_lead_id));
+              if (alreadyLinked && existingTrackingById.get(String(row.meta_lead_id)) === leadAttributionFingerprint(row)) continue;
               const trackingResult = await syncMetaLeadToRD(admin, String(row.meta_lead_id), deadlineAt);
+              if (trackingResult.status === "written") linkedLeadIdSet.add(String(row.meta_lead_id));
               if (trackingResult.status === "failed" && trackingResult.error) formErrors.push(`lead ${row.meta_lead_id}: ${trackingResult.error}`);
             }
           }

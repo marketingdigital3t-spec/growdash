@@ -1,5 +1,6 @@
 import type { InsightRow } from "@/hooks/useInsights";
 import { mergeManualTracking, type ManualTracking } from "@/lib/leadTracking";
+import { normalizeMetaPlatform, normalizeMetaPlacement } from "@/lib/metaDeliveryNormalization";
 
 export type LeadAttributionMethod = "meta_id" | "utm" | "touch" | "manual" | "unmatched";
 export type LeadAttributionStatus = "attributed" | "partial" | "unavailable";
@@ -110,11 +111,32 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
       status: "attributed",
     };
   };
+  const rawPlatform = text(deal.meta_platform);
+  const rawPlacement = text(deal.meta_placement);
+  const hasMetaLink = Boolean(
+    deal.meta_attribution_method ||
+    deal.meta_ad_id ||
+    deal.meta_form_id ||
+    deal.meta_campaign_id ||
+    deal.meta_campaign_name ||
+    deal.meta_ad_name ||
+    rawPlatform
+  );
+  const normalizedPlatform = normalizeMetaPlatform(rawPlatform) || (hasMetaLink ? "Meta Ads" : null);
+  const normalizedPlacement = normalizeMetaPlacement(rawPlacement);
+
   if (!hit) {
+    const hasMetaRecorded = Boolean(
+      deal.meta_ad_id ||
+      deal.meta_attribution_method ||
+      (deal.meta_campaign_name && (deal.meta_ad_name || deal.meta_form_name))
+    );
+    const status: LeadAttributionStatus = hasMetaRecorded ? "attributed" : hasAny ? "partial" : "unavailable";
+    const method: LeadAttributionMethod = hasMetaRecorded ? "meta_id" : "unmatched";
     return applyManual({
       source,
-      platform: text(deal.meta_platform) || null,
-      placement: text(deal.meta_placement) || null,
+      platform: normalizedPlatform,
+      placement: normalizedPlacement,
       formId: text(deal.meta_form_id) || null,
       formName: text(deal.meta_form_name) || null,
       isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
@@ -124,14 +146,14 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
       adsetName: text(deal.meta_adset_name) || adset || null,
       adId,
       adName: text(deal.meta_ad_name) || creative || null,
-      method: hasAny ? "unmatched" : "unmatched",
-      status: hasAny ? "partial" : "unavailable",
+      method,
+      status,
     });
   }
   return applyManual({
     source,
-    platform: text(deal.meta_platform) || null,
-    placement: text(deal.meta_placement) || null,
+    platform: normalizedPlatform,
+    placement: normalizedPlacement,
     formId: text(deal.meta_form_id) || null,
     formName: text(deal.meta_form_name) || null,
     isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
