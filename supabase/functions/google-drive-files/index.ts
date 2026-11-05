@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         for (const file of files.slice(0, 200)) {
           const event = { type: "google_drive_file" as const, id: String(file.id || ""), text: String(file.name || ""), integration_id: integration.id, file };
           for (const automation of matchingWorkflowAutomations(automations, event)) {
-            const response = await fetch(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-drive:${integration.id}:${file.id}:${file.modifiedTime || ""}` }) });
+            const response = await fetchGoogle(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-drive:${integration.id}:${file.id}:${file.modifiedTime || ""}` }) });
             const result = await response.json().catch(() => ({}));
             workflowResults.push({ automation_id: automation.id, file_id: file.id, status: response.ok ? result?.status || "processed" : "failed", detail: result?.error || null });
           }
@@ -106,10 +106,23 @@ Deno.serve(async (req) => {
     if (input.action === "upload") {
       const name = String(input.name ?? "").trim();
       const mimeType = String(input.mimeType ?? "application/octet-stream");
-      const contentBase64 = String(input.contentBase64 ?? "");
+      const contentBase64 = String(input.contentBase64 ?? "").replace(/^data:[^;]+;base64,/i, "").replace(/\s/g, "");
       if (!name || !contentBase64) return json({ error: "Escolha um arquivo para enviar." }, 400);
-      const bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
-      if (bytes.byteLength > 10 * 1024 * 1024) return json({ error: "Envie arquivos de até 10 MB por vez." }, 413);
+      // Reject oversized payloads before atob allocates a decoded buffer. A
+      // base64 request is roughly 4/3 the binary size, so this bound keeps
+      // the Edge isolate from being exhausted by an otherwise rejected file.
+      const maxBytes = 10 * 1024 * 1024;
+      const maxBase64Length = Math.ceil(maxBytes / 3) * 4;
+      if (contentBase64.length > maxBase64Length || !/^[A-Za-z0-9+/]*={0,2}$/.test(contentBase64) || contentBase64.length % 4 === 1) {
+        return json({ error: "Envie arquivos de até 10 MB por vez." }, 413);
+      }
+      let bytes: Uint8Array;
+      try {
+        bytes = Uint8Array.from(atob(contentBase64), (char) => char.charCodeAt(0));
+      } catch {
+        return json({ error: "O conteúdo do arquivo está inválido." }, 400);
+      }
+      if (bytes.byteLength > maxBytes) return json({ error: "Envie arquivos de até 10 MB por vez." }, 413);
       const boundary = `growdash-${crypto.randomUUID()}`;
       const metadata = JSON.stringify({ name, mimeType });
       const body = new Blob([`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`, bytes, `\r\n--${boundary}--`]);

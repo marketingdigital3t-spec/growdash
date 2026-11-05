@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -61,18 +62,39 @@ Deno.serve(async (req) => {
     const runId = run.data?.id;
     await admin.from("expert_sheet_connections").update({ status: "syncing", last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
     const range = encodeURIComponent(`${connection.worksheet_name}!A:ZZ`);
-    let response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (response.status === 401) { token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken; response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } }); }
+    const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`;
+    let response = await fetchWithTimeout(sheetsUrl, { headers: { Authorization: `Bearer ${token}` } }, 15_000);
+    if (response.status === 401) { token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken; response = await fetchWithTimeout(sheetsUrl, { headers: { Authorization: `Bearer ${token}` } }, 15_000); }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error?.message || "Não foi possível ler a planilha Google Sheets.");
     const values = Array.isArray(payload.values) ? payload.values : [];
     if (!values.length) throw new Error("A aba da planilha está vazia.");
     const headers = values[0].map(norm);
     const rows = values.slice(1).filter((row: unknown[]) => row.some((cell) => String(cell ?? "").trim()));
-    const { data: classes, error: classesError } = await admin.from("event_classes").select("id,title,expert_name,expert_id");
-    if (classesError) throw classesError;
-    const expertName = norm(expert?.nome);
-    const classRows = (classes || []).filter((item: any) => item.expert_id === connection.expert_id || (Boolean(expertName) && norm(item.expert_name) === expertName));
+    const { data: sources, error: sourcesError } = await admin.from("expert_operation_sources").select("ad_account_id").eq("expert_id", connection.expert_id).not("ad_account_id", "is", null);
+    if (sourcesError) throw sourcesError;
+    const accountIds = Array.from(new Set((sources || []).map((source: any) => String(source.ad_account_id || "")).filter(Boolean)));
+    const classRowsById = new Map<string, any>();
+    const { data: directClasses, error: directClassesError } = await admin.from("event_classes").select("id,title,expert_name,expert_id,ad_account_id").eq("expert_id", connection.expert_id);
+    if (directClassesError) throw directClassesError;
+    for (const item of directClasses || []) classRowsById.set(String(item.id), item);
+    if (accountIds.length) {
+      const { data: accountClasses, error: accountClassesError } = await admin.from("event_classes").select("id,title,expert_name,expert_id,ad_account_id").in("ad_account_id", accountIds);
+      if (accountClassesError) throw accountClassesError;
+      for (const item of accountClasses || []) classRowsById.set(String(item.id), item);
+      const { data: linkedClasses, error: linkedClassesError } = await admin.from("event_class_accounts").select("event_class_id").in("ad_account_id", accountIds);
+      if (linkedClassesError) throw linkedClassesError;
+      const linkedIds = Array.from(new Set((linkedClasses || []).map((item: any) => String(item.event_class_id || "")).filter(Boolean)));
+      if (linkedIds.length) {
+        const { data: linkedRows, error: linkedRowsError } = await admin.from("event_classes").select("id,title,expert_name,expert_id,ad_account_id").in("id", linkedIds);
+        if (linkedRowsError) throw linkedRowsError;
+        for (const item of linkedRows || []) classRowsById.set(String(item.id), item);
+      }
+    }
+    // Match only classes explicitly linked to this expert or one of its
+    // configured ad accounts. Name-only matching would cross workspace data
+    // whenever two experts share a display name.
+    const classRows = Array.from(classRowsById.values()).filter((item: any) => !item.expert_id || item.expert_id === connection.expert_id);
     const classById = new Map(classRows.map((item: any) => [String(item.id), item]));
     const classByName = new Map<string, any[]>();
     for (const item of classRows) {
@@ -116,7 +138,7 @@ Deno.serve(async (req) => {
       for (const synced of syncedEvents.slice(0, 200)) {
         const event = { type: "google_sheets_row" as const, id: synced.id, text: String(synced.raw.name || synced.raw.email || ""), integration_id: connection.id, spreadsheet_id: connection.spreadsheet_id, raw: synced.raw };
         for (const automation of matchingWorkflowAutomations(automations, event)) {
-          const response = await fetch(`${base}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-sheets:${connection.id}:${synced.id}` }) });
+          const response = await fetchWithTimeout(`${base}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-sheets:${connection.id}:${synced.id}` }) }, 15_000);
           const result = await response.json().catch(() => ({}));
           workflowResults.push({ automation_id: automation.id, row_id: synced.id, status: response.ok ? result?.status || "processed" : "failed", detail: result?.error || null });
         }

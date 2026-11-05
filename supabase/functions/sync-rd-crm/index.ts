@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { buildRDDealNote, isNoteAutomationFunnel } from "../_shared/rdDealNote.ts";
 import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,7 +101,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: true, reason: "pipeline_not_linked" });
     }
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/rd-sync-deals`, {
+    const response = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/rd-sync-deals`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
@@ -114,7 +115,7 @@ Deno.serve(async (req) => {
         cron_trigger: true,
         trigger_source: "webhook",
       }),
-    });
+    }, 30_000);
     const result = await response.json().catch(() => ({}));
     // RD retries a webhook when it receives a non-2xx response. A duplicate
     // execution is expected while the per-funnel sync lock is held; accepting
@@ -238,11 +239,11 @@ async function findMetaLead(admin: any, deal: any) {
 
 async function createRDNote(token: string, rdDealId: string, body: string): Promise<string | null> {
   if (!token) throw new Error("Token do RD Station ausente");
-  const response = await fetch(`https://crm.rdstation.com/api/v1/activities?token=${encodeURIComponent(token)}`, {
+  const response = await fetchWithTimeout(`https://crm.rdstation.com/api/v1/activities?token=${encodeURIComponent(token)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ deal_id: rdDealId, type: "note", description: body }),
-  });
+  }, 15_000);
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`RD note HTTP ${response.status}${detail ? ` — ${detail.slice(0, 180)}` : ""}`);

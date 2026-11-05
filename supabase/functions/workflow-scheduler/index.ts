@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { secretsMatch } from "../_shared/secretsMatch.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,6 +21,10 @@ function matches(field: string, value: number, minimum: number, maximum: number)
   });
 }
 
+function isWildcard(field: string) {
+  return field.split(",").every((part) => part.split("/")[0] === "*");
+}
+
 function nextOccurrence(expression: string, timezone: string, from: Date) {
   const fields = expression.trim().split(/\s+/);
   if (fields.length !== 5) throw new Error("A expressão cron precisa de cinco campos.");
@@ -29,7 +34,14 @@ function nextOccurrence(expression: string, timezone: string, from: Date) {
     const candidate = new Date(from.getTime() + minute * 60_000);
     const parts = Object.fromEntries(formatter.formatToParts(candidate).filter((item) => item.type !== "literal").map((item) => [item.type, item.value]));
     const month = Number(parts.month); const day = Number(parts.day); const hour = Number(parts.hour); const minuteValue = Number(parts.minute); const weekday = weekdayMap[parts.weekday];
-    const dayMatches = matches(fields[2], day, 1, 31) && matches(fields[4], weekday, 0, 6);
+    const dayOfMonthMatches = matches(fields[2], day, 1, 31);
+    const dayOfWeekMatches = matches(fields[4], weekday, 0, 6);
+    // POSIX cron uses OR when both day-of-month and day-of-week are
+    // restricted. Using AND silently drops valid executions such as
+    // "weekdays on the 1st or 15th".
+    const dayMatches = isWildcard(fields[2]) || isWildcard(fields[4])
+      ? dayOfMonthMatches && dayOfWeekMatches
+      : dayOfMonthMatches || dayOfWeekMatches;
     if (matches(fields[0], minuteValue, 0, 59) && matches(fields[1], hour, 0, 23) && dayMatches && matches(fields[3], month, 1, 12)) return candidate.toISOString();
   }
   throw new Error("Não foi possível calcular a próxima execução do agendamento.");
@@ -48,7 +60,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
   if (!(await validCron(req))) return json({ error: "Não autorizado" }, 401);
   const now = new Date();
-  const { data: schedules, error } = await admin.from("growdash_workflow_schedules").select("id,workflow_id,workspace_id,cron_expression,timezone,next_run_at").eq("status", "active").or(`next_run_at.is.null,next_run_at.lte.${now.toISOString()}`).order("next_run_at", { ascending: true, nullsFirst: true }).limit(50);
+  const { data: schedules, error } = await admin.from("growdash_workflow_schedules").select("id,workflow_id,workspace_id,cron_expression,timezone,next_run_at,failure_count,last_error").eq("status", "active").or(`next_run_at.is.null,next_run_at.lte.${now.toISOString()}`).order("next_run_at", { ascending: true, nullsFirst: true }).limit(50);
   if (error) return json({ error: error.message }, 500);
   const results: Array<Record<string, unknown>> = [];
   for (const schedule of schedules || []) {
@@ -59,7 +71,7 @@ Deno.serve(async (req) => {
       // is allowed to execute the workflow.
       const { data: claimed, error: claimError } = await admin
         .from("growdash_workflow_schedules")
-        .update({ next_run_at: nextRunAt, last_run_at: now.toISOString() })
+        .update({ next_run_at: nextRunAt, last_error: null })
         .eq("id", schedule.id)
         .eq("status", "active")
         .or(`next_run_at.is.null,next_run_at.lte.${now.toISOString()}`)
@@ -72,12 +84,18 @@ Deno.serve(async (req) => {
       }
       const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
       if (internalSecret.length < 24) throw new Error("AUTOMATION_INTERNAL_SECRET não configurado");
-      const response = await fetch(`${url}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: schedule.workflow_id, mode: "schedule", input: { source: "schedule", scheduled_at: now.toISOString(), schedule_id: schedule.id }, idempotency_key: `schedule:${schedule.id}:${now.toISOString().slice(0, 16)}` }) });
+      const response = await fetchWithTimeout(`${url}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: schedule.workflow_id, mode: "schedule", input: { source: "schedule", scheduled_at: now.toISOString(), schedule_id: schedule.id }, idempotency_key: `schedule:${schedule.id}:${now.toISOString().slice(0, 16)}` }) }, 15_000);
       const payload = await response.json().catch(() => ({}));
-      results.push({ workflow_id: schedule.workflow_id, status: response.ok ? payload.status || "success" : "error", next_run_at: nextRunAt });
+      if (!response.ok) throw new Error(String(payload?.error || `workflow-execute HTTP ${response.status}`).slice(0, 500));
+      await admin.from("growdash_workflow_schedules").update({ last_run_at: now.toISOString(), status: "active", last_error: null, failure_count: 0 }).eq("id", schedule.id);
+      results.push({ workflow_id: schedule.workflow_id, status: payload.status || "success", next_run_at: nextRunAt });
     } catch (scheduleError) {
-      await admin.from("growdash_workflow_schedules").update({ status: "error" }).eq("id", schedule.id);
-      results.push({ workflow_id: schedule.workflow_id, status: "error", error: scheduleError instanceof Error ? scheduleError.message : "Falha no agendamento" });
+      const message = (scheduleError instanceof Error ? scheduleError.message : "Falha no agendamento").slice(0, 500);
+      const cronError = /expressão cron|calcular a próxima execução|timezone/i.test(message);
+      const retryCount = Number(schedule.failure_count || 0) + 1;
+      const retryAt = new Date(Date.now() + Math.min(6 * 60 * 60_000, 15 * 60_000 * (2 ** Math.min(retryCount - 1, 5)))).toISOString();
+      await admin.from("growdash_workflow_schedules").update({ status: cronError ? "error" : "active", next_run_at: cronError ? schedule.next_run_at : retryAt, last_error: message, failure_count: retryCount }).eq("id", schedule.id);
+      results.push({ workflow_id: schedule.workflow_id, status: "error", retry_at: cronError ? null : retryAt, error: message });
     }
   }
   return json({ ok: results.every((item) => item.status !== "error"), processed: results.length, results });

@@ -4,6 +4,7 @@ import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { classifySyncErrorCode, redactSyncErrorMessage } from "../../../src/lib/syncContract.ts";
 import { normalizeMetaPlatform, normalizeMetaPlacement } from "../_shared/metaDeliveryNormalization.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,7 +122,7 @@ async function fetchLead(leadId: string, account: MetaAccount) {
   const baseUrl = `https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}`;
   const accessToken = `access_token=${encodeURIComponent(account.access_token)}`;
   const request = async (fields: string) => {
-    const response = await fetch(`${baseUrl}?fields=${fields}&${accessToken}`);
+    const response = await fetchWithTimeout(`${baseUrl}?fields=${fields}&${accessToken}`, {}, 12_000);
     const payload = await response.json().catch(() => ({}));
     return { response, payload };
   };
@@ -159,7 +160,7 @@ async function fetchLead(leadId: string, account: MetaAccount) {
 async function graphObject(id: string | null | undefined, fields: string, account: MetaAccount) {
   if (!id) return null;
   const version = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
-  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(account.access_token)}`);
+  const response = await fetchWithTimeout(`https://graph.facebook.com/${version}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(account.access_token)}`, {}, 12_000);
   const payload = await response.json().catch(() => ({}));
   return response.ok && !payload?.error ? payload : null;
 }
@@ -239,7 +240,7 @@ async function dispatchLeadWorkflows(admin: any, workspaceId: string | null, lea
   for (const automation of automations || []) {
     const definition = automation.workflow_definition as { nodes?: Array<{ type?: string }> } | null;
     if (!definition?.nodes?.some((node) => node.type === "lead.trigger")) continue;
-    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { source: "meta_lead", meta_lead_id: lead.meta_lead_id, lead, event_id: eventId }, idempotency_key: `meta-lead:${automation.id}:${String(lead.meta_lead_id || eventId)}` }) });
+    const response = await fetchWithTimeout(`${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { source: "meta_lead", meta_lead_id: lead.meta_lead_id, lead, event_id: eventId }, idempotency_key: `meta-lead:${automation.id}:${String(lead.meta_lead_id || eventId)}` }) }, 15_000);
     const payload = await response.json().catch(() => ({}));
     results.push({ automation_id: automation.id, automation_name: automation.name, status: response.ok ? payload?.status || "processed" : "failed", detail: payload?.error ?? null });
   }

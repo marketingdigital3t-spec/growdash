@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -7,7 +8,7 @@ const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-
 
 async function reprocessMissingDeals(funnel: { id: string; user_id: string }, dealIds: string[]) {
   if (dealIds.length === 0) return { attempted: 0, ok: true, response: null };
-  const response = await fetch(`${url}/functions/v1/rd-sync-deals`, {
+  const response = await fetchWithTimeout(`${url}/functions/v1/rd-sync-deals`, {
     method: "POST",
     headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -17,7 +18,7 @@ async function reprocessMissingDeals(funnel: { id: string; user_id: string }, de
       cron_trigger: true,
       trigger_source: "rd_metric_reconciliation",
     }),
-  });
+  }, 30_000);
   const payload = await response.json().catch(() => ({}));
   return { attempted: dealIds.length, ok: response.ok && payload?.success !== false && payload?.ok !== false, response: { status: response.status, payload } };
 }

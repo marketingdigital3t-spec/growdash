@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 const sha256 = async (value: string) => {
@@ -25,7 +26,7 @@ async function fetchProfile(url: URL, token: string) {
     const attempt = new URL(url);
     attempt.searchParams.set("fields", fields);
     attempt.searchParams.set("access_token", token);
-    lastResponse = await fetch(attempt);
+    lastResponse = await fetchWithTimeout(attempt, {}, 15_000);
     lastPayload = await lastResponse.json().catch(() => ({}));
     if (lastResponse.ok && (lastPayload.id || lastPayload.user_id)) return { response: lastResponse, payload: lastPayload };
   }
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
     if (!code) return page("error", "O Instagram não devolveu o código de autorização.");
     const redirectUri = Deno.env.get("INSTAGRAM_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/instagram-oauth-callback`;
     const form = new URLSearchParams({ client_id: appId, client_secret: appSecret, grant_type: "authorization_code", redirect_uri: redirectUri, code });
-    const shortResponse = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+    const shortResponse = await fetchWithTimeout("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form }, 15_000);
     const short = await shortResponse.json().catch(() => ({}));
     if (!shortResponse.ok || !short.access_token) {
       console.error("Instagram short token exchange failed", short?.error_type ?? shortResponse.status);
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
     longUrl.searchParams.set("client_secret", appSecret);
     longUrl.searchParams.set("access_token", short.access_token);
-    const longResponse = await fetch(longUrl);
+    const longResponse = await fetchWithTimeout(longUrl, {}, 15_000);
     const long = await longResponse.json().catch(() => ({}));
     const token = String(long.access_token ?? short.access_token);
     const expiresIn = Number(long.expires_in ?? 3600);
