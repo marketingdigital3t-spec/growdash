@@ -18,6 +18,18 @@ deploy/.env
 .output
 .vinxi
 .tanstack/**
+
+# Perfil persistente do Playwright usado pelo traffic-agent. Os cookies e a
+# sessão do Ads Manager neste diretório equivalem a acesso total à conta de
+# anúncios: nunca devem entrar no histórico do Git.
+work/
+traffic-agent-profile/
+
+# Relatórios e locks gerados pelo loop-engineering
+reports/*.lock/
+reports/*.json.lock/
+test-results/
+playwright-report/
 .nitro
 *.local
 *.tsbuildinfo

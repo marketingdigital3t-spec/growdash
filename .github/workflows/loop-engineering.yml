@@ -9,8 +9,13 @@ on:
     # GitHub Actions cron usa UTC: executa no minuto 17 a cada 3 horas.
     - cron: "17 */3 * * *"
 
+# O bot não deve re-disparar a si mesmo: um push do próprio loop em main
+# gerava outro run, que podia gerar outro push, em ciclo. Pushes do bot são
+# ignorados; pushes humanos continuam publicando normalmente.
+
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: growdash-promotion-${{ github.ref }}
@@ -18,6 +23,7 @@ concurrency:
 
 jobs:
   detect:
+    if: github.actor != 'growdash-loop-engineering[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -85,14 +91,57 @@ jobs:
 
       - name: Commit validated automatic repairs
         if: steps.repair.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -u
           if git diff --quiet; then exit 0; fi
+          # Só entram arquivos que o reparo realmente pode tocar. Um "git add ."
+          #或其它 aqui versionaria artefatos de build, .env e relatórios.
           git add src supabase/functions supabase/migrations scripts package.json package-lock.json docs
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "growdash-loop-engineering[bot]"
           git config user.email "growdash-loop-engineering[bot]@users.noreply.github.com"
           git commit -m "fix: apply validated loop engineering repairs"
-          git push origin HEAD:main
+          # Antes isso era "git push origin HEAD:main", com auto-commit direto
+          # em produção e sem revisão. O push em main também re-disparava este
+          # workflow, criando um ciclo de push que podia republicar sozinho.
+          # O reparo passa a subir como branch + PR, e um push do próprio bot em
+          # main é ignorado para não alimentar o laço.
+          branch="loop-engineering/auto-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "$branch"
+          git push origin "$branch"
+          {
+            echo "title=fix: apply validated loop engineering repairs"
+            echo "body=Reparo determinístico aplicado pelo loop engineering. Commit automático sem revisão humana direta: revisar antes de mergear."
+            echo "head=$branch"
+            echo "base=main"
+          } >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_ENV"
+
+      - name: Open pull request for validated repairs
+        if: steps.repair.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          if [ -z "${GITHUB_TOKEN:-}" ]; then
+            echo "GITHUB_TOKEN ausente; PR não será aberto (reparo permanece na branch)."
+            exit 0
+          fi
+          branch="${branch:-}"
+          if [ -z "$branch" ]; then exit 0; fi
+          payload=$(printf '{"title":"fix: apply validated loop engineering repairs","head":"%s","base":"main","body":"Reparo deterministico aplicado pelo loop engineering. Revisar antes de mergear."}' "$branch")
+          code="$(curl -sS -o /tmp/gd-pr.json -w '%{http_code}' -X POST \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data "$payload")"
+          if [ "$code" != "201" ]; then
+            echo "Não foi possível abrir o PR (HTTP $code); o reparo permanece na branch $branch para revisão manual."
+            exit 0
+          fi
+          echo "PR aberto com o reparo na branch $branch."
 
       - name: Upload loop report
         if: always()
@@ -150,29 +199,34 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          set +e
+          set -u
           timeout -k 10s 90s supabase link --project-ref cixnvosxqlacjbpymjha
           status=$?
           if [ "$status" -ne 0 ]; then
-            echo "Supabase link não respondeu (exit $status); usando o project-ref local para continuar a publicação."
-            mkdir -p supabase/.temp
-            printf '%s' 'cixnvosxqlacjbpymjha' > supabase/.temp/project-ref
+            # Sem link real o "supabase link" pode falhar por indisponibilidade
+            # do serviço, e seguir com um project-ref local faz o CLI agir como
+            # se estivesse vinculado sem estar. Publicar assim pode aplicar a
+            # migration no projeto errado, então falhamos fechado.
+            echo "Supabase link falhou (exit $status); publicação bloqueada para não agir com vínculo indefinido."
+            exit 2
           fi
-          exit 0
 
       - name: Validate migrations without applying them
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          set +e
+          set -u
           timeout -k 10s 90s supabase migration list --linked
           list_status=$?
           timeout -k 10s 90s supabase db push --linked --dry-run
           dry_run_status=$?
+          # Falha fechada: sem dry-run bem-sucedido não é seguro aplicar
+          # migration. Antes esta etapa terminava em "exit 0" e a publicação
+          # seguia com o schema possivelmente divergente da migrations.
           if [ "$list_status" -ne 0 ] || [ "$dry_run_status" -ne 0 ]; then
-            echo "Supabase database indisponível para validação (list=$list_status dry-run=$dry_run_status); migrations ficarão pendentes de verificação."
+            echo "Supabase database indisponível para validação (list=$list_status dry-run=$dry_run_status); publicação bloqueada."
+            exit 2
           fi
-          exit 0
 
       - name: Run Supabase advisors and retain evidence
         env:
@@ -199,7 +253,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          set +e
+          set -u
           for attempt in 1 2 3; do
             timeout -k 10s 90s supabase db push --linked --yes
             status=$?
@@ -217,8 +271,12 @@ jobs:
             echo "Banco remoto confirmado atualizado; a falha anterior foi apenas de disponibilidade do apply."
             exit 0
           fi
-          echo "Não foi possível confirmar o estado das migrations após a falha do apply; publicação de funções e frontend seguirá, e migrations ficam pendentes de verificação."
-          exit 0
+          # Falha fechada: sem confirmar o schema, publicar funções e frontend
+          # deixa o app operando contra um banco que pode não ter as tabelas
+          # esperadas. Antes esta etapa terminava em "exit 0" e a publicação
+          # seguia com as migrations pendentes de verificação.
+          echo "Não foi possível confirmar o estado das migrations após a falha do apply; publicação bloqueada."
+          exit 2
 
       - name: Deploy Meta/RD Edge Functions
         env:
@@ -230,12 +288,15 @@ jobs:
           # Only cron/webhook functions intentionally accept requests without a
           # Supabase JWT; authenticated sync functions must be rejected at the
           # gateway before their handler runs.
-          for fn in controlled-realtime-sync sync-meta-insights sync-meta-hourly sync-meta-leads sync-meta-balance rd-sync-deals meta-traffic-mcp; do
+          for fn in controlled-realtime-sync sync-meta-insights sync-meta-hourly sync-meta-leads sync-meta-balance rd-sync-deals meta-traffic-mcp repair-lead-attribution; do
             supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha
           done
-          for fn in daily-incremental-sync meta-webhook whatsapp-agent-reply; do
+          for fn in daily-incremental-sync meta-webhook whatsapp-agent-reply daily-reconciliation; do
             supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
           done
+          # repair-lead-attribution é invocada por daily-reconciliation: se ela
+          # for publicada depois, o job diário falha com 404 na invocação.
+          # Por isso a ordem acima é obrigatória (repair antes do chamador).
 
       - name: Build release artifact
         env:
