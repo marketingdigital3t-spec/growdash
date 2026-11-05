@@ -561,7 +561,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
               })()}
             </div>
             <Tabs className="gd-platform-tabs" value={platformView} onValueChange={(v) => setPlatformView(v as any)}>
-              <TabsList className="mx-auto grid h-9 w-full max-w-md grid-cols-3 place-items-stretch p-1">
+              <TabsList className="gd-platform-segments mx-auto grid h-9 w-fit max-w-full grid-cols-3 place-items-stretch gap-1 border-0 bg-transparent p-1">
                 <TabsTrigger value="leads" className="w-full justify-center text-xs">Leads</TabsTrigger>
                 <TabsTrigger value="revenue" className="w-full justify-center text-xs">Receita</TabsTrigger>
                 <TabsTrigger value="conv" className="w-full justify-center text-xs">Conversão</TabsTrigger>

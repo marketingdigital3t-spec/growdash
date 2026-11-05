@@ -15674,3 +15674,33 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: var(--gd-emerald-bright) !important;
   stroke: currentColor !important;
 }
+
+/* Platform distribution — segmented control --------------------------
+   Leads/Receita/Conversão is a single control, not a nested card. The
+   tablist used to carry its own rounded border, which collided with the
+   emerald card-border contract and drew a square frame around three pills
+   that already had a border of their own. The frame is gone here: the group
+   is a neutral rail and only the segments keep their own border. */
+.brand-shell :is(.dashboard-page, .expert-dashboard) .gd-platform-segments {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* One radius for the same control on the dashboard and on the Expert panel. */
+.brand-shell :is(.dashboard-page, .expert-dashboard) .gd-platform-segments [role="tab"] {
+  border-radius: 8px !important;
+}
+/* The active segment carries the emerald accent; the others stay neutral so
+   the control reads as one row of switches instead of three competing cards. */
+.brand-shell :is(.dashboard-page, .expert-dashboard) .gd-platform-segments [role="tab"]:not([data-state="active"]) {
+  background: transparent !important;
+  color: var(--gd-content-muted) !important;
+}
+.brand-shell :is(.dashboard-page, .expert-dashboard) .gd-platform-segments [role="tab"]:not([data-state="active"]):hover {
+  background: color-mix(in srgb, var(--gd-content-text) 8%, transparent) !important;
+  border-color: var(--gd-content-text) !important;
+  color: var(--gd-content-text) !important;
+}
+
