@@ -6,6 +6,7 @@ import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFact
 import { isWonRDStageName } from "../../../src/lib/rdDealStatus.ts";
 import { fetchWithRetry, inCivilPeriod, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 import { isValidCivilDate } from "../_shared/mcpContract.ts";
+import { crmLeadDateBounds } from "../_shared/crmLeadPeriod.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
@@ -187,8 +188,9 @@ Deno.serve(async (req) => {
     let crmLeadQuery = admin.from("crm_leads")
       .select("id,status,source_provider,first_received_at,last_received_at,utm_source,utm_campaign")
       .eq("workspace_id", workspace.id).order("first_received_at", { ascending: false }).limit(1000);
-    if (startDate) crmLeadQuery = crmLeadQuery.gte("first_received_at", `${startDate}T00:00:00.000Z`);
-    if (endDate) crmLeadQuery = crmLeadQuery.lt("first_received_at", `${endDate}T23:59:59.999Z`);
+    const crmLeadBounds = crmLeadDateBounds(startDate, endDate, workspace.timezone || "America/Sao_Paulo");
+    if (crmLeadBounds.start) crmLeadQuery = crmLeadQuery.gte("first_received_at", crmLeadBounds.start);
+    if (crmLeadBounds.endExclusive) crmLeadQuery = crmLeadQuery.lt("first_received_at", crmLeadBounds.endExclusive);
     const { data: crmLeads, error: crmLeadError } = await crmLeadQuery;
     if (crmLeadError) throw crmLeadError;
     const crmLeadFacts = {

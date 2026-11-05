@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
 import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
@@ -1166,7 +1167,7 @@ Deno.serve(async (req) => {
 
     async function persistDeal(d: any, existingProfile: any = null) {
       const rdDealId = String(d.id || d._id);
-      const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
+      const amountTotal = parseLocaleAmount(d.amount_total ?? d.amount);
       const stageName = rdDealStageName(d);
       const stageId = rdDealStageId(d);
       const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
@@ -1194,7 +1195,7 @@ Deno.serve(async (req) => {
           && String(existingProfile.stage_updated_at || "") === String(providerUpdatedAt)
           && (!providerStageKnown || String(existingProfile.rd_stage_id || "") === String(stageId || ""))
           && (!providerStageKnown || String(existingProfile.rd_stage_name || "") === String(stageName || ""))
-          && (!providerAmountKnown || Number(existingProfile.amount_total || 0) === amountTotal)
+          && (!providerAmountKnown || amountTotal === null || Number(existingProfile.amount_total || 0) === amountTotal)
           && (!providerClosedAtKnown || String(existingProfile.closed_at || "") === String(d.closed_at || ""))
           && (!providerWinKnown || Boolean(existingProfile.win) === Boolean(won)),
       );
@@ -1294,7 +1295,7 @@ Deno.serve(async (req) => {
         if (!match) match = productList.find((p) => norm.includes(normalize(p.name)));
         if (match) {
           productId = match.id;
-          if (match.tax_rate) {
+          if (match.tax_rate && amountTotal !== null) {
             taxAmount = amountTotal * (match.tax_rate / 100);
             netRevenue = amountTotal - taxAmount;
           }
@@ -1429,7 +1430,7 @@ Deno.serve(async (req) => {
       if (existingSalesError) throw existingSalesError;
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
-      const hasFinancialData = amountTotal > 0 || netRevenue > 0 || taxAmount > 0;
+      const hasFinancialData = amountTotal !== null || netRevenue !== null || taxAmount > 0;
 
       // A won RD deal is canonical for counting conversions, but it is not
       // proof of a payment. Do not create a zero-value financial sale when RD
@@ -1698,7 +1699,7 @@ Deno.serve(async (req) => {
           rd_stage_order: stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
           stage_bucket: bucketFromStage(stageName, won, lost),
           win: won,
-          amount_total: parseFloat(d.amount_total || d.amount || "0") || 0,
+          amount_total: parseLocaleAmount(d.amount_total ?? d.amount),
           lead_created_at: d.created_at || null,
           stage_updated_at: d.stage_updated_at || d.updated_at || null,
           closed_at: d.closed_at || null,

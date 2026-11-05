@@ -22,8 +22,14 @@ Deno.serve(async (req) => {
   const { data: member } = await admin.from("workspace_members").select("id").eq("workspace_id", approval.workspace_id).eq("user_id", user.id).eq("status", "active").maybeSingle();
   if (!member) return json({ error: "Workspace não autorizado." }, 403);
   if (approval.status !== "pending") return json({ ok: true, status: approval.status, run_id: approval.run_id });
-  const { error: updateError } = await admin.from("growdash_workflow_approvals").update({ status: decision, resolved_at: new Date().toISOString(), resolved_by: user.id }).eq("id", approval.id).eq("status", "pending");
+  // Consume the pending row atomically. A concurrent click must not resume
+  // the same run twice, even when both requests read `pending` beforehand.
+  const { data: consumedApproval, error: updateError } = await admin.from("growdash_workflow_approvals").update({ status: decision, resolved_at: new Date().toISOString(), resolved_by: user.id }).eq("id", approval.id).eq("status", "pending").select("id,status").maybeSingle();
   if (updateError) return json({ error: updateError.message }, 500);
+  if (!consumedApproval) {
+    const { data: current } = await admin.from("growdash_workflow_approvals").select("status").eq("id", approval.id).maybeSingle();
+    return json({ ok: true, status: current?.status || "unknown", run_id: approval.run_id, duplicate: true });
+  }
   if (decision === "rejected") {
     await admin.from("growdash_automation_runs").update({ status: "error", error_message: "Aprovação manual rejeitada.", finished_at: new Date().toISOString() }).eq("id", approval.run_id).eq("status", "partial");
     return json({ ok: true, status: "rejected", run_id: approval.run_id });

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,25 +27,24 @@ function isConfirmedStatus(status?: string | null) {
     .some((value) => normalized === value || normalized.includes(value));
 }
 
-function parseAmount(amountObj: any): number {
-  if (amountObj == null) return 0;
+function parseAmount(amountObj: any): number | null {
+  if (amountObj == null) return null;
   // Meta returns: { currency, total, total_cents } where total is already in major currency unit (e.g. "2400.00")
   if (typeof amountObj === "object") {
     if (amountObj.total != null) {
-      const n = Number(String(amountObj.total).replace(",", "."));
-      if (isFinite(n)) return n;
+      const n = parseLocaleAmount(amountObj.total);
+      if (n !== null) return n;
     }
     if (amountObj.total_cents != null) {
       const n = Number(amountObj.total_cents);
       if (isFinite(n)) return n / 100;
     }
     if (amountObj.value != null) {
-      const n = Number(String(amountObj.value).replace(",", "."));
-      if (isFinite(n)) return n;
+      const n = parseLocaleAmount(amountObj.value);
+      if (n !== null) return n;
     }
   }
-  const n = Number(String(amountObj).replace(/[^0-9.\-]/g, ""));
-  return isFinite(n) ? n : 0;
+  return parseLocaleAmount(amountObj);
 }
 
 async function fetchTransactions(metaAccountId: string, token: string, sinceUnix: number) {
@@ -183,8 +183,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const rows = txs.map((t: any) => {
+        const rows = txs.flatMap((t: any) => {
           const amount = parseAmount(t.amount);
+          if (amount === null) {
+            errors.push(`${acc.name}: transação ${String(t.id || "sem id")} sem valor financeiro válido; registro ignorado.`);
+            return [];
+          }
           const currency = (typeof t.amount === "object" && t.amount?.currency) || null;
           const timeIso = t.time
             ? new Date(typeof t.time === "number" ? t.time * 1000 : t.time).toISOString()
@@ -193,7 +197,7 @@ Deno.serve(async (req) => {
             id: String(t.id),
             ad_account_id: acc.id,
             time: timeIso,
-            amount: isFinite(amount) ? amount : 0,
+            amount,
             currency,
             status: t.status ?? null,
             payment_method: mapPaymentMethod(t.payment_option),

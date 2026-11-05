@@ -4,6 +4,7 @@ import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { filterHourlyFactsByRange, missingHourlyFactKeys, staleHourlyAdIds, type HourlyFactKey } from "../../../src/lib/hourlySyncContract.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
+import { fetchWithTimeout, remainingSyncTimeoutMs } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -361,12 +362,16 @@ Deno.serve(async (req) => {
 });
 
 const RETRYABLE_META_CODES = new Set([1, 2, 4, 17, 32, 613, 80004]);
+const HOURLY_META_DEADLINE_MS = 60_000;
+const HOURLY_META_REQUEST_TIMEOUT_MS = 15_000;
 
-async function fetchMeta(url: string, maxAttempts = 4): Promise<any> {
+async function fetchMeta(url: string, maxAttempts = 4, deadlineAt = Date.now() + HOURLY_META_DEADLINE_MS): Promise<any> {
   let lastMessage = "Falha ao consultar a Graph API";
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(url);
+      if (Date.now() >= deadlineAt) return { error: { message: "Meta request deadline exceeded", is_transient: true }, __retryable: true };
+      const timeoutMs = remainingSyncTimeoutMs(deadlineAt, HOURLY_META_REQUEST_TIMEOUT_MS);
+      const response = await fetchWithTimeout(url, {}, timeoutMs);
       const raw = await response.text();
       let payload: any = {};
       try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = {}; }
@@ -378,14 +383,16 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<any> {
       if (retryable && attempt + 1 < maxAttempts) {
         const retryAfter = Number(response.headers.get("retry-after") || 0) * 1000;
         const exponential = 750 * (2 ** attempt) + Math.floor(Math.random() * 250);
-        await sleep(Math.min(15_000, Math.max(retryAfter, exponential)));
+        const delay = Math.min(15_000, Math.max(retryAfter, exponential), Math.max(0, deadlineAt - Date.now()));
+        if (delay <= 0) break;
+        await sleep(delay);
         continue;
       }
       return { ...payload, error: { ...metaError, message: lastMessage }, __httpStatus: response.status, __retryable: retryable };
     } catch (error) {
       lastMessage = error instanceof Error ? error.message : "Falha de rede ao consultar a Meta";
-      if (attempt + 1 < maxAttempts) {
-        await sleep(750 * (2 ** attempt));
+      if (attempt + 1 < maxAttempts && Date.now() < deadlineAt) {
+        await sleep(Math.min(750 * (2 ** attempt), Math.max(0, deadlineAt - Date.now())));
         continue;
       }
     }
@@ -393,7 +400,7 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<any> {
   return { error: { message: lastMessage, is_transient: true }, __retryable: true };
 }
 
-async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{ data: any[]; pages?: number; error?: string; errorCode?: number; retryable?: boolean; repeatedCursor?: boolean; truncated?: boolean }> {
+async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY, deadlineAt = Date.now() + HOURLY_META_DEADLINE_MS): Promise<{ data: any[]; pages?: number; error?: string; errorCode?: number; retryable?: boolean; repeatedCursor?: boolean; truncated?: boolean }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
@@ -401,7 +408,7 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
   while (next && pages < maxPages) {
     if (seen.has(next)) return { data: all, pages, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação horária." };
     seen.add(next);
-    const res = await fetchMeta(next);
+    const res = await fetchMeta(next, 4, deadlineAt);
     if (res.error) return {
       data: all,
       error: res.error.message || String(res.error),

@@ -62,13 +62,13 @@ function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
   // Re-read a small overlap so a provider that updates a record at the edge of
   // a window cannot leave a gap. The upserts/deduplication make this safe.
   const parsedPrevious = previousEnd ? new Date(previousEnd) : null;
-  // This short run window bounds run telemetry and RD incremental
-  // reconciliation. Meta uses a separate per-account attribution lookback
-  // below because timestamp overlap alone cannot correct late conversions.
-  const previousIsRecent = parsedPrevious && Number.isFinite(parsedPrevious.getTime())
-    ? end.getTime() - parsedPrevious.getTime() <= 5 * 60_000
-    : false;
-  const watermark = previousIsRecent && parsedPrevious
+  const previousIsValid = parsedPrevious !== null && Number.isFinite(parsedPrevious.getTime());
+  // O watermark anterior SEMPRE define o início da janela. Antes, um run
+  // anterior mais velho que 5 minutos era descartado e a janela regridia para
+  // "agora - 5min", o que perdia em silêncio todo o intervalo entre o último
+  // window_end real e agora (por exemplo, depois de uma queda de 20 minutos).
+  // Nenhum backfill cobria essa lacuna. Aqui o gap é preservado.
+  const watermark = previousIsValid && parsedPrevious
     ? parsedPrevious
     : new Date(end.getTime() - 5 * 60_000);
   // Keep a small overlap around the five-minute cadence. Upserts make the

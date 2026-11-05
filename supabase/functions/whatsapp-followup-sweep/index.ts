@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 import { secretsMatch } from "../_shared/secretsMatch.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -16,6 +17,10 @@ Deno.serve(async (req) => {
   }
   if (!(expected.length >= 24 && secretsMatch(provided, expected)) && !cronAuthorized) return json({ error: "Não autorizado" }, 401);
   const now = new Date().toISOString();
+  // Processing is a lease only after provider idempotency exists. Reopening a
+  // timed-out claim can duplicate a message that the provider already accepted,
+  // so uncertain claims remain visible for reconciliation instead of retrying
+  // silently.
   const { data: due, error: dueError } = await admin.from("whatsapp_followups").select("id,workspace_id,conversation_id,whatsapp_number_id,agent_id,sequence_no").eq("status", "pending").lte("scheduled_at", now).order("scheduled_at").limit(100);
   if (dueError) return json({ error: "Fila de follow-ups indisponível", error_code: "WHATSAPP_FOLLOWUP_QUEUE_UNAVAILABLE" }, 503);
   const results: unknown[] = [];
@@ -24,11 +29,25 @@ Deno.serve(async (req) => {
     if (!claimed.data?.id) continue;
     const { data: conversation } = await admin.from("whatsapp_conversations").select("id,workspace_id,wa_contact_id,last_inbound_at,last_outbound_at,whatsapp_number_id").eq("id", followup.conversation_id).maybeSingle();
     const { data: number } = await admin.from("whatsapp_numbers").select("id,provider,phone_number_id,access_token,waha_session_name,mode,agent_id").eq("id", followup.whatsapp_number_id).maybeSingle();
-    if (!conversation || !number || number.mode === "human") { await cancelWhatsAppFollowups(admin, followup.conversation_id); continue; }
-    if (conversation.last_outbound_at && conversation.last_inbound_at && new Date(conversation.last_outbound_at) > new Date(conversation.last_inbound_at)) { await cancelWhatsAppFollowups(admin, followup.conversation_id); continue; }
-    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-agent-reply`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-internal-secret": expected }, body: JSON.stringify({ conversation_id: conversation.id, followup_id: followup.id }) });
-    if (response.ok) { await admin.from("whatsapp_followups").update({ status: "sent", updated_at: new Date().toISOString() }).eq("id", followup.id); results.push({ id: followup.id, status: "sent" }); }
-    else { const errorText = await response.text(); await admin.from("whatsapp_followups").update({ status: "failed", error_message: errorText.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", followup.id); results.push({ id: followup.id, status: "failed" }); }
+    if (!conversation || !number || number.mode === "human") { await admin.from("whatsapp_followups").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", followup.id).eq("status", "processing"); await cancelWhatsAppFollowups(admin, followup.conversation_id); continue; }
+    if (conversation.last_outbound_at && conversation.last_inbound_at && new Date(conversation.last_outbound_at) > new Date(conversation.last_inbound_at)) { await admin.from("whatsapp_followups").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", followup.id).eq("status", "processing"); await cancelWhatsAppFollowups(admin, followup.conversation_id); continue; }
+    try {
+      const response = await fetchWithTimeout(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-agent-reply`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-internal-secret": expected }, body: JSON.stringify({ conversation_id: conversation.id, followup_id: followup.id }) }, 15_000);
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && (payload?.sent || payload?.handoff || payload?.skipped)) {
+        const status = payload?.skipped ? "cancelled" : "sent";
+        await admin.from("whatsapp_followups").update({ status, provider_message_id: Array.isArray(payload?.provider_message_ids) ? String(payload.provider_message_ids[0] || "") || null : String(payload?.provider_message_id || "") || null, updated_at: new Date().toISOString() }).eq("id", followup.id).eq("status", "processing");
+        results.push({ id: followup.id, status });
+      } else {
+        const errorText = typeof payload?.error === "string" ? payload.error : `HTTP ${response.status}`;
+        await admin.from("whatsapp_followups").update({ status: "failed", error_message: errorText.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", followup.id).eq("status", "processing");
+        results.push({ id: followup.id, status: "failed" });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao executar o follow-up.";
+      await admin.from("whatsapp_followups").update({ status: "failed", error_message: message.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", followup.id).eq("status", "processing");
+      results.push({ id: followup.id, status: "failed", error: message });
+    }
   }
   return json({ processed: results.length, results });
 });

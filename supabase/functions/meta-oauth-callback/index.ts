@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     const metaError = url.searchParams.get("error_message")
       ?? url.searchParams.get("error_description")
       ?? url.searchParams.get("error");
-    if (metaError) return resultPage("error", `A Meta recusou a autorização: ${metaError}`);
+    if (metaError) return resultPage("error", "A Meta recusou a autorização.");
 
     const code = url.searchParams.get("code");
     if (!code) return resultPage("error", "A Meta não devolveu o código de autorização.");

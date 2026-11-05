@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,14 +12,14 @@ function safeWebhookUrl(value: unknown) {
   const url = new URL(String(value ?? ""));
   if (url.protocol !== "https:") throw new Error("O webhook precisa usar HTTPS.");
   const host = url.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".local") || host === "0.0.0.0" || host === "::1" || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+  if (host.includes(":") || /^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host) || host === "localhost" || host.endsWith(".local") || host === "0.0.0.0" || host === "::1" || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
     throw new Error("O webhook deve apontar para um host público.");
   }
   return url;
 }
 
 async function graphRequest(url: URL, init: RequestInit) {
-  const response = await fetch(url, init);
+  const response = await fetchWithTimeout(url, init, 15_000);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error) throw new Error(payload?.error?.message ?? `Instagram HTTP ${response.status}`);
   return payload;
@@ -75,14 +76,18 @@ Deno.serve(async (req) => {
         }
         if (type === "webhook") {
           const url = safeWebhookUrl(action.url);
-          const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Growdash-Automation/1.0" }, body: JSON.stringify({ automation_id: automation.id, workspace_id: automation.workspace_id, trigger: triggerEvent }) });
+          const response = await fetchWithTimeout(url, { method: "POST", headers: { "Content-Type": "application/json", "User-Agent": "Growdash-Automation/1.0" }, body: JSON.stringify({ automation_id: automation.id, workspace_id: automation.workspace_id, trigger: triggerEvent }) }, 15_000);
           if (!response.ok) throw new Error(`Webhook respondeu HTTP ${response.status}`);
           executed.push({ type, status: "sent", host: url.host });
           continue;
         }
         if (type === "instagram_reply") {
           const socialAccountId = String(automation.trigger_config?.social_account_id ?? "");
-          const { data: account } = await admin.from("social_accounts").select("id,user_id,provider_account_id").eq("id", socialAccountId).maybeSingle();
+          let { data: account } = await admin.from("social_accounts").select("id,user_id,provider_account_id,workspace_id").eq("id", socialAccountId).eq("workspace_id", automation.workspace_id).maybeSingle();
+          if (!account && automation.created_by) {
+            const legacy = await admin.from("social_accounts").select("id,user_id,provider_account_id,workspace_id").eq("id", socialAccountId).is("workspace_id", null).eq("user_id", automation.created_by).maybeSingle();
+            account = legacy.data;
+          }
           if (!account) throw new Error("Perfil do Instagram não encontrado.");
           const { data: integration } = await admin.from("integrations").select("api_token,is_active,token_expires_at").eq("user_id", account.user_id).eq("provider", "instagram_business").eq("provider_account_id", account.provider_account_id).maybeSingle();
           if (!integration?.is_active || !integration.api_token) throw new Error("Reconecte o Instagram antes de enviar respostas.");

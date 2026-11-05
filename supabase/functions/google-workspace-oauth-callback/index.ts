@@ -1,10 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) => byte.toString(16).padStart(2, "0")).join("");
 const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+const appOrigin = () => new URL(Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").origin;
 const page = (status: "success" | "error", message: string) => {
   const payload = JSON.stringify({ type: "growdash-google-workspace-oauth", status, message }).replaceAll("<", "\\u003c");
-  return new Response(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Google</title><style>body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #444;border-radius:18px;background:#161616;padding:32px;text-align:center;box-shadow:0 20px 60px #0008}h1{color:${status === "success" ? "#fff" : "#ff7474"}}p{color:#c8c8c8;line-height:1.55}button{border:0;border-radius:10px;background:#fff;color:#111;padding:12px 18px;font-weight:700}</style><main><h1>${status === "success" ? "Google conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
+  return new Response(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Google</title><style>body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #444;border-radius:18px;background:#161616;padding:32px;text-align:center;box-shadow:0 20px 60px #0008}h1{color:${status === "success" ? "#fff" : "#ff7474"}}p{color:#c8c8c8;line-height:1.55}button{border:0;border-radius:10px;background:#fff;color:#111;padding:12px 18px;font-weight:700}</style><main><h1>${status === "success" ? "Google conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},${JSON.stringify(appOrigin())})}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
 };
 
 Deno.serve(async (req) => {
@@ -13,7 +15,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const state = url.searchParams.get("state") ?? "";
     const code = url.searchParams.get("code") ?? "";
-    if (!state || !code) return page("error", url.searchParams.get("error_description") ?? "O Google não devolveu uma autorização válida.");
+    if (!state || !code) return page("error", "O Google não devolveu uma autorização válida.");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID")?.trim();
     const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")?.trim();
@@ -24,10 +26,10 @@ Deno.serve(async (req) => {
     if (!stateRow || new Date(stateRow.expires_at).getTime() < Date.now()) return page("error", "Esta tentativa expirou ou já foi utilizada.");
     const redirectUri = Deno.env.get("GOOGLE_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/google-workspace-oauth-callback`;
     const body = new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" });
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+    const tokenResponse = await fetchWithTimeout("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }, 15_000);
     const token = await tokenResponse.json().catch(() => ({}));
     if (!tokenResponse.ok || !token.access_token) return page("error", "O Google não aceitou a troca do código. Confira o cliente OAuth e a URL de retorno.");
-    const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` } });
+    const profileResponse = await fetchWithTimeout("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` } }, 15_000);
     const profile = await profileResponse.json().catch(() => ({}));
     const email = String(profile.email ?? "").trim().toLowerCase();
     if (!profileResponse.ok || !email) return page("error", "A conta Google foi autorizada, mas o e-mail não pôde ser identificado.");

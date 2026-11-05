@@ -44,9 +44,16 @@ Deno.serve(async (req) => {
     if (!connectionId) return json({ error: "Informe a conexão da planilha." }, 400);
     const { data: connection, error: connectionError } = await admin.from("expert_sheet_connections").select("*").eq("id", connectionId).maybeSingle();
     if (connectionError || !connection) return json({ error: "Conexão de planilha não encontrada." }, 404);
-    const { data: expert } = await admin.from("experts").select("id,workspace_id,nome").eq("id", connection.expert_id).maybeSingle();
-    const { data: membership } = await admin.from("workspace_members").select("id").eq("workspace_id", expert?.workspace_id).eq("user_id", user.id).maybeSingle();
-    if (!membership && expert?.workspace_id) return json({ error: "Sem permissão para este expert." }, 403);
+    const { data: expert, error: expertError } = await admin.from("experts").select("id,workspace_id,nome").eq("id", connection.expert_id).maybeSingle();
+    // This function uses the service role for the provider read, so the
+    // workspace check must fail closed before any Google token is loaded.
+    // Treat lookup failures as unavailable instead of allowing a transient
+    // null expert/workspace to bypass authorization.
+    if (expertError) return json({ error: "Não foi possível validar o expert." }, 503);
+    if (!expert?.workspace_id) return json({ error: "Expert sem workspace válido." }, 404);
+    const { data: membership, error: membershipError } = await admin.from("workspace_members").select("id").eq("workspace_id", expert.workspace_id).eq("user_id", user.id).eq("status", "active").maybeSingle();
+    if (membershipError) return json({ error: "Não foi possível validar a permissão do workspace." }, 503);
+    if (!membership) return json({ error: "Sem permissão para este expert." }, 403);
     const { data: integration } = await admin.from("integrations").select("id,api_token,token_expires_at").eq("user_id", user.id).eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
     if (!integration) return json({ error: "Conecte uma conta Google antes de sincronizar a planilha." }, 409);
     let token = (await getFreshGoogleToken(admin, integration)).accessToken;

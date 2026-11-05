@@ -1,8 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const valueAt = (source: any, paths: string[]) => paths.map((path) => path.split(".").reduce((current, key) => current?.[key], source)).find((value) => value !== undefined && value !== null && value !== "");
-const numberValue = (value: unknown) => Number(String(value ?? 0).replace(",", ".")) || 0;
+const numberValue = (value: unknown) => parseLocaleAmount(value);
 const stringValue = (value: unknown) => typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
 
 function secretsMatch(received: string | null | undefined, expected: string | null | undefined) {
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
     if (eventError) throw eventError;
     const normalized = normalize(payload, eventType);
     const { data: existing } = await admin.from("sales").select("id").eq("user_id", integration.user_id).eq("source_provider", sourceProvider).eq("source_record_id", recordId).maybeSingle();
+    if (normalized.gross === null) return json({ error: "Evento sem valor financeiro válido", error_code: "SALE_AMOUNT_UNAVAILABLE" }, 422);
     const sale = { user_id: integration.user_id, sale_date: normalized.saleDate, gross_revenue: normalized.gross, net_revenue: normalized.net, tax_amount: 0, refund_amount: normalized.refunded ? normalized.gross : 0, chargeback_amount: normalized.chargeback ? normalized.gross : 0, payment_method: normalized.payment, payment_method_source: "webhook", status: normalized.status, quantity: normalized.quantity, contact_name: normalized.name || null, contact_email: normalized.email || null, contact_phone: normalized.phone || null, rd_product_name: normalized.product || null, source_provider: sourceProvider, source_record_id: recordId, source_closed_at: new Date().toISOString(), notes: `Webhook ${sourceProvider}` };
     const result = existing ? await admin.from("sales").update(sale).eq("id", existing.id) : await admin.from("sales").insert(sale);
     if (result.error) throw result.error;

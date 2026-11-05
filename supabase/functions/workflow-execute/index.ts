@@ -4,6 +4,7 @@ import { resumeWorkflow } from "../_shared/workflowResume.ts";
 import { getFreshGoogleToken } from "../_shared/googleToken.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { normalizeSellerNotification, normalizeTagAssignment, normalizeTask } from "../_shared/automationActions.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -30,10 +31,11 @@ const integrationFor = async (admin: any, userId: string, provider: string, prov
   if (!data?.api_token) throw new Error(`Integração ${provider} não configurada para este workflow.`);
   return data;
 };
+const externalFetch = (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15_000) => fetchWithTimeout(input, init, timeoutMs);
 const googleRequest = async (admin: any, userId: string, url: string, init: RequestInit = {}) => {
   const integration = await integrationFor(admin, userId, "google_workspace");
   let token = (await getFreshGoogleToken(admin, integration)).accessToken;
-  const request = () => fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
+  const request = () => externalFetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
   let response = await request();
   if (response.status === 401) {
     token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken;
@@ -103,7 +105,10 @@ function safeUrl(raw: unknown): string {
   if (!/^https?:$/.test(url.protocol)) throw new Error("A URL deve usar HTTPS ou HTTP público.");
   const host = url.hostname.toLowerCase();
   if (url.protocol === "http:" && host !== "localhost") throw new Error("Requisições externas precisam usar HTTPS.");
-  if (/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|::1$)/.test(host) || host.endsWith(".local")) throw new Error("URL privada bloqueada por segurança.");
+  // Reject alternate numeric and IPv6 spellings of loopback/private hosts.
+  // DNS rebinding cannot be made safe with a hostname regex alone, so
+  // configurable HTTP nodes remain deny-by-default for literal IP aliases.
+  if (host.includes(":") || /^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host) || /^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host.endsWith(".local")) throw new Error("URL privada bloqueada por segurança.");
   return url.toString();
 }
 async function sha(value: string) { const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return [...new Uint8Array(bytes)].map((item) => item.toString(16).padStart(2, "0")).join(""); }
@@ -155,7 +160,7 @@ async function executeGoogleNode(admin: any, actorId: string, type: string, para
     let bytes: Uint8Array;
     if (String(parameters.contentBase64 || "")) bytes = Uint8Array.from(atob(String(parameters.contentBase64)), (char) => char.charCodeAt(0));
     else if (String(parameters.fileUrl || "")) {
-      const response = await fetch(safeUrl(parameters.fileUrl));
+      const response = await externalFetch(safeUrl(parameters.fileUrl));
       if (!response.ok) throw new Error(`Não foi possível baixar o arquivo (HTTP ${response.status}).`);
       bytes = new Uint8Array(await response.arrayBuffer());
     } else throw new Error("Informe contentBase64 ou fileUrl para enviar um arquivo ao Drive.");
@@ -171,7 +176,18 @@ async function executeGoogleNode(admin: any, actorId: string, type: string, para
 
 async function executeInstagramNode(admin: any, actorId: string, type: string, parameters: Record<string, unknown>, context: Record<string, unknown>) {
   const accountId = String(parameters.socialAccountId || parameters.social_account_id || getPath(context, "trigger.social_account_id") || "");
-  const { data: account } = await admin.from("social_accounts").select("id,provider_account_id").eq("id", accountId).maybeSingle();
+  const workspaceId = String(getPath(context, "workflow.workspace_id") || "");
+  const accountQuery = admin.from("social_accounts").select("id,provider_account_id,workspace_id").eq("id", accountId);
+  let { data: account } = workspaceId
+    ? await accountQuery.eq("workspace_id", workspaceId).maybeSingle()
+    : { data: null };
+  // Legacy OAuth rows may not have workspace_id. They are eligible only when
+  // they belong to the workflow actor, which prevents cross-tenant access
+  // while allowing a controlled migration of old connections.
+  if (!account && workspaceId) {
+    const legacy = await admin.from("social_accounts").select("id,provider_account_id,workspace_id").eq("id", accountId).is("workspace_id", null).eq("user_id", actorId).maybeSingle();
+    account = legacy.data;
+  }
   if (!account) throw new Error("Selecione uma conta do Instagram para este nó.");
   const integration = await integrationFor(admin, actorId, "instagram_business", account.provider_account_id);
   const version = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
@@ -183,19 +199,19 @@ async function executeInstagramNode(admin: any, actorId: string, type: string, p
     const senderId = String(parameters.recipientId || trigger.sender_id || trigger.recipient_id || "");
     if (commentId) {
       const url = new URL(`https://graph.instagram.com/${version}/${encodeURIComponent(commentId)}/replies`);
-      const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ message, access_token: String(integration.api_token) }) });
+      const response = await externalFetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ message, access_token: String(integration.api_token) }) });
       return providerJson(response, "O Instagram recusou a resposta ao comentário");
     }
     if (!senderId) throw new Error("O evento do Instagram não contém comment_id ou sender_id.");
     const url = new URL(`https://graph.instagram.com/${version}/${encodeURIComponent(account.provider_account_id)}/messages`);
     url.searchParams.set("access_token", String(integration.api_token));
-    return providerJson(await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: { id: senderId }, message: { text: message } }) }), "O Instagram recusou a mensagem");
+    return providerJson(await externalFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: { id: senderId }, message: { text: message } }) }), "O Instagram recusou a mensagem");
   }
   const recipientId = String(parameters.recipientId || trigger.recipient_id || trigger.sender_id || "");
   if (!recipientId) throw new Error("Informe recipientId para enviar uma mensagem no Instagram.");
   const url = new URL(`https://graph.instagram.com/${version}/${encodeURIComponent(account.provider_account_id)}/messages`);
   url.searchParams.set("access_token", String(integration.api_token));
-  return providerJson(await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: { id: recipientId }, message: { text: message } }) }), "O Instagram recusou o envio");
+  return providerJson(await externalFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: { id: recipientId }, message: { text: message } }) }), "O Instagram recusou o envio");
 }
 
 async function executeRDNode(admin: any, actorId: string, type: string, parameters: Record<string, unknown>, context: Record<string, unknown>) {
@@ -208,25 +224,25 @@ async function executeRDNode(admin: any, actorId: string, type: string, paramete
   const fields = parameters.fields && typeof parameters.fields === "object" && !Array.isArray(parameters.fields) ? parameters.fields as Record<string, unknown> : {};
   if (type === "crm.note.create") {
     if (!dealId || !String(parameters.body || parameters.note || "").trim()) throw new Error("A anotação RD exige rd_deal_id e body.");
-    const response = await fetch(`https://crm.rdstation.com/api/v1/activities?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal_id: dealId, type: "note", description: String(parameters.body || parameters.note).trim() }) });
+    const response = await externalFetch(`https://crm.rdstation.com/api/v1/activities?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal_id: dealId, type: "note", description: String(parameters.body || parameters.note).trim() }) });
     return providerJson(response, "O RD Station recusou a anotação");
   }
   if (type === "crm.contact.upsert") {
     const contact = { ...fields, ...(dealId ? { deal_ids: Array.from(new Set([...(Array.isArray(fields.deal_ids) ? fields.deal_ids : []), dealId])) } : {}) };
     if (!Object.keys(contact).length) throw new Error("Informe fields para criar ou atualizar o contato RD.");
-    const response = await fetch(`https://crm.rdstation.com/api/v1/contacts?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ contact }) });
+    const response = await externalFetch(`https://crm.rdstation.com/api/v1/contacts?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ contact }) });
     return providerJson(response, "O RD Station recusou o contato");
   }
   if (type === "crm.deal.create") {
     const deal = { ...fields, ...(parameters.deal_stage_id ? { deal_stage_id: String(parameters.deal_stage_id) } : {}) };
     if (!Object.keys(deal).length) throw new Error("Informe fields para criar a negociação RD.");
-    const response = await fetch(`https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal }) });
+    const response = await externalFetch(`https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}`, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal }) });
     return providerJson(response, "O RD Station recusou a negociação");
   }
   if (type === "crm.stage.change") {
     const stageId = String(parameters.deal_stage_id || parameters.stageId || "").trim();
     if (!dealId || !stageId) throw new Error("Alterar etapa exige rd_deal_id e deal_stage_id.");
-    const response = await fetch(`https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(dealId)}?token=${encodeURIComponent(token)}`, { method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal_stage_id: stageId }) });
+    const response = await externalFetch(`https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(dealId)}?token=${encodeURIComponent(token)}`, { method: "PUT", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ deal_stage_id: stageId }) });
     return providerJson(response, "O RD Station recusou a alteração de etapa");
   }
   throw new Error(`Nó RD não suportado: ${type}`);
@@ -346,7 +362,7 @@ Deno.serve(async (req) => {
       if (runError || !createdRun) throw runError || new Error("Não foi possível iniciar a execução.");
       run = createdRun;
     }
-    const context: Record<string, unknown> = { trigger: input, lead: input.lead || input, date: { now: new Date().toISOString() }, node: {} };
+    const context: Record<string, unknown> = { trigger: input, lead: input.lead || input, workflow: { id: workflowId, workspace_id: automation.workspace_id }, date: { now: new Date().toISOString() }, node: {} };
     if (resumeNodeId) {
       const { data: previousSteps, error: previousStepsError } = await admin.from("growdash_workflow_run_steps").select("node_id,output").eq("run_id", run.id).eq("status", "success").order("created_at", { ascending: true });
       if (previousStepsError) throw previousStepsError;
@@ -387,7 +403,7 @@ Deno.serve(async (req) => {
           const method = String(p.method || "POST").toUpperCase();
           let requestBody: unknown = p.body || {};
           if (typeof requestBody === "string") { try { requestBody = JSON.parse(requestBody); } catch { /* envia texto literal quando não for JSON */ } }
-          const response = await fetch(safeUrl(p.url), { method, headers: { "Content-Type": "application/json", ...safeHeaderMap(p.headers) }, body: ["GET", "HEAD"].includes(method) ? undefined : typeof requestBody === "string" ? requestBody : JSON.stringify(requestBody) });
+          const response = await externalFetch(safeUrl(p.url), { method, headers: { "Content-Type": "application/json", ...safeHeaderMap(p.headers) }, body: ["GET", "HEAD"].includes(method) ? undefined : typeof requestBody === "string" ? requestBody : JSON.stringify(requestBody) });
           const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(`HTTP ${response.status}: ${String(result?.message || result?.error || response.statusText)}`); return { status: response.status, body: result };
         }
         case "condition.if": case "logic.filter": {
@@ -425,14 +441,14 @@ Deno.serve(async (req) => {
           const { data: number } = numberId ? await numberQuery.eq("id", numberId).maybeSingle() : await numberQuery.limit(1).maybeSingle();
           if (!number) throw new Error("Nenhum número WhatsApp conectado neste workspace.");
           const response = number.provider === "waha"
-            ? await fetch(`${(Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "")}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${phone}@c.us`, text: message }) })
-            : await fetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body: message } }) });
+            ? await externalFetch(`${(Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "")}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${phone}@c.us`, text: message }) })
+            : await externalFetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body: message } }) });
           const result = await response.json().catch(() => ({})); if (!response.ok || result.error) throw new Error(result.error?.message || "A Meta recusou o envio."); return { message_id: result.messages?.[0]?.id || null, status: "sent" };
         }
         case "agent.run": {
           const key = Deno.env.get("OPENAI_API_KEY"); if (!key) throw new Error("Agente IA indisponível: OPENAI_API_KEY não configurada.");
           const prompt = String(p.prompt || ""); if (!prompt) throw new Error("A instrução do agente é obrigatória.");
-          const response = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: String(p.model || "gpt-4o-mini"), temperature: Number(p.temperature ?? 0.2), max_tokens: Math.min(2000, Number(p.maxTokens || 500)), messages: [{ role: "user", content: resolve(prompt, context) }] }) });
+          const response = await externalFetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: String(p.model || "gpt-4o-mini"), temperature: Number(p.temperature ?? 0.2), max_tokens: Math.min(2000, Number(p.maxTokens || 500)), messages: [{ role: "user", content: resolve(prompt, context) }] }) });
           const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error?.message || "Falha no agente IA."); const text = result.choices?.[0]?.message?.content || ""; return p.output === "json" ? JSON.parse(text) : text;
         }
         case "task.create": case "tag.add": case "seller.notify": return executeInternalAction(admin, { id: workflowId, workspace_id: automation.workspace_id }, run.id, actorId, node.type, p);

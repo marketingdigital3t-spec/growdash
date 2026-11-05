@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
 import { buildRannielyFallbackReply, buildRannielyIdentityContext, buildRannielyMediaHandoffSummary, getRannielyGreeting, getRannielyNextQuestionIndex, isRannielyAgentContext, isWhatsAppImage, needsRannielyReplyCorrection, RANNIELY_FUNNEL_QUESTIONS, RANNIELY_HANDOFF_ACK, RANNIELY_MEDIA_ACK, RANNIELY_POLICY, splitWhatsAppReply } from "../_shared/whatsappAgentPolicy.ts";
 import { neutralizeCommandMarkers, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 function secretsMatch(received: string | null | undefined, expected: string | null | undefined) {
@@ -20,12 +21,12 @@ const internal = (req: Request) => {
 async function sendMessage(number: Record<string, unknown>, to: string, text: string) {
   if (number.provider === "waha") {
     const base = (Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "");
-    const response = await fetch(`${base}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${to}@c.us`, text }) });
+    const response = await fetchWithTimeout(`${base}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${to}@c.us`, text }) }, 15_000);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.message || "WAHA recusou a mensagem.");
     return String(payload.id || payload.messageId || crypto.randomUUID());
   }
-  const response = await fetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: text } }) });
+  const response = await fetchWithTimeout(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: text } }) }, 15_000);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "Meta recusou a mensagem.");
   return String(payload.messages?.[0]?.id || crypto.randomUUID());
@@ -44,7 +45,7 @@ async function claimHandoff(admin: any, conversationId: string, summary: string)
 }
 
 async function generateAgentReply(key: string, model: string, prompt: string, history: Array<{ role: "assistant" | "user"; content: string }>) {
-  const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) });
+  const response = await fetchWithTimeout(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.2, max_tokens: 500, messages: [{ role: "system", content: prompt }, ...history] }) }, 20_000);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) return { error: payload?.error?.message || "Falha no agente" };
   const text = String(payload.choices?.[0]?.message?.content || "").trim();

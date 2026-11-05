@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     if (oauthState) await admin.from("instagram_oauth_states").delete().eq("state_hash", stateHash);
     if (!oauthState || new Date(oauthState.expires_at).getTime() < Date.now()) return page("error", "Esta tentativa expirou ou já foi utilizada.");
     const denied = url.searchParams.get("error_description") ?? url.searchParams.get("error_message");
-    if (denied) return page("error", `O Instagram recusou a autorização: ${denied}`);
+    if (denied) return page("error", "O Instagram recusou a autorização.");
     const code = url.searchParams.get("code")?.replace(/#_$/, "");
     if (!code) return page("error", "O Instagram não devolveu o código de autorização.");
     const redirectUri = Deno.env.get("INSTAGRAM_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/instagram-oauth-callback`;

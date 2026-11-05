@@ -82,7 +82,10 @@ Deno.serve(async (req) => {
     for (const service_user_id of serviceUserIds) {
       const r = await invokeFn("reconcile-sales-rd", { days: 90, service_user_id });
       if (!r.ok) throw new Error(`reconcile failed for ${service_user_id}: ${r.status} ${JSON.stringify(r.data)}`);
-      processed += Number((r.data as any)?.created ?? 0);
+      // A função devolve deals_upserted/sales_updated. Ler "created" aqui
+      // fazia processed valer 0 sempre, e a telemetria do job ficava errada.
+      const data = (r.data as any) || {};
+      processed += Number(data.deals_upserted ?? 0) + Number(data.sales_updated ?? 0);
       (metadata.results as unknown[]).push({ service_user_id, result: r.data });
     }
     return { processed, metadata };
@@ -95,9 +98,12 @@ Deno.serve(async (req) => {
       for (let i = 0; i < 10; i++) {
         const r = await invokeFn("rd-enrich-states", { limit: 200, service_user_id });
         if (!r.ok) throw new Error(`enrich failed for ${service_user_id}: ${r.status}`);
-        const updated = (r.data as any)?.updated ?? 0;
-        total += updated;
-        if (updated < 50) break; // nothing significant left
+        // A função devolve enriched/processed. Ler "updated" (que não existe)
+        // fazia o loop quebrar na primeira iteração, truncando o backlog.
+        const data = (r.data as any) || {};
+        const enriched = Number(data.enriched ?? data.processed ?? 0);
+        total += enriched;
+        if (enriched < 50) break; // nothing significant left
       }
     }
     return { processed: total };

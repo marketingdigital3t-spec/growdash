@@ -4,6 +4,7 @@
 //
 // Roda no contexto do usuário autenticado (usa o token de integração dele).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
@@ -245,7 +246,8 @@ Deno.serve(async (req) => {
       if (!funnel) funnel = funnelByAdAccount.get(sale.ad_account_id);
       if (!funnel) { errors++; continue; }
 
-      const amountTotal = parseFloat(deal.amount_total || deal.amount || "0") || 0;
+      const amountTotal = parseLocaleAmount(deal.amount_total ?? deal.amount);
+      if (amountTotal === null) continue;
 
       // Upsert rd_deals
       const { error: upErr } = await admin.from("rd_deals").upsert({

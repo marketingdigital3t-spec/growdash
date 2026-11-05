@@ -278,25 +278,22 @@ jobs:
           echo "Não foi possível confirmar o estado das migrations após a falha do apply; publicação bloqueada."
           exit 2
 
-      - name: Deploy Meta/RD Edge Functions
+      - name: Deploy all Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           supabase secrets set --yes --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
-          # Keep gateway JWT verification aligned with supabase/config.toml.
-          # Only cron/webhook functions intentionally accept requests without a
-          # Supabase JWT; authenticated sync functions must be rejected at the
-          # gateway before their handler runs.
-          for fn in controlled-realtime-sync sync-meta-insights sync-meta-hourly sync-meta-leads sync-meta-balance rd-sync-deals meta-traffic-mcp repair-lead-attribution; do
+          # Deploy every checked-in function. The gateway JWT mode comes from
+          # supabase/config.toml; a hand-maintained allowlist silently left
+          # changed functions stale in production.
+          mapfile -t functions < <(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts -print | sort)
+          test "${#functions[@]}" -gt 0
+          for path in "${functions[@]}"; do
+            fn="$(basename "$(dirname "$path")")"
+            echo "Deploying $fn"
             supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha
           done
-          for fn in daily-incremental-sync meta-webhook whatsapp-agent-reply daily-reconciliation; do
-            supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha --no-verify-jwt
-          done
-          # repair-lead-attribution é invocada por daily-reconciliation: se ela
-          # for publicada depois, o job diário falha com 404 na invocação.
-          # Por isso a ordem acima é obrigatória (repair antes do chamador).
 
       - name: Build release artifact
         env:
