@@ -228,9 +228,11 @@ export default function CrmPage() {
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,
-    // O quadro precisa obedecer ao mesmo calendário visível nos indicadores.
-    // "Máximo" continua sendo a única escolha que solicita o histórico inteiro.
-    dateScope: preset === "max" ? "pipeline" : "period",
+    // O quadro é o espelho do pipeline atual do RD. O calendário continua
+    // restrito aos indicadores abaixo; aplicar o período na leitura do quadro
+    // fazia uma conta sem negócios criados ontem parecer vazia, mesmo com
+    // negociações abertas e válidas no funil do RD.
+    dateScope: "pipeline",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, isError: salesError, error: salesQueryError } = useSales({
@@ -441,8 +443,8 @@ export default function CrmPage() {
     endDate,
     dateRule: "created_at_for_open_closed_at_for_won",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
-  // O quadro e os indicadores usam o mesmo recorte do calendário. A exceção
-  // é o preset "Máximo", que solicita explicitamente todo o histórico.
+  // O quadro mantém o pipeline atual completo; somente os indicadores usam
+  // o recorte civil escolhido no calendário.
   const dealsInPipeline = scopedDeals;
   const dealsInSelectedPeriod = useMemo(
     () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, { ...rdScope, accountIds: [], funnelIds: [] })),
@@ -896,7 +898,7 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro e os indicadores respeitam o período selecionado; escolha “Máximo” para consultar todo o histórico.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro espelha o pipeline atual; os indicadores respeitam o período selecionado.</p></div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
