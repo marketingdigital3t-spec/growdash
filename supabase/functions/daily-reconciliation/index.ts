@@ -29,6 +29,7 @@ async function runJob(jobName: string, fn: () => Promise<{ processed: number; me
     .insert({ job_name: jobName, status: "running", trigger_source: "cron" })
     .select("id")
     .single();
+  if (runInsertError?.code === "23505") return { jobName, ok: true, skipped: true, reason: "Outra execução do mesmo job já está em andamento." };
   if (runInsertError || !run) throw runInsertError || new Error(`Não foi possível registrar o job ${jobName}`);
   const runId = run?.id;
   try {

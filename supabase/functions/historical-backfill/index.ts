@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
     } else {
       const started = new Date().toISOString();
       const { data: createdRun, error: runError } = await admin.from("sync_backfill_runs").insert({ user_id: userId, status: "running", started_at: started }).select("id,user_id,status,summary,started_at").single();
+      if (runError?.code === "23505") return new Response(JSON.stringify({ ok: false, status: "already_running", message: "Já existe um backfill histórico em andamento." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (runError || !createdRun) return new Response(JSON.stringify({ error: runError?.message || "Não foi possível criar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       run = createdRun;
     }

@@ -318,6 +318,12 @@ Deno.serve(async (req) => {
     .single();
 
   if (runError) {
+    if (runError.code === "23505") {
+      return new Response(JSON.stringify({ success: false, status: "skipped", reason: "Outra execução assumiu a janela incremental." }), {
+        status: 202,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: runError.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
