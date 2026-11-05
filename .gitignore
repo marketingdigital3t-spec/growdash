@@ -56,3 +56,4 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 *.sw?
 
 .auth/
+.pnpm-store/

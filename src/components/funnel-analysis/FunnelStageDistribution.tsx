@@ -91,7 +91,12 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
         {visualMode ? (
           <div className="flex flex-col items-center gap-2 py-1" aria-label="Funil visual por etapa">
             <div className="gd-funnel-visual w-full rounded-2xl border border-border/50 bg-background/30 px-2 py-3 sm:px-4 sm:py-4">
-              <div className="gd-funnel-visual-stack mx-auto flex w-full max-w-[560px] flex-col items-center gap-1.5">
+              <div
+                className="gd-funnel-visual-stack mx-auto flex w-full max-w-[560px] flex-col items-center gap-1.5"
+                style={{
+                  "--funnel-stage-accent": funnelStageVisualColor(Math.max(0, visualStageCount - 1), visualStageCount),
+                } as CSSProperties}
+              >
                 <TooltipProvider delayDuration={250}>
                   {stages.map((stage, index) => {
                     const width = funnelStageVisualWidth(index, visualStageCount);
@@ -113,18 +118,18 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                             } as CSSProperties}
                             aria-label={accessibleDescription}
                           >
-                            <span className="pointer-events-none absolute inset-x-6 top-0 h-px rounded-full bg-white/45" aria-hidden="true" />
-                            <span className="relative z-10 flex max-w-full items-center justify-center gap-2 text-[10px] font-extrabold uppercase leading-none tracking-[0.08em]" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span className="gd-funnel-stage-dot h-2 w-2 shrink-0 rounded-full ring-2 ring-black/10" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
+                            <span className="relative z-10 flex max-w-full items-center justify-center gap-2 text-[11px] font-semibold leading-tight" style={{ color: "var(--funnel-stage-text)" }}>
+                              <span className="gd-funnel-stage-dot h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
                               <span className="max-w-full break-words">{stage.name}</span>
                             </span>
-                            <span className="relative z-10 mt-1 flex items-baseline justify-center gap-2 tabular-nums" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span className="text-xl font-black leading-none sm:text-2xl">{stage.count}</span>
-                              <span className="text-[9px] font-bold uppercase tracking-[0.08em] opacity-70">leads</span>
-                              <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] font-bold">{stage.pct.toFixed(1)}%</span>
+                            <span className="relative z-10 mt-1 flex items-baseline justify-center gap-1.5 tabular-nums" style={{ color: "var(--funnel-stage-text)" }}>
+                              <span className="text-[22px] font-semibold leading-none tracking-tight sm:text-[26px]">{stage.count}</span>
+                              <span className="text-[11px] font-medium opacity-55">leads</span>
+                              <span className="ml-1 text-[11px] font-medium opacity-70">{stage.pct.toFixed(1)}%</span>
                             </span>
-                            <span className="relative z-10 mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[9px] font-semibold leading-tight opacity-70" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
+                            <span className="relative z-10 mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 text-[10px] font-medium leading-tight opacity-50" style={{ color: "var(--funnel-stage-text)" }}>
+                              <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias em média` : "Tempo indisponível"}</span>
+                              <span className="opacity-60">·</span>
                               <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
                             </span>
                           </div>
@@ -139,7 +144,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                     );
                   })}
                 </TooltipProvider>
-                <div className="mt-0.5 h-2 w-12 rounded-b-md border-x border-b border-white/50 bg-gradient-to-r from-slate-500 via-slate-100 to-slate-600 shadow-[0_4px_8px_-5px_rgba(0,0,0,.9)]" aria-hidden="true" />
+                <div className="gd-funnel-visual-exit" aria-hidden="true" />
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
