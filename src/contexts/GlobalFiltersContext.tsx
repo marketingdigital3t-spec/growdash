@@ -60,7 +60,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   // data request. Settings screens that intentionally omit workspaceId keep
   // the hook's original behavior.
   const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, !loadingWorkspace);
-  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections(workspace?.id, { enabled: !loadingWorkspace });
+  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections({ enabled: !loadingWorkspace });
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const accountScopeReady = !loadingWorkspace && !!workspace?.id && !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
   const stored = typeof window === "undefined" ? null : readStored();

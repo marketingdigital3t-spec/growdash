@@ -42,8 +42,8 @@ export function SpacePhaseBackground({ phase, dashboardScene = false }: { phase:
 export function SpaceMissionStrip({ phase, realized, target }: { phase: SpacePhase; realized: number; target: number }) {
   const progress = target > 0 ? Math.max(0, Math.min(100, (realized / target) * 100)) : 0;
   return (
-    <section className="space-mission-strip" data-phase={phase} aria-label="Combustível da Missão">
-      <div className="space-mission-title"><Fuel /><span><b>COMBUSTÍVEL DA MISSÃO</b><small>{realized.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} de {target > 0 ? target.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "meta não definida"}</small></span></div>
+    <section className="space-mission-strip" data-phase={phase} aria-label="Meta de faturamento">
+      <div className="space-mission-title"><Fuel /><span><b>META DE FATURAMENTO</b><small>{realized.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} de {target > 0 ? target.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "meta não definida"}</small></span></div>
       <div className="space-mission-track"><span style={{ width: `${progress}%` }} /><SpaceRocket className="space-mission-rocket" style={{ left: `${progress}%` }} /></div>
       <strong>{target > 0 ? `${progress.toFixed(0)}%` : "—"}</strong>
     </section>

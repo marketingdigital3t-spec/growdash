@@ -148,4 +148,38 @@ describe("frontend theme and responsive contracts", () => {
     expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
     expect(themeHook).not.toContain("metallic-gold");
   });
+
+  it("wins the cascade against the legacy gradients that pin the shell flat", () => {
+    // The legacy stylesheet paints the page shells with flat gradients and
+    // pins `background-image: none` on the shell. The premium layer must
+    // mirror those selector depths, otherwise the nebula is silently lost.
+    expect(premiumStyles).toContain(
+      "html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)",
+    );
+    expect(premiumStyles).toContain(
+      "html.gd-premium .brand-shell[data-space-phase] .space-mission-strip",
+    );
+    expect(premiumStyles).toContain(
+      "html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)\n  :is(.gd-panel",
+    );
+    expect(premiumStyles).toContain("html .brand-shell.growdash-app-shell");
+    expect(premiumStyles).toContain("--gd-surface-card: var(--surface-card) !important");
+  });
+
+  it("keeps the platform theme toggle labelled as light and dark modes", () => {
+    const appSidebar = readFileSync(
+      fileURLToPath(new URL("../components/AppSidebar.tsx", import.meta.url)),
+      "utf8",
+    );
+    const layout = readFileSync(
+      fileURLToPath(new URL("../growdash/GrowdashLayout.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(appSidebar).toContain("Modo Claro");
+    expect(appSidebar).toContain("Modo Escuro");
+    expect(appSidebar).toContain('aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}');
+    expect(layout).toContain('aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}');
+    expect(appSidebar).not.toContain("Tema Esmeralda");
+    expect(layout).not.toContain("Tema Esmeralda");
+  });
 });

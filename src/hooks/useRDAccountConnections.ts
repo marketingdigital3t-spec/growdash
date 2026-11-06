@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
 
-const RD_SCOPE_TIMEOUT_MS = 2_500;
+const RD_SCOPE_TIMEOUT_MS = 12_000;
 
 export type RDAccountConnection = {
   id: string;
@@ -24,14 +25,17 @@ export type RDAccountConnection = {
   updated_at: string;
 };
 
-export function useRDAccountConnections(workspaceId?: string, options?: { enabled?: boolean }) {
+export function useRDAccountConnections(options?: { enabled?: boolean }) {
   const { user } = useAuth();
+  const { data: workspace, isLoading: workspaceLoading } = useWorkspace();
+  const workspaceId = workspace?.id;
   const cacheKey = user?.id ? `growdash:rd-connections:${user.id}:${workspaceId ?? "owner-only"}` : "";
   const cachedConnections = readLocalCache<RDAccountConnection[]>(cacheKey);
   return useQuery<RDAccountConnection[]>({
     queryKey: ["rd_account_connections", user?.id, workspaceId ?? "owner-only"],
-    enabled: (options?.enabled ?? true) && !!user,
-    retry: 0,
+    enabled: (options?.enabled ?? true) && !!user && !workspaceLoading,
+    retry: 1,
+    retryDelay: 1_000,
     refetchInterval: (query) => query.state.error ? 10_000 : false,
     refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedConnections)),
     refetchOnWindowFocus: false,

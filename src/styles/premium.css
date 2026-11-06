@@ -195,9 +195,15 @@ html[data-platform-theme="obsidian"] {
 
 /* --------------------------------------------------------------------------
    2. Atmosphere — Level 0: nebula + noise
+   --------------------------------------------------------------------------
+   The legacy stylesheet pins `.brand-shell` to a transparent canvas with
+   `background-image: none !important`. The premium layer therefore targets
+   the same element with an equal-or-higher specificity so the nebula is
+   actually painted instead of being silently dropped.
    -------------------------------------------------------------------------- */
 
-.brand-shell.growdash-app-shell {
+html .brand-shell.growdash-app-shell,
+html body .brand-shell.growdash-app-shell {
   position: relative;
   isolation: isolate;
   background-color: var(--bg-canvas) !important;
@@ -205,7 +211,7 @@ html[data-platform-theme="obsidian"] {
     radial-gradient(ellipse 62% 42% at 84% 8%, rgba(138, 43, 226, 0.20) 0%, transparent 68%),
     radial-gradient(ellipse 52% 36% at 10% 88%, rgba(52, 211, 153, 0.14) 0%, transparent 64%),
     radial-gradient(circle 460px at 48% 46%, rgba(74, 20, 140, 0.16) 0%, transparent 78%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 42%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 42%) !important;
   background-attachment: fixed;
 }
 
@@ -215,11 +221,11 @@ html[data-platform-theme="emerald"] .brand-shell.growdash-app-shell {
     radial-gradient(ellipse 62% 42% at 84% 8%, rgba(109, 40, 217, 0.10) 0%, transparent 68%),
     radial-gradient(ellipse 52% 36% at 10% 88%, rgba(4, 120, 87, 0.12) 0%, transparent 64%),
     radial-gradient(circle 460px at 48% 46%, rgba(16, 74, 45, 0.07) 0%, transparent 78%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 42%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 42%) !important;
 }
 
 /* Texture layer — 3.5% organic noise, non-interactive */
-.brand-shell.growdash-app-shell::after {
+html .brand-shell.growdash-app-shell::after {
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -230,9 +236,38 @@ html[data-platform-theme="emerald"] .brand-shell.growdash-app-shell {
 
 /* --------------------------------------------------------------------------
    3. Elevation — Level 1 glass, Level 2 hover glow, Level 3 overlays
+   --------------------------------------------------------------------------
+   These rules mirror the legacy selector depth
+   (`html .brand-shell :is(page) :is(card)`) so the premium surface wins the
+   cascade even against the historical `!important` gradient overrides.
    -------------------------------------------------------------------------- */
 
-.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+/* Level 1 — the glass surface itself. Declared here (not only in tokens.css)
+   because tokens.css loads before index.css, and the legacy `.gd-metric-card`
+   rules would otherwise paint over the translucency. */
+.gd-glass-card {
+  background-color: var(--gd-surface-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+html .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
   border: 1px solid var(--gd-border) !important;
   border-radius: var(--gd-radius-card) !important;
@@ -552,9 +587,145 @@ html[data-platform-theme="emerald"] .brand-shell .brand-topbar {
 .gd-theme-swatch-preview-emerald i:nth-child(3) {
   background: rgba(11, 26, 21, 0.22);
 }
+/* --------------------------------------------------------------------------
+   12. Neutralizing legacy gradients — the nebula is the atmosphere
+   --------------------------------------------------------------------------
+   The historical stylesheet contains several competing theme layers whose
+   selectors reach a specificity of ~600 characters (for example
+   `.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section >
+   .dashboard-financial-overview > *`). Mirroring each one individually is
+   brittle, so the premium layer is anchored on a dedicated `.gd-premium`
+   class on `<html>`: one extra class raises specificity by a full step over
+   every legacy selector, so the rules below win the cascade.
+   -------------------------------------------------------------------------- */
+
+/* Shell-level semantic tokens — rebound at the `.gd-premium` depth. */
+html.gd-premium:not(.dark) .brand-shell,
+html.gd-premium.dark .brand-shell,
+html.gd-premium[data-platform-theme="emerald"] .brand-shell,
+html.gd-premium[data-platform-theme="obsidian"] .brand-shell {
+  --gd-surface-page: var(--bg-canvas) !important;
+  --gd-surface-card: var(--surface-card) !important;
+  --gd-surface-raised: var(--surface-raised) !important;
+  --gd-surface-control: var(--surface-raised) !important;
+  --gd-content: var(--text-primary) !important;
+  --gd-content-text: var(--text-primary) !important;
+  --gd-content-muted: var(--text-muted) !important;
+  --gd-content-faint: var(--text-muted) !important;
+  --gd-content-bg: var(--bg-canvas) !important;
+  --gd-content-surface: var(--surface-card) !important;
+  --gd-content-panel: var(--surface-raised) !important;
+  --gd-border: var(--border-subtle) !important;
+  --gd-border-subtle: var(--border-subtle) !important;
+  --gd-content-border: var(--border-subtle) !important;
+  --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  --gd-control-active-thumb: #05070C !important;
+}
+
+html.gd-premium:not(.dark) .brand-shell,
+html.gd-premium[data-platform-theme="emerald"] .brand-shell {
+  --gd-shadow-card: 0 10px 30px -18px rgba(6, 78, 59, 0.28), 0 2px 6px -3px rgba(6, 78, 59, 0.12) !important;
+  --gd-control-active-thumb: #FFFFFF !important;
+}
+
+/* Page shells must be transparent so the nebula painted on the app shell
+   becomes the atmosphere instead of a flat white or green fill. */
+html.gd-premium .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell),
+html.gd-premium .brand-shell[data-space-phase] :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--text-primary) !important;
+}
+
+/* Card surfaces — glass instead of the flat white/green gradients. */
+html.gd-premium .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *),
+html.gd-premium .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card,
+    .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *,
+    .dashboard-reference-kpi) {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background-color: var(--gd-surface-card) !important;
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(var(--purple-glow-color), 0.09) 0%, transparent 15rem) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+}
+
+html.gd-premium.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045) 0%, transparent 40%),
+    radial-gradient(circle at 100% 0%, rgba(var(--purple-glow-color), 0.13) 0%, transparent 15rem) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Legacy: `.brand-shell[data-dashboard-scene="true"] … blur(10px) !important` —
+   the dashboard scene pins a weaker blur. The premium glass uses a deeper
+   blur with saturation, so it reasserts itself at the `.gd-premium` depth. */
+html.gd-premium .brand-shell[data-dashboard-scene="true"] .dashboard-page
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card),
+html.gd-premium .brand-shell[data-dashboard-scene="true"] .dashboard-page
+  :is(.dashboard-primary-kpis > *, .dashboard-financial-overview > *) {
+  backdrop-filter: blur(14px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(135%) !important;
+}
+
+/* The goal strip is a data surface, not a sci-fi prop. */
+html.gd-premium .brand-shell[data-space-phase] .space-mission-strip,
+html.gd-premium .brand-shell .space-mission-strip {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-title,
+html.gd-premium .brand-shell[data-space-phase] .space-mission-strip > strong,
+html.gd-premium .brand-shell .space-mission-title,
+html.gd-premium .brand-shell .space-mission-strip > strong {
+  color: var(--accent-primary) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-title small,
+html.gd-premium .brand-shell .space-mission-title small {
+  color: var(--gd-content-muted) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-track,
+html.gd-premium .brand-shell .space-mission-track {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-raised) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-track > span,
+html.gd-premium .brand-shell .space-mission-track > span {
+  background: linear-gradient(90deg, rgba(var(--purple-glow-color), 0.95) 0%, rgba(var(--emerald-glow-color), 0.95) 100%) !important;
+  box-shadow: 0 0 14px -3px rgba(var(--purple-glow-color), 0.75) !important;
+}
 
 /* --------------------------------------------------------------------------
-   11. Reduced transparency fallback
+   13. Reduced transparency fallback
    -------------------------------------------------------------------------- */
 
 @supports not (backdrop-filter: blur(1px)) {

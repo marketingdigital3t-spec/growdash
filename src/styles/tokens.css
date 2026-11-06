@@ -138,7 +138,9 @@
   letter-spacing: -0.03em;
 }
 
-/* Assinatura de vidro premium (Glassmorphism) */
+/* Assinatura de vidro premium (Glassmorphism)
+   A implementação autoritativa vive em `premium.css`, que é importado
+   depois de `index.css` — aqui fica apenas o contrato de referência. */
 .gd-glass-card {
   background-color: var(--surface-card);
   backdrop-filter: blur(16px) saturate(140%);

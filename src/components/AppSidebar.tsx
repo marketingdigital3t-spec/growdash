@@ -91,13 +91,13 @@ export function AppSidebar() {
           size={collapsed ? "icon" : "sm"}
           className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300"
           onClick={() => setAccent(accent === "obsidian" ? "emerald" : "obsidian")}
-          aria-label={accent === "obsidian" ? "Ativar tema Esmeralda" : "Ativar tema Obsidian"}
+          aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}
         >
           <div className="relative h-4 w-4 shrink-0">
             <Sun className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${accent === "obsidian" ? "rotate-0 opacity-100" : "-rotate-90 opacity-0"}`} />
             <Moon className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${accent === "obsidian" ? "rotate-90 opacity-0" : "rotate-0 opacity-100"}`} />
           </div>
-          {!collapsed && <span className="ml-3">{accent === "obsidian" ? "Tema Esmeralda" : "Tema Obsidian"}</span>}
+          {!collapsed && <span className="ml-3">{accent === "obsidian" ? "Modo Claro" : "Modo Escuro"}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

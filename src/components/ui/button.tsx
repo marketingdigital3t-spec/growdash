@@ -12,10 +12,10 @@ const buttonVariants = cva(
         // Ações principais usam o mesmo tratamento premium do CTA de
         // integração em Marcas. Variantes secundárias e destrutivas continuam
         // semanticamente distintas para preservar a hierarquia da interface.
-        default: "gd-highlight-action bg-[#10B981] text-[#062015] shadow-[0_8px_20px_-12px_rgba(16,185,129,.95)] hover:-translate-y-px hover:bg-[#34D399]",
+        default: "gd-highlight-action bg-primary text-primary-foreground shadow-gd-glow hover:-translate-y-px hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background shadow-sm hover:-translate-y-px hover:border-primary/45 hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        outline: "border border-border bg-card/60 text-foreground shadow-sm backdrop-blur-md hover:-translate-y-px hover:border-primary/45 hover:bg-accent hover:text-accent-foreground",
+        secondary: "border border-border-subtle bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

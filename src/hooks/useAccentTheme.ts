@@ -37,6 +37,8 @@ export function applyAccent(value: AccentTheme) {
   const root = document.documentElement;
   root.dataset.accent = palette.html;
   root.dataset.platformTheme = palette.html;
+  // `gd-premium` anchors the premium layer above the legacy theme rules.
+  root.classList.add("gd-premium");
   root.classList.toggle("dark", palette.isDark);
 
   let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');

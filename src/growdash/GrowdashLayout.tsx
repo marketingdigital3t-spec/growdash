@@ -458,10 +458,10 @@ export default function GrowdashLayout() {
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
               showSidebarLabels ? "gap-3 px-3" : "justify-center",
             )}
-            aria-label={accent === "obsidian" ? "Ativar tema Esmeralda" : "Ativar tema Obsidian"}
+            aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}
           >
             {accent === "obsidian" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {showSidebarLabels && <span>{accent === "obsidian" ? "Tema Esmeralda" : "Tema Obsidian"}</span>}
+            {showSidebarLabels && <span>{accent === "obsidian" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
           <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -35,6 +35,7 @@
           var root = document.documentElement;
           root.dataset.accent = platform;
           root.dataset.platformTheme = platform;
+          root.classList.add('gd-premium');
           if (platform === 'obsidian') root.classList.add('dark');
           else root.classList.remove('dark');
           root.style.colorScheme = platform === 'obsidian' ? 'dark' : 'light';

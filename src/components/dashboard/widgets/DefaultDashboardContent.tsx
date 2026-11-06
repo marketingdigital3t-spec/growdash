@@ -748,11 +748,11 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
 
       {/* 5. Gráficos diários */}
       <div className="dashboard-daily-charts mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div><ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#10b981" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
-        <div><ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="#facc15" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
-        <div><ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="#22c55e" /></div>
-        <div><ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#10b981" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
-        <div className="md:col-span-2"><ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#10b981" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
+        <div><ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="hsl(var(--primary))" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
+        <div><ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="hsl(var(--warning))" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
+        <div><ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="hsl(var(--success))" /></div>
+        <div><ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="hsl(var(--primary))" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
+        <div className="md:col-span-2"><ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="hsl(var(--primary))" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
       </div></section>
       </>}
     </div>
