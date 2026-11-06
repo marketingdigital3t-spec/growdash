@@ -27,6 +27,17 @@
     <script type="application/ld+json">
       {"@context":"https://schema.org","@type":"Organization","name":"Growdash","url":"https://growdash.com.br/","logo":"https://growdash.com.br/growdash-logo-full-light.png"}
     </script>
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          else document.documentElement.classList.remove('dark');
+          var accent = localStorage.getItem('growdash:accent-theme') || 'obsidian';
+          document.documentElement.dataset.accent = accent;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root">

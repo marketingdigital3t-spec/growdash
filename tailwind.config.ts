@@ -66,11 +66,42 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        gd: {
+          surface: {
+            page: "var(--gd-surface-page)",
+            card: "var(--gd-surface-card)",
+            raised: "var(--gd-surface-raised)",
+            control: "var(--gd-surface-control)",
+          },
+          border: {
+            DEFAULT: "var(--gd-border)",
+            subtle: "var(--gd-border-subtle)",
+            focus: "var(--gd-border-focus)",
+          },
+          content: {
+            DEFAULT: "var(--gd-content)",
+            muted: "var(--gd-content-muted)",
+            faint: "var(--gd-content-faint)",
+          },
+          status: {
+            critical: "var(--gd-status-critical)",
+            attention: "var(--gd-status-attention)",
+            observation: "var(--gd-status-observation)",
+            initial: "var(--gd-status-initial)",
+            healthy: "var(--gd-status-healthy)",
+            inactive: "var(--gd-status-inactive)",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        "gd-card": "var(--gd-shadow-card)",
+        "gd-glow": "var(--gd-glow-emerald)",
+        "gd-glow-purple": "var(--gd-glow-purple)",
       },
       keyframes: {
         "accordion-down": {
