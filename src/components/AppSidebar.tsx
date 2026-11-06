@@ -13,12 +13,12 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useTheme } from "next-themes";
+import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppSidebar() {
-  const { theme, setTheme } = useTheme();
+  const { accent, setAccent } = useAccentTheme();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const collapsed = state === "collapsed";
@@ -90,13 +90,14 @@ export function AppSidebar() {
           variant="ghost"
           size={collapsed ? "icon" : "sm"}
           className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          onClick={() => setAccent(accent === "obsidian" ? "emerald" : "obsidian")}
+          aria-label={accent === "obsidian" ? "Ativar tema Esmeralda" : "Ativar tema Obsidian"}
         >
           <div className="relative h-4 w-4 shrink-0">
-            <Sun className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${theme === "dark" ? "rotate-0 opacity-100" : "-rotate-90 opacity-0"}`} />
-            <Moon className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${theme === "dark" ? "rotate-90 opacity-0" : "rotate-0 opacity-100"}`} />
+            <Sun className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${accent === "obsidian" ? "rotate-0 opacity-100" : "-rotate-90 opacity-0"}`} />
+            <Moon className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${accent === "obsidian" ? "rotate-90 opacity-0" : "rotate-0 opacity-100"}`} />
           </div>
-          {!collapsed && <span className="ml-3">{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
+          {!collapsed && <span className="ml-3">{accent === "obsidian" ? "Tema Esmeralda" : "Tema Obsidian"}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

@@ -30,11 +30,15 @@
     <script>
       (function() {
         try {
-          var theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-          if (theme === 'dark') document.documentElement.classList.add('dark');
-          else document.documentElement.classList.remove('dark');
-          var accent = localStorage.getItem('growdash:accent-theme') || 'obsidian';
-          document.documentElement.dataset.accent = accent;
+          var stored = localStorage.getItem('growdash:accent-theme');
+          var platform = stored === 'obsidian' ? 'obsidian' : (stored === 'emerald' ? 'emerald' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'obsidian' : 'emerald'));
+          var root = document.documentElement;
+          root.dataset.accent = platform;
+          root.dataset.platformTheme = platform;
+          if (platform === 'obsidian') root.classList.add('dark');
+          else root.classList.remove('dark');
+          root.style.colorScheme = platform === 'obsidian' ? 'dark' : 'light';
+          localStorage.setItem('theme', platform === 'obsidian' ? 'dark' : 'light');
         } catch (e) {}
       })();
     </script>

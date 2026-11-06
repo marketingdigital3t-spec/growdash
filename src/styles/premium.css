@@ -1,0 +1,564 @@
+/* ==========================================================================
+   Growdash Premium Layer — Obsidian & Esmeralda
+   --------------------------------------------------------------------------
+   Authoritative visual contract for the platform. This file is imported AFTER
+   `index.css` so it wins over the historical theme phases (monochrome,
+   metallic-gold, space-phase) that still live in that 15k-line stylesheet.
+
+   Design contract (audit-front/05-design-system.md):
+   - Esmeralda (light): translucent greenish surfaces, high contrast copy.
+   - Obsidian (dark): deep matte black + violet nebula, data as the hero.
+   - Emerald drives action. Purple drives state, progress and intelligence.
+   - Borders are light, never heavy lead-gray outlines.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Theme tokens (HSL triplets consumed by tailwind.config.ts)
+   -------------------------------------------------------------------------- */
+
+:root,
+html[data-platform-theme="emerald"],
+html:not(.dark):not([data-platform-theme="obsidian"]) {
+  color-scheme: light;
+
+  --background: 150 22% 96%;
+  --foreground: 160 41% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 160 41% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 160 41% 7%;
+  --primary: 163 94% 24%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 146 19% 93%;
+  --secondary-foreground: 160 41% 12%;
+  --muted: 146 19% 93%;
+  --muted-foreground: 156 16% 36%;
+  --accent: 151 53% 90%;
+  --accent-foreground: 163 88% 20%;
+  --destructive: 358 75% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 161 94% 30%;
+  --success-foreground: 0 0% 100%;
+  --warning: 32 95% 44%;
+  --warning-foreground: 0 0% 100%;
+  --border: 148 18% 86%;
+  --input: 146 16% 82%;
+  --ring: 161 94% 30%;
+  --radius: 0.875rem;
+
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 160 41% 12%;
+  --sidebar-primary: 163 94% 24%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 151 40% 93%;
+  --sidebar-accent-foreground: 163 88% 20%;
+  --sidebar-border: 148 18% 88%;
+  --sidebar-ring: 161 94% 30%;
+
+  /* Platform accents */
+  --brand-gold: #047857;
+  --brand-gold-light: #6ee7b7;
+  --brand-bronze: #065f46;
+  --brand-accent-rgb: 4, 120, 87;
+
+  /* Design system semantic layer */
+  --bg-canvas: #F4F8F6;
+  --surface-card: rgba(255, 255, 255, 0.82);
+  --surface-raised: #FFFFFF;
+  --border-subtle: rgba(6, 78, 59, 0.10);
+  --border-strong: rgba(6, 78, 59, 0.20);
+  --text-primary: #0B1A15;
+  --text-secondary: #2D4A3E;
+  --text-muted: #4D6B5F;
+  --accent-primary: #047857;
+  --accent-secondary: #6D28D9;
+  --purple-accent: #6D28D9;
+  --purple-glow-color: 109, 40, 217;
+  --emerald-glow-color: 4, 120, 87;
+
+  --gd-surface-page: var(--bg-canvas);
+  --gd-surface-card: var(--surface-card);
+  --gd-surface-raised: var(--surface-raised);
+  --gd-surface-control: var(--surface-raised);
+  --gd-border: var(--border-subtle);
+  --gd-border-subtle: var(--border-subtle);
+  --gd-border-focus: rgba(4, 120, 87, 0.55);
+  --gd-content: var(--text-primary);
+  --gd-content-text: var(--text-primary);
+  --gd-content-muted: var(--text-muted);
+  --gd-content-faint: #6B8177;
+  --gd-content-disabled: #7C9189;
+  --gd-content-border: var(--border-subtle);
+  --gd-content-bg: var(--bg-canvas);
+  --gd-content-surface: var(--surface-card);
+  --gd-content-panel: var(--surface-raised);
+  --gd-shadow-card: 0 10px 30px -18px rgba(6, 78, 59, 0.28), 0 2px 6px -3px rgba(6, 78, 59, 0.12);
+  --gd-control-active-thumb: #FFFFFF;
+
+  --gd-status-critical: #DC2626;
+  --gd-status-attention: #D97706;
+  --gd-status-observation: #CA8A04;
+  --gd-status-initial: #2563EB;
+  --gd-status-healthy: #047857;
+  --gd-status-inactive: #64748B;
+
+  --gd-glow-emerald: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
+  --gd-glow-purple: 0 0 26px -6px rgba(109, 40, 217, 0.30), 0 0 10px -3px rgba(168, 85, 247, 0.34);
+}
+
+html.dark:not([data-platform-theme="emerald"]),
+html[data-platform-theme="obsidian"] {
+  color-scheme: dark;
+
+  --background: 223 33% 4%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 158 64% 52%;
+  --primary-foreground: 163 90% 7%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 158 26% 14%;
+  --accent-foreground: 152 76% 80%;
+  --destructive: 358 75% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 158 64% 52%;
+  --success-foreground: 163 90% 7%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 38 90% 8%;
+  --border: 217 33% 17%;
+  --input: 218 32% 21%;
+  --ring: 158 64% 52%;
+  --radius: 0.875rem;
+
+  --sidebar-background: 218 33% 6%;
+  --sidebar-foreground: 213 27% 84%;
+  --sidebar-primary: 158 64% 52%;
+  --sidebar-primary-foreground: 163 90% 7%;
+  --sidebar-accent: 216 32% 15%;
+  --sidebar-accent-foreground: 152 76% 80%;
+  --sidebar-border: 217 33% 17%;
+  --sidebar-ring: 158 64% 52%;
+
+  --brand-gold: #34D399;
+  --brand-gold-light: #A7F3D0;
+  --brand-bronze: #047857;
+  --brand-accent-rgb: 52, 211, 153;
+
+  --bg-canvas: #07090E;
+  --surface-card: rgba(15, 23, 42, 0.62);
+  --surface-raised: rgba(30, 41, 59, 0.74);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --accent-primary: #34D399;
+  --accent-secondary: #A855F7;
+  --purple-accent: #A855F7;
+  --purple-glow-color: 168, 85, 247;
+  --emerald-glow-color: 52, 211, 153;
+
+  --gd-surface-page: var(--bg-canvas);
+  --gd-surface-card: var(--surface-card);
+  --gd-surface-raised: var(--surface-raised);
+  --gd-surface-control: var(--surface-raised);
+  --gd-border: var(--border-subtle);
+  --gd-border-subtle: var(--border-subtle);
+  --gd-border-focus: rgba(52, 211, 153, 0.60);
+  --gd-content: var(--text-primary);
+  --gd-content-text: var(--text-primary);
+  --gd-content-muted: var(--text-muted);
+  --gd-content-faint: #7D8796;
+  --gd-content-disabled: #64748B;
+  --gd-content-border: var(--border-subtle);
+  --gd-content-bg: var(--bg-canvas);
+  --gd-content-surface: var(--surface-card);
+  --gd-content-panel: var(--surface-raised);
+  --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --gd-control-active-thumb: #05070C;
+
+  --gd-status-critical: #F87171;
+  --gd-status-attention: #FBBF24;
+  --gd-status-observation: #FDE047;
+  --gd-status-initial: #60A5FA;
+  --gd-status-healthy: #34D399;
+  --gd-status-inactive: #94A3B8;
+
+  --gd-glow-emerald: 0 0 24px -4px rgba(52, 211, 153, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.50);
+  --gd-glow-purple: 0 0 30px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
+}
+
+/* --------------------------------------------------------------------------
+   2. Atmosphere — Level 0: nebula + noise
+   -------------------------------------------------------------------------- */
+
+.brand-shell.growdash-app-shell {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--bg-canvas) !important;
+  background-image:
+    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(138, 43, 226, 0.20) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(52, 211, 153, 0.14) 0%, transparent 64%),
+    radial-gradient(circle 460px at 48% 46%, rgba(74, 20, 140, 0.16) 0%, transparent 78%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 42%);
+  background-attachment: fixed;
+}
+
+html:not(.dark) .brand-shell.growdash-app-shell,
+html[data-platform-theme="emerald"] .brand-shell.growdash-app-shell {
+  background-image:
+    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(109, 40, 217, 0.10) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(4, 120, 87, 0.12) 0%, transparent 64%),
+    radial-gradient(circle 460px at 48% 46%, rgba(16, 74, 45, 0.07) 0%, transparent 78%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 42%);
+}
+
+/* Texture layer — 3.5% organic noise, non-interactive */
+.brand-shell.growdash-app-shell::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  content: "";
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   3. Elevation — Level 1 glass, Level 2 hover glow, Level 3 overlays
+   -------------------------------------------------------------------------- */
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background-color: var(--gd-surface-card) !important;
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(var(--purple-glow-color), 0.09) 0%, transparent 15rem);
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  transition: border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi),
+html[data-platform-theme="obsidian"] .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card,
+    .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045) 0%, transparent 40%),
+    radial-gradient(circle at 100% 0%, rgba(var(--purple-glow-color), 0.13) 0%, transparent 15rem);
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Luminous top edge — simulates light incidence on glass */
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::before {
+  display: block !important;
+  position: absolute;
+  inset: 0 10% auto 10%;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(var(--purple-glow-color), 0.55), rgba(var(--emerald-glow-color), 0.45), transparent);
+  content: "";
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::after {
+  display: none !important;
+}
+
+/* Level 2 — hover elevation with colored glow */
+.brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
+  border-color: rgba(var(--emerald-glow-color), 0.42) !important;
+  box-shadow:
+    0 20px 48px -28px rgba(var(--emerald-glow-color), 0.60),
+    0 0 22px -8px rgba(var(--purple-glow-color), 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-2px);
+}
+
+html:not(.dark) .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
+  box-shadow:
+    0 22px 48px -26px rgba(6, 78, 59, 0.32),
+    0 0 0 1px rgba(4, 120, 87, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Data typography — the number is the hero
+   -------------------------------------------------------------------------- */
+
+.brand-shell :is(.gd-metric-card, .dashboard-reference-kpi, .dashboard-reference-funnel,
+    .dashboard-reference-radar, .dashboard-financial-overview) :is(
+  .dashboard-terra-metric-value, .tabular-nums, [class*="tabular"]) {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+  letter-spacing: -0.03em;
+}
+
+.brand-shell :is(.gd-metric-card, .dashboard-reference-kpi) p:first-child {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--gd-content-muted) !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. Chrome — sidebar and topbar
+   -------------------------------------------------------------------------- */
+
+.brand-shell .brand-sidebar {
+  background:
+    linear-gradient(180deg, rgba(var(--purple-glow-color), 0.10) 0%, transparent 22rem),
+    rgba(7, 9, 14, 0.92);
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+html:not(.dark) .brand-shell .brand-sidebar,
+html[data-platform-theme="emerald"] .brand-shell .brand-sidebar {
+  background:
+    linear-gradient(180deg, rgba(109, 40, 217, 0.07) 0%, transparent 20rem),
+    rgba(255, 255, 255, 0.86);
+  border-color: rgba(6, 78, 59, 0.10) !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] {
+  background: linear-gradient(90deg, rgba(var(--emerald-glow-color), 0.18) 0%, rgba(var(--emerald-glow-color), 0.04) 100%) !important;
+  border-color: rgba(var(--emerald-glow-color), 0.34) !important;
+  color: var(--text-primary) !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"],
+html:not(.dark) .brand-shell .brand-sidebar nav a[data-state="active"] {
+  color: #065F46 !important;
+}
+
+.brand-shell .brand-topbar {
+  background: rgba(7, 9, 14, 0.78) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+html:not(.dark) .brand-shell .brand-topbar,
+html[data-platform-theme="emerald"] .brand-shell .brand-topbar {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(6, 78, 59, 0.09) !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. Progress, status and accent discipline
+   -------------------------------------------------------------------------- */
+
+/* Emerald drives action; purple drives progress and intelligence */
+.brand-shell .topbar-goal-progress-fill,
+.brand-shell .topbar-goal-progress-track .h-full {
+  background: linear-gradient(90deg, rgba(var(--purple-glow-color), 0.95) 0%, rgba(var(--emerald-glow-color), 0.95) 100%) !important;
+  box-shadow: 0 0 14px -3px rgba(var(--purple-glow-color), 0.75);
+}
+
+.brand-shell .gd-progress-fill,
+.brand-shell [role="progressbar"] > div {
+  background: linear-gradient(90deg, rgba(var(--purple-glow-color), 0.9) 0%, rgba(var(--emerald-glow-color), 0.9) 100%) !important;
+}
+
+.brand-shell :is(.text-emerald-500, .text-emerald-600, .text-emerald-400) {
+  color: var(--accent-primary) !important;
+}
+
+.brand-shell :is(.text-amber-500, .text-amber-600, .text-orange-500) {
+  color: var(--gd-status-attention) !important;
+}
+
+.brand-shell :is(.text-rose-500, .text-red-500, .text-red-600) {
+  color: var(--gd-status-critical) !important;
+}
+
+.brand-shell :is(.bg-emerald-500\/10, .bg-emerald-500\/15, .bg-emerald-500\/20) {
+  background-color: rgba(var(--emerald-glow-color), 0.12) !important;
+}
+
+.brand-shell :is(.bg-amber-500\/10, .bg-amber-500\/15, .bg-amber-500\/20) {
+  background-color: rgba(217, 119, 6, 0.13) !important;
+}
+
+.brand-shell :is(.bg-rose-500\/10, .bg-rose-500\/12, .bg-rose-500\/15) {
+  background-color: rgba(220, 38, 38, 0.13) !important;
+}
+
+.brand-shell :is(.border-emerald-500\/25, .border-emerald-500\/20) {
+  border-color: rgba(var(--emerald-glow-color), 0.34) !important;
+}
+
+.brand-shell :is(.border-amber-500\/25, .border-amber-500\/30, .border-amber-500\/20) {
+  border-color: rgba(217, 119, 6, 0.38) !important;
+}
+
+.brand-shell :is(.border-rose-500\/25, .border-rose-500\/30) {
+  border-color: rgba(220, 38, 38, 0.40) !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. Form controls
+   -------------------------------------------------------------------------- */
+
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account) {
+  background: var(--gd-surface-raised) !important;
+  border-color: var(--gd-border) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .growdash-main :is(input, select, textarea):focus-visible {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--emerald-glow-color), 0.22) !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. Focus visibility — every interactive element
+   -------------------------------------------------------------------------- */
+
+.brand-shell :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-primary) !important;
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   9. Reduced motion — hard requirement from the design system
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell *,
+  .brand-shell *::before,
+  .brand-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. Theme switcher widgets (settings + profile)
+   -------------------------------------------------------------------------- */
+
+.gd-theme-swatch {
+  position: relative;
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--gd-border);
+  border-radius: 14px;
+  background: var(--gd-surface-card);
+  text-align: left;
+  transition: border-color 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, transform 220ms ease;
+}
+
+.gd-theme-swatch:hover {
+  border-color: rgba(var(--emerald-glow-color), 0.45);
+  box-shadow: 0 12px 30px -18px rgba(var(--emerald-glow-color), 0.55);
+  transform: translateY(-1px);
+}
+
+.gd-theme-swatch[aria-pressed="true"] {
+  border-color: rgba(var(--emerald-glow-color), 0.70);
+  box-shadow: 0 0 0 1px rgba(var(--emerald-glow-color), 0.28), 0 14px 34px -20px rgba(var(--emerald-glow-color), 0.75);
+}
+
+.gd-theme-swatch-preview {
+  position: relative;
+  display: block;
+  height: 62px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
+}
+
+.gd-theme-swatch-preview::after {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  content: "";
+  pointer-events: none;
+}
+
+.gd-theme-swatch-preview-obsidian {
+  background:
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(138, 43, 226, 0.55) 0%, transparent 66%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(52, 211, 153, 0.30) 0%, transparent 62%),
+    linear-gradient(135deg, #0B0F16 0%, #07090E 52%, #0A0714 100%);
+}
+
+.gd-theme-swatch-preview-emerald {
+  background:
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(109, 40, 217, 0.16) 0%, transparent 66%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(4, 120, 87, 0.22) 0%, transparent 62%),
+    linear-gradient(135deg, #FFFFFF 0%, #F4F8F6 52%, #EAF3EE 100%);
+}
+
+.gd-theme-swatch-preview i {
+  position: absolute;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.gd-theme-swatch-preview i:nth-child(1) {
+  top: 13px;
+  left: 13px;
+  width: 46%;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+}
+
+.gd-theme-swatch-preview i:nth-child(2) {
+  top: 26px;
+  left: 13px;
+  width: 30%;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.gd-theme-swatch-preview i:nth-child(3) {
+  top: 39px;
+  left: 13px;
+  width: 20%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.gd-theme-swatch-preview-emerald i:nth-child(1) {
+  background: rgba(11, 26, 21, 0.82);
+  box-shadow: none;
+}
+
+.gd-theme-swatch-preview-emerald i:nth-child(2) {
+  background: rgba(11, 26, 21, 0.42);
+}
+
+.gd-theme-swatch-preview-emerald i:nth-child(3) {
+  background: rgba(11, 26, 21, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   11. Reduced transparency fallback
+   -------------------------------------------------------------------------- */
+
+@supports not (backdrop-filter: blur(1px)) {
+  .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card) {
+    background-color: var(--gd-surface-raised) !important;
+  }
+}

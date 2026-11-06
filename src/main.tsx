@@ -6,6 +6,7 @@ import "@fontsource/inter/700.css";
 import "./styles/tokens.css";
 import App from "./App.tsx";
 import "./index.css";
+import "./styles/premium.css";
 
 declare global {
   interface Window {

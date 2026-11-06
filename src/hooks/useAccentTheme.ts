@@ -1,17 +1,31 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+/**
+ * Platform theme (fonte única de verdade do visual).
+ *
+ * `obsidian` é o tema escuro cósmico (deep matte black + nebulosa roxa) e
+ * `emerald` é o tema claro elegante (translúcido esverdeado). O atributo
+ * `data-platform-theme` no <html> é o contrato consumido pelo design system;
+ * a classe `.dark` é mantida sincronizada porque ~100 regras legadas de
+ * `index.css` ainda dependem dela.
+ */
 export type AccentTheme = "obsidian" | "emerald";
-const STORAGE_KEY = "growdash:accent-theme";
+export const PLATFORM_THEME_STORAGE_KEY = "growdash:accent-theme";
 
 const ACCENT: Record<AccentTheme, { html: string; color: string; isDark: boolean }> = {
   obsidian: { html: "obsidian", color: "#07090E", isDark: true },
   emerald: { html: "emerald", color: "#F4F8F6", isDark: false },
 };
 
+export const PLATFORM_THEMES: { value: AccentTheme; label: string; description: string }[] = [
+  { value: "obsidian", label: "Obsidian", description: "Preto profundo cósmico, nebulosa violeta e dados em destaque." },
+  { value: "emerald", label: "Esmeralda", description: "Claro translúcido esverdeado, alto contraste e leitura confortável." },
+];
+
 function readAccent(): AccentTheme {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    // Migrated legacy gold/monochrome prefs to the premium emerald theme
+    const saved = window.localStorage.getItem(PLATFORM_THEME_STORAGE_KEY);
+    // Legacy prefs (gold/monochrome) migrate to the emerald light theme.
     return saved === "obsidian" ? "obsidian" : "emerald";
   } catch {
     return "emerald";
@@ -20,7 +34,10 @@ function readAccent(): AccentTheme {
 
 export function applyAccent(value: AccentTheme) {
   const palette = ACCENT[value];
-  document.documentElement.dataset.accent = palette.html;
+  const root = document.documentElement;
+  root.dataset.accent = palette.html;
+  root.dataset.platformTheme = palette.html;
+  root.classList.toggle("dark", palette.isDark);
 
   let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (!themeColor) {
@@ -44,20 +61,28 @@ export function applyAccent(value: AccentTheme) {
   favicon.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * Keeps next-themes in sync with the platform theme so `useTheme()` consumers
+ * (toasts, sidebar toggle, settings switch) all report the same state.
+ */
 export function useAccentTheme() {
   const [accent, setAccentState] = useState<AccentTheme>(readAccent);
 
-  useEffect(() => applyAccent(accent), [accent]);
+  useEffect(() => {
+    applyAccent(accent);
+    document.documentElement.style.colorScheme = ACCENT[accent].isDark ? "dark" : "light";
+  }, [accent]);
 
-  const setAccent = (value: AccentTheme) => {
+  const setAccent = useCallback((value: AccentTheme) => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, value);
+      window.localStorage.setItem(PLATFORM_THEME_STORAGE_KEY, value);
+      window.localStorage.setItem("theme", value === "obsidian" ? "dark" : "light");
     } catch {
       // The preference remains active for this session if browser storage is blocked.
     }
     applyAccent(value);
     setAccentState(value);
-  };
+  }, []);
 
   return { accent, setAccent };
 }

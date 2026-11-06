@@ -113,7 +113,7 @@ function getInitialSectionState() {
 }
 
 export default function GrowdashLayout() {
-  useAccentTheme();
+  const { accent, setAccent } = useAccentTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
@@ -452,16 +452,16 @@ export default function GrowdashLayout() {
         <div className="shrink-0 border-t border-white/10 p-2">
           <button
             type="button"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setAccent(accent === "obsidian" ? "emerald" : "obsidian")}
             data-theme-toggle
             className={cn(
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
               showSidebarLabels ? "gap-3 px-3" : "justify-center",
             )}
-            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+            aria-label={accent === "obsidian" ? "Ativar tema Esmeralda" : "Ativar tema Obsidian"}
           >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {showSidebarLabels && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
+            {accent === "obsidian" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {showSidebarLabels && <span>{accent === "obsidian" ? "Tema Esmeralda" : "Tema Obsidian"}</span>}
           </button>
           <DropdownMenu>
           <DropdownMenuTrigger asChild>

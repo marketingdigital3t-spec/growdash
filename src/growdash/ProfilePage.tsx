@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
-import { useAccentTheme, type AccentTheme } from "@/hooks/useAccentTheme";
+import { PlatformThemePicker } from "@/components/settings/PlatformThemePicker";
 import { AuthenticatorMfaCard } from "@/components/auth/AuthenticatorMfaCard";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -28,7 +28,6 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
-  const { accent, setAccent } = useAccentTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: workspace } = useWorkspace();
   const { data: plans = [] } = usePlans();
@@ -171,24 +170,15 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="appearance" className="gd-panel p-5 sm:p-7">
-          <div className="grid gap-4 md:grid-cols-2">
-            <AppearanceCard active={theme === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setTheme("dark")} />
-            <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
-          </div>
+          <h2 className="font-black">Tema da plataforma</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Escolha entre Esmeralda e Obsidian. A preferência fica salva na sua conta e vale para todos os dispositivos.</p>
+          <div className="mt-4"><PlatformThemePicker /></div>
           <div className="mt-7 border-t border-border pt-6">
-            <h2 className="font-black">Paleta da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Escolha entre verde esmeralda e dourado. As duas paletas mantêm superfícies pretas/brancas de leitura e bordas sutis.</p>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {([
-                ["emerald", "Verde esmeralda", "Preto, branco e sinais de ação em verde Growdash", "profile-palette-emerald"],
-                ["metallic-gold", "Ônix dourado", "Preto profundo, ouro metálico e bordas luminosas", "profile-palette-gold"],
-              ] as [AccentTheme, string, string, string][]).map(([value, label, description, previewClass]) => (
-                <button key={value} type="button" onClick={() => setAccent(value)} aria-pressed={accent === value} className={`profile-palette-choice ${previewClass} ${accent === value ? "is-active" : ""}`}>
-                  <span className="profile-palette-swatch" aria-hidden="true"><i /><i /><i /></span>
-                  <span className="min-w-0"><b className="block text-sm">{label}</b><small className="mt-1 block text-[10px] text-muted-foreground">{description}</small></span>
-                  {accent === value && <Check className="ml-auto h-4 w-4 shrink-0" />}
-                </button>
-              ))}
+            <h2 className="font-black">Modo de leitura</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Ajuste fino para operações longas ou ambientes muito iluminados.</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <AppearanceCard active={theme === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setTheme("dark")} />
+              <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
             </div>
           </div>
           <div className="mt-6 max-w-sm"><Field label="Densidade da interface"><Select value={form.density} onValueChange={(value) => setForm({ ...form, density: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comfortable">Confortável</SelectItem><SelectItem value="compact">Compacta</SelectItem></SelectContent></Select></Field></div>

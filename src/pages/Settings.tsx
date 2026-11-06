@@ -1,6 +1,5 @@
 import { Bell, ChevronRight, Database, Link2, Palette, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useTheme } from "next-themes";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Switch } from "@/components/ui/switch";
+import { PlatformThemePicker } from "@/components/settings/PlatformThemePicker";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
 import { SmartAlertSettingsCard } from "@/components/settings/SmartAlertSettingsCard";
 
@@ -19,7 +19,6 @@ const sections = [
 ] as const;
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
   const { data: workspace } = useWorkspace();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -56,8 +55,8 @@ export default function SettingsPage() {
 
       <MotionItem className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-black">Aparência rápida</h2><p className="text-xs text-muted-foreground">Aplicada em toda a plataforma.</p></div></div>
-          <div className="mt-5 flex items-center justify-between rounded-xl border border-border p-4"><span className="text-sm">Modo escuro</span><Switch aria-label="Ativar modo escuro" checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} /></div>
+          <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-black">Tema da plataforma</h2><p className="text-xs text-muted-foreground">Esmeralda e Obsidian, aplicados em toda a plataforma.</p></div></div>
+          <div className="mt-5"><PlatformThemePicker /></div>
         </section>
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-3"><Bell className="h-5 w-5 text-primary" /><div><h2 className="font-black">Notificações</h2><p className="text-xs text-muted-foreground">Alertas críticos e resumos da operação.</p></div></div>
