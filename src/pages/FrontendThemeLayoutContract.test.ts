@@ -34,6 +34,14 @@ const settingsPage = readFileSync(
   fileURLToPath(new URL("./Settings.tsx", import.meta.url)),
   "utf8",
 );
+const themePicker = readFileSync(
+  fileURLToPath(new URL("../components/settings/PlatformThemePicker.tsx", import.meta.url)),
+  "utf8",
+);
+const premiumStyles = readFileSync(
+  fileURLToPath(new URL("../styles/premium.css", import.meta.url)),
+  "utf8",
+);
 const platformRules = readFileSync(
   fileURLToPath(new URL("../components/settings/PlatformRulesSection.tsx", import.meta.url)),
   "utf8",
@@ -81,7 +89,9 @@ describe("frontend theme and responsive contracts", () => {
     expect(whatsappPage).toContain('aria-label="Enviar mensagem"');
     expect(modulePage).toContain("aria-label={`Excluir automação ${automation.name}`}");
     expect(financePage).toContain('aria-label="Incluir imposto Meta no cálculo"');
-    expect(settingsPage).toContain('aria-label="Ativar modo escuro"');
+    expect(settingsPage).toContain("PlatformThemePicker");
+    expect(themePicker).toContain('aria-label="Tema da plataforma"');
+    expect(themePicker).toContain('aria-pressed={active}');
     expect(platformRules).toContain('aria-label="Ativar regra"');
     expect(platformRules).toContain('aria-label="Usar como fallback"');
     expect(customMetrics).toContain('aria-label="Usar como Lead padrão"');
@@ -110,5 +120,32 @@ describe("frontend theme and responsive contracts", () => {
     expect(css).toContain("html:not(.dark) .brand-shell .growdash-main");
     expect(css).toContain(".gd-crm-metric-card .gd-metric-icon.text-primary");
     expect(css).toContain(".gd-crm-metric-card > p.text-primary");
+  });
+
+  it("ships both platform themes with the premium surface contract", () => {
+    expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
+    expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
+    expect(premiumStyles).toContain("--accent-primary: #047857");
+    expect(premiumStyles).toContain("--accent-primary: #34D399");
+    expect(premiumStyles).toContain("--accent-secondary: #6D28D9");
+    expect(premiumStyles).toContain("--accent-secondary: #A855F7");
+  });
+
+  it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
+    expect(premiumStyles).toContain("backdrop-filter: blur(14px) saturate(135%)");
+    expect(premiumStyles).toContain("rgba(var(--purple-glow-color), 0.55)");
+    expect(premiumStyles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(premiumStyles).toContain("animation-duration: 0.01ms !important");
+  });
+
+  it("keeps the platform theme as the single source of truth for the visual contract", () => {
+    const themeHook = readFileSync(
+      fileURLToPath(new URL("../hooks/useAccentTheme.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(themeHook).toContain('root.dataset.platformTheme = palette.html');
+    expect(themeHook).toContain('root.classList.toggle("dark", palette.isDark)');
+    expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
+    expect(themeHook).not.toContain("metallic-gold");
   });
 });

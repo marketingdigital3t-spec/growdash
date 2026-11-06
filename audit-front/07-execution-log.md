@@ -45,13 +45,27 @@ O Prompt Master em `/audit-front/06-remediation-prompt-front.md` foi iniciado co
 
 ## 4. Log de Etapas do Redesign Executadas
 
-### Etapa 1: Fundação de Tokens e Sistema de Temas (CONCLUÍDA)
-- **Arquivos modificados:**
-  - `src/styles/tokens.css`: Redefinido com os tokens dinâmicos para temas **Esmeralda** (light) e **Obsidian** (dark), classes de assinatura `.gd-glass-card`, `.gd-glow-border`, `.gd-nebula-bg`, `.gd-noise-overlay` e 4 camadas de elevação.
-  - `src/hooks/useAccentTheme.ts`: Tipagem atualizada para `"obsidian" | "emerald"` com favicon dinâmico em gradiente galáctico/esmeralda.
-  - `index.html`: Injetado script síncrono IIFE anti-FOUC no `<head>` para leitura imediata de `theme` e `growdash:accent-theme` antes da pintura.
-  - `tailwind.config.ts`: Estendido com tokens utilitários `colors.gd.*` e sombras com brilho `boxShadow["gd-glow"]` e `boxShadow["gd-glow-purple"]`.
+### Etapas 1 a 6: Redesign Premium Completo — Esmeralda & Obsidian (CONCLUÍDO)
+
+- **Camada Autoritativa Premium (`src/styles/premium.css`):**
+  - Criação da folha `premium.css` importada após `index.css`, sobrepondo de forma definitiva as 15.706 linhas de temas legados.
+  - Tokens HSL sincronizados com o Tailwind para `:root` / `html[data-platform-theme="emerald"]` e `html[data-platform-theme="obsidian"]`.
+  - Camada 0: Nebulosa cósmica radial (violeta + esmeralda) com background fixo e textura de ruído orgânico (SVG noise 3.5%).
+  - Camada 1: Vidro premium (`.gd-glass-card`) com `backdrop-filter: blur(14px) saturate(135%)` e reflexo luminoso superior de 1px simulando incidência de luz.
+  - Camada 2: Elevação com glow colorido suave no hover (`rgba(52, 211, 153, 0.4)` e `rgba(138, 43, 226, 0.42)`).
+  - Camada 3: Overlays e diálogos com sombra difusa `0 24px 64px`.
+  - Tipografia de dados: `font-variant-numeric: tabular-nums` e tracking `-0.03em` generalizados.
+  - Disciplina de acento: esmeralda conduz ação e conversão; roxo conduz estado, progresso e inteligência.
+  - Cláusula obrigatória de `prefers-reduced-motion: reduce` desativando animações pesadas para acessibilidade.
+
+- **Motor de Tema Unificado (`src/hooks/useAccentTheme.ts`):**
+  - `data-platform-theme` como fonte única de verdade no DOM (`obsidian` | `emerald`), mantendo `.dark` em sincronia para compatibilidade legada.
+  - Bootstrap síncrono no `<head>` de `index.html` anti-flash (FOUC).
+
+- **Seletor de Tema Interativo (`PlatformThemePicker.tsx`):**
+  - Criado e integrado nas telas de Configurações (`src/pages/Settings.tsx`), Perfil (`src/growdash/ProfilePage.tsx`), Topbar e Sidebar (`AppSidebar.tsx` e `GrowdashLayout.tsx`), permitindo a alternância imediata com preview visual dos dois temas.
+
 - **Evidências de Validação:**
-  - Build Vite concluído em 3.85s sem erros.
-  - 798 testes unitários passando em 177 suítes no Vitest.
-- **Status:** Validado e pronto para commit da Etapa 1.
+  - Build Vite concluído em 6.40s sem nenhum erro.
+  - 801 testes unitários passando em 177 suítes no Vitest (3 novos testes de contrato de design system).
+  - Testado e comprovado no navegador via automação Playwright/DevTools com alternância dinâmica validada (`toggleWorks: true`).
