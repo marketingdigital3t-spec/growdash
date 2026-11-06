@@ -125,8 +125,8 @@ describe("frontend theme and responsive contracts", () => {
   it("ships both platform themes with the premium surface contract", () => {
     expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
     expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
-    expect(premiumStyles).toContain("--palette-accent: #047857");
-    expect(premiumStyles).toContain("--palette-accent: #A855F7");
+    expect(premiumStyles).toContain("--palette-accent: #10B981");
+    expect(premiumStyles).toContain("--palette-accent: #BC13FE");
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
   });
 
@@ -180,5 +180,60 @@ describe("frontend theme and responsive contracts", () => {
     expect(layout).toContain('aria-label={mode === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}');
     expect(appSidebar).not.toContain("Tema Esmeralda");
     expect(layout).not.toContain("Tema Esmeralda");
+  });
+
+  it("keeps palette and reading mode as independent dimensions", () => {
+    // The palette (`data-platform-theme`) only decides the accent colour; the
+    // reading mode (`.dark`) only decides the surfaces. Esmeralda stays green
+    // and Obsidian stays purple no matter which reading mode is active, so
+    // every combination is valid: emerald+light, emerald+dark, obsidian+light,
+    // obsidian+dark.
+    const premiumStyles = readFileSync(
+      fileURLToPath(new URL("../styles/premium.css", import.meta.url)),
+      "utf8",
+    );
+    const appSidebar = readFileSync(
+      fileURLToPath(new URL("../components/AppSidebar.tsx", import.meta.url)),
+      "utf8",
+    );
+    const layout = readFileSync(
+      fileURLToPath(new URL("../growdash/GrowdashLayout.tsx", import.meta.url)),
+      "utf8",
+    );
+    const profile = readFileSync(
+      fileURLToPath(new URL("../growdash/ProfilePage.tsx", import.meta.url)),
+      "utf8",
+    );
+    const hook = readFileSync(
+      fileURLToPath(new URL("../hooks/useAccentTheme.ts", import.meta.url)),
+      "utf8",
+    );
+
+    // Palette: Esmeralda sets green accents, Obsidian sets purple accents.
+    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-accent:\s*#10B981/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-secondary:\s*#047857/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="obsidian"\][\s\S]*?--palette-accent:\s*#BC13FE/);
+
+    // Mode: the dark block depends only on `.dark`, not on the palette.
+    expect(premiumStyles).toContain("html.dark {");
+    expect(premiumStyles).not.toMatch(/html\.dark[^\n]*\[data-platform-theme/);
+
+    // The cosmic background follows the palette, not the mode.
+    expect(premiumStyles).toContain("rgba(var(--palette-secondary-rgb), 0.18)");
+    expect(premiumStyles).toContain("rgba(var(--palette-accent-rgb), 0.16)");
+
+    // The hook returns the reading mode separately and applies it.
+    expect(hook).toContain("setMode");
+    expect(hook).toContain("applyReadingMode");
+
+    // Profile shows palette picker and reading-mode cards as two separate controls.
+    expect(profile).toContain("PlatformThemePicker");
+    expect(profile).toContain("Modo de leitura");
+    expect(profile).toContain("setMode(\"dark\")");
+    expect(profile).toContain("setMode(\"light\")");
+
+    // Sidebar and layout buttons toggle the reading mode, not the palette.
+    expect(appSidebar).toContain("setMode(mode === \"dark\" ? \"light\" : \"dark\")");
+    expect(layout).toContain("setMode(mode === \"dark\" ? \"light\" : \"dark\")");
   });
 });

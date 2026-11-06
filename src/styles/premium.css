@@ -29,32 +29,32 @@
 /* --- Palette: Esmeralda (green accent) ------------------------------------ */
 :root,
 html[data-platform-theme="emerald"] {
-  --palette-accent: #047857;
+  --palette-accent: #10B981;
   --palette-accent-bright: #34D399;
-  --palette-accent-soft: rgba(4, 120, 87, .14);
-  --palette-accent-rgb: 4, 120, 87;
+  --palette-accent-soft: rgba(16, 185, 129, .14);
+  --palette-accent-rgb: 16, 185, 129;
   --palette-secondary: #047857;
   --palette-secondary-rgb: 4, 120, 87;
-  --palette-glow-accent: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
-  --palette-glow-secondary: 0 0 22px -6px rgba(4, 120, 87, 0.28), 0 0 8px -3px rgba(52, 211, 153, 0.30);
+  --palette-glow-accent: 0 0 24px -4px rgba(16, 185, 129, 0.42), 0 0 8px -2px rgba(52, 211, 153, 0.46);
+  --palette-glow-secondary: 0 0 22px -6px rgba(16, 185, 129, 0.34), 0 0 8px -3px rgba(52, 211, 153, 0.34);
   --palette-favicon-start: #D1FAE5;
   --palette-favicon-mid: #34D399;
-  --palette-favicon-end: #047857;
+  --palette-favicon-end: #10B981;
 }
 
-/* --- Palette: Obsidian (purple accent) ------------------------------------ */
+/* --- Palette: Obsidian (purple neon accent) ------------------------------- */
 html[data-platform-theme="obsidian"] {
-  --palette-accent: #A855F7;
-  --palette-accent-bright: #C084FC;
-  --palette-accent-soft: rgba(168, 85, 247, .16);
-  --palette-accent-rgb: 168, 85, 247;
+  --palette-accent: #BC13FE;
+  --palette-accent-bright: #E879F9;
+  --palette-accent-soft: rgba(188, 19, 254, .16);
+  --palette-accent-rgb: 188, 19, 254;
   --palette-secondary: #7C3AED;
   --palette-secondary-rgb: 124, 58, 237;
-  --palette-glow-accent: 0 0 26px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
-  --palette-glow-secondary: 0 0 30px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
-  --palette-favicon-start: #2D0B4F;
-  --palette-favicon-mid: #8A2BE2;
-  --palette-favicon-end: #A855F7;
+  --palette-glow-accent: 0 0 26px -6px rgba(188, 19, 254, 0.46), 0 0 10px -3px rgba(232, 121, 249, 0.50);
+  --palette-glow-secondary: 0 0 30px -6px rgba(188, 19, 254, 0.42), 0 0 10px -3px rgba(232, 121, 249, 0.46);
+  --palette-favicon-start: #4C1D95;
+  --palette-favicon-mid: #BC13FE;
+  --palette-favicon-end: #E879F9;
 }
 
 /* --- Mode: light surfaces -------------------------------------------------- */
@@ -249,19 +249,18 @@ html body .brand-shell.growdash-app-shell {
   isolation: isolate;
   background-color: var(--bg-canvas) !important;
   background-image:
-    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(138, 43, 226, 0.20) 0%, transparent 68%),
-    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(52, 211, 153, 0.14) 0%, transparent 64%),
-    radial-gradient(circle 460px at 48% 46%, rgba(74, 20, 140, 0.16) 0%, transparent 78%),
+    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(var(--palette-secondary-rgb), 0.18) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(var(--palette-accent-rgb), 0.16) 0%, transparent 64%),
+    radial-gradient(circle 460px at 48% 46%, rgba(var(--palette-secondary-rgb), 0.12) 0%, transparent 78%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 42%) !important;
   background-attachment: fixed;
 }
 
-html:not(.dark) .brand-shell.growdash-app-shell,
-html[data-platform-theme="emerald"] .brand-shell.growdash-app-shell {
+html:not(.dark) .brand-shell.growdash-app-shell {
   background-image:
-    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(109, 40, 217, 0.10) 0%, transparent 68%),
-    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(4, 120, 87, 0.12) 0%, transparent 64%),
-    radial-gradient(circle 460px at 48% 46%, rgba(16, 74, 45, 0.07) 0%, transparent 78%),
+    radial-gradient(ellipse 62% 42% at 84% 8%, rgba(var(--palette-secondary-rgb), 0.08) 0%, transparent 68%),
+    radial-gradient(ellipse 52% 36% at 10% 88%, rgba(var(--palette-accent-rgb), 0.12) 0%, transparent 64%),
+    radial-gradient(circle 460px at 48% 46%, rgba(var(--palette-accent-rgb), 0.06) 0%, transparent 78%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 42%) !important;
 }
 
@@ -326,9 +325,7 @@ html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashbo
 }
 
 html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
-    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi),
-html[data-platform-theme="obsidian"] .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card,
-    .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
   background-image:
     linear-gradient(145deg, rgba(255, 255, 255, 0.045) 0%, transparent 40%),
     radial-gradient(circle at 100% 0%, rgba(var(--purple-glow-color), 0.13) 0%, transparent 15rem);
@@ -396,15 +393,14 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashbo
 
 .brand-shell .brand-sidebar {
   background:
-    linear-gradient(180deg, rgba(var(--purple-glow-color), 0.10) 0%, transparent 22rem),
+    linear-gradient(180deg, rgba(var(--palette-secondary-rgb), 0.10) 0%, transparent 22rem),
     rgba(7, 9, 14, 0.92);
   border-color: rgba(255, 255, 255, 0.08) !important;
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
-html:not(.dark) .brand-shell .brand-sidebar,
-html[data-platform-theme="emerald"] .brand-shell .brand-sidebar {
+html:not(.dark) .brand-shell .brand-sidebar {
   background:
     linear-gradient(180deg, rgba(109, 40, 217, 0.07) 0%, transparent 20rem),
     rgba(255, 255, 255, 0.86);
@@ -425,13 +421,12 @@ html:not(.dark) .brand-shell .brand-sidebar nav a[data-state="active"] {
 
 .brand-shell .brand-topbar {
   background: rgba(7, 9, 14, 0.78) !important;
-  border-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(var(--palette-secondary-rgb), 0.10) !important;
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
-html:not(.dark) .brand-shell .brand-topbar,
-html[data-platform-theme="emerald"] .brand-shell .brand-topbar {
+html:not(.dark) .brand-shell .brand-topbar {
   background: rgba(255, 255, 255, 0.82) !important;
   border-color: rgba(6, 78, 59, 0.09) !important;
 }
@@ -641,10 +636,7 @@ html[data-platform-theme="emerald"] .brand-shell .brand-topbar {
    -------------------------------------------------------------------------- */
 
 /* Shell-level semantic tokens — rebound at the `.gd-premium` depth. */
-html.gd-premium:not(.dark) .brand-shell,
-html.gd-premium.dark .brand-shell,
-html.gd-premium[data-platform-theme="emerald"] .brand-shell,
-html.gd-premium[data-platform-theme="obsidian"] .brand-shell {
+html.gd-premium .brand-shell {
   --gd-surface-page: var(--bg-canvas) !important;
   --gd-surface-card: var(--surface-card) !important;
   --gd-surface-raised: var(--surface-raised) !important;
@@ -663,8 +655,7 @@ html.gd-premium[data-platform-theme="obsidian"] .brand-shell {
   --gd-control-active-thumb: #05070C !important;
 }
 
-html.gd-premium:not(.dark) .brand-shell,
-html.gd-premium[data-platform-theme="emerald"] .brand-shell {
+html.gd-premium:not(.dark) .brand-shell {
   --gd-shadow-card: 0 10px 30px -18px rgba(6, 78, 59, 0.28), 0 2px 6px -3px rgba(6, 78, 59, 0.12) !important;
   --gd-control-active-thumb: #FFFFFF !important;
 }
