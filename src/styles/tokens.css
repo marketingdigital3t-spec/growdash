@@ -55,69 +55,9 @@
   --gd-status-inactive: #95a5a6;
 }
 
-/* Tema "Esmeralda" (Light Premium) */
-:root, :root[data-accent="emerald"] {
-  color-scheme: light;
-  --bg-canvas: #F4F8F6;
-  --surface-card: rgba(255, 255, 255, 0.85);
-  --surface-raised: #FFFFFF;
-  --border-subtle: rgba(6, 78, 59, 0.09);
-  --border-strong: rgba(6, 78, 59, 0.2);
-  --text-primary: #0B1A15;
-  --text-secondary: #2D4A3E;
-  --text-muted: #4D6B5F;
-  --accent-primary: #059669;
-  --accent-secondary: #6D28D9;
-
-  --gd-surface-page: var(--bg-canvas);
-  --gd-surface-card: var(--surface-card);
-  --gd-surface-raised: var(--surface-raised);
-  --gd-surface-control: var(--surface-raised);
-  --gd-border: var(--border-subtle);
-  --gd-border-subtle: var(--border-subtle);
-  --gd-border-focus: rgba(37, 99, 235, .42);
-  --gd-content: var(--text-primary);
-  --gd-content-muted: #425248;
-  --gd-content-faint: #64748B;
-  --gd-shadow-card: 0 10px 30px rgba(15, 23, 42, .08);
-  --gd-control-active-thumb: #ffffff;
-
-  /* Glows (efeitos de borda com brilho) */
-  --gd-glow-emerald: 0 0 24px rgba(16, 185, 129, 0.35), 0 0 8px rgba(52, 211, 153, 0.45);
-  --gd-glow-purple: 0 0 32px rgba(138, 43, 226, 0.38), 0 0 10px rgba(168, 85, 247, 0.45);
-}
-
-/* Tema "Obsidian" (Dark Premium) */
-:root.dark, :root[data-accent="obsidian"] {
-  color-scheme: dark;
-  --bg-canvas: #07090E;
-  --surface-card: rgba(15, 23, 42, 0.65);
-  --surface-raised: rgba(30, 41, 59, 0.75);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-  --accent-primary: #10B981;
-  --accent-secondary: #A855F7;
-
-  --gd-surface-page: var(--bg-canvas);
-  --gd-surface-card: var(--surface-card);
-  --gd-surface-raised: var(--surface-raised);
-  --gd-surface-control: var(--surface-raised);
-  --gd-border: var(--border-subtle);
-  --gd-border-subtle: var(--border-subtle);
-  --gd-border-focus: rgba(148, 163, 184, .46);
-  --gd-content: var(--text-primary);
-  --gd-content-muted: var(--text-muted);
-  --gd-content-faint: #7d8796;
-  --gd-shadow-card: 0 14px 34px rgba(0, 0, 0, .28);
-  --gd-control-active-thumb: #050505;
-
-  /* Glows (efeitos de borda com brilho) */
-  --gd-glow-emerald: 0 0 24px rgba(16, 185, 129, 0.35), 0 0 8px rgba(52, 211, 153, 0.45);
-  --gd-glow-purple: 0 0 32px rgba(138, 43, 226, 0.38), 0 0 10px rgba(168, 85, 247, 0.45);
-}
+/* Platform themes (Esmeralda / Obsidian) are defined once, in
+ * premium.css, which is loaded after index.css. Keeping a single source of
+ * truth here avoids two competing token layers drifting apart. */
 
 /* Keep the focus treatment available to every primitive introduced later. */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {

@@ -17,7 +17,6 @@ import {
   Palette,
   BadgeDollarSign,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { businessMonthRange, aggregateMonthlyGoalRevenue } from "@/lib/monthlyGoalRevenue";
 import { NAV_SECTIONS } from "./navigation";
 import { cn } from "@/lib/utils";
@@ -113,7 +112,7 @@ function getInitialSectionState() {
 }
 
 export default function GrowdashLayout() {
-  const { accent, setAccent } = useAccentTheme();
+  const { mode, setMode } = useAccentTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
@@ -126,7 +125,6 @@ export default function GrowdashLayout() {
   const [loadBackgroundData] = useState(true);
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
-  const { theme, setTheme } = useTheme();
   const { user, status: authStatus, errorMessage: authErrorMessage, retrySession, signOut } = useAuth();
   const { data: sidebarProfile } = useQuery({
     queryKey: ["sidebar-profile", user?.id],
@@ -452,16 +450,16 @@ export default function GrowdashLayout() {
         <div className="shrink-0 border-t border-white/10 p-2">
           <button
             type="button"
-            onClick={() => setAccent(accent === "obsidian" ? "emerald" : "obsidian")}
+            onClick={() => setMode(mode === "dark" ? "light" : "dark")}
             data-theme-toggle
             className={cn(
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
               showSidebarLabels ? "gap-3 px-3" : "justify-center",
             )}
-            aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}
+            aria-label={mode === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
           >
-            {accent === "obsidian" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {showSidebarLabels && <span>{accent === "obsidian" ? "Modo Claro" : "Modo Escuro"}</span>}
+            {mode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {showSidebarLabels && <span>{mode === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
           <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -14,11 +14,52 @@
 
 /* --------------------------------------------------------------------------
    1. Theme tokens (HSL triplets consumed by tailwind.config.ts)
+
+   Two independent dimensions:
+     - `data-platform-theme` = the palette (emerald = green, obsidian = purple)
+     - `.dark` on <html>        = the reading mode (light or dark)
+
+   Every combination is valid: emerald+light, emerald+dark, obsidian+light,
+   obsidian+dark. The palette drives the ACCENT colours (primary, accent
+   secondary, glow); the mode drives the SURFACE colours (background, card,
+   text). That is why the palette block below only sets accent tokens and
+   the mode blocks set the surfaces.
    -------------------------------------------------------------------------- */
 
+/* --- Palette: Esmeralda (green accent) ------------------------------------ */
 :root,
-html[data-platform-theme="emerald"],
-html:not(.dark):not([data-platform-theme="obsidian"]) {
+html[data-platform-theme="emerald"] {
+  --palette-accent: #047857;
+  --palette-accent-bright: #34D399;
+  --palette-accent-soft: rgba(4, 120, 87, .14);
+  --palette-accent-rgb: 4, 120, 87;
+  --palette-secondary: #047857;
+  --palette-secondary-rgb: 4, 120, 87;
+  --palette-glow-accent: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
+  --palette-glow-secondary: 0 0 22px -6px rgba(4, 120, 87, 0.28), 0 0 8px -3px rgba(52, 211, 153, 0.30);
+  --palette-favicon-start: #D1FAE5;
+  --palette-favicon-mid: #34D399;
+  --palette-favicon-end: #047857;
+}
+
+/* --- Palette: Obsidian (purple accent) ------------------------------------ */
+html[data-platform-theme="obsidian"] {
+  --palette-accent: #A855F7;
+  --palette-accent-bright: #C084FC;
+  --palette-accent-soft: rgba(168, 85, 247, .16);
+  --palette-accent-rgb: 168, 85, 247;
+  --palette-secondary: #7C3AED;
+  --palette-secondary-rgb: 124, 58, 237;
+  --palette-glow-accent: 0 0 26px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
+  --palette-glow-secondary: 0 0 30px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
+  --palette-favicon-start: #2D0B4F;
+  --palette-favicon-mid: #8A2BE2;
+  --palette-favicon-end: #A855F7;
+}
+
+/* --- Mode: light surfaces -------------------------------------------------- */
+:root,
+html:not(.dark) {
   color-scheme: light;
 
   --background: 150 22% 96%;
@@ -55,11 +96,11 @@ html:not(.dark):not([data-platform-theme="obsidian"]) {
   --sidebar-border: 148 18% 88%;
   --sidebar-ring: 161 94% 30%;
 
-  /* Platform accents */
-  --brand-gold: #047857;
-  --brand-gold-light: #6ee7b7;
-  --brand-bronze: #065f46;
-  --brand-accent-rgb: 4, 120, 87;
+  /* Platform accents — driven by the palette, not by the reading mode. */
+  --brand-gold: var(--palette-accent);
+  --brand-gold-light: var(--palette-accent-bright);
+  --brand-bronze: var(--palette-accent);
+  --brand-accent-rgb: var(--palette-accent-rgb);
 
   /* Design system semantic layer */
   --bg-canvas: #F4F8F6;
@@ -70,11 +111,11 @@ html:not(.dark):not([data-platform-theme="obsidian"]) {
   --text-primary: #0B1A15;
   --text-secondary: #2D4A3E;
   --text-muted: #4D6B5F;
-  --accent-primary: #047857;
-  --accent-secondary: #6D28D9;
-  --purple-accent: #6D28D9;
-  --purple-glow-color: 109, 40, 217;
-  --emerald-glow-color: 4, 120, 87;
+  --accent-primary: var(--palette-accent);
+  --accent-secondary: var(--palette-secondary);
+  --purple-accent: var(--palette-secondary);
+  --purple-glow-color: var(--palette-secondary-rgb);
+  --emerald-glow-color: var(--palette-accent-rgb);
 
   --gd-surface-page: var(--bg-canvas);
   --gd-surface-card: var(--surface-card);
@@ -82,7 +123,7 @@ html:not(.dark):not([data-platform-theme="obsidian"]) {
   --gd-surface-control: var(--surface-raised);
   --gd-border: var(--border-subtle);
   --gd-border-subtle: var(--border-subtle);
-  --gd-border-focus: rgba(4, 120, 87, 0.55);
+  --gd-border-focus: rgba(var(--palette-accent-rgb), 0.55);
   --gd-content: var(--text-primary);
   --gd-content-text: var(--text-primary);
   --gd-content-muted: var(--text-muted);
@@ -106,8 +147,8 @@ html:not(.dark):not([data-platform-theme="obsidian"]) {
   --gd-glow-purple: 0 0 26px -6px rgba(109, 40, 217, 0.30), 0 0 10px -3px rgba(168, 85, 247, 0.34);
 }
 
-html.dark:not([data-platform-theme="emerald"]),
-html[data-platform-theme="obsidian"] {
+/* --- Mode: dark surfaces --------------------------------------------------- */
+html.dark {
   color-scheme: dark;
 
   --background: 223 33% 4%;
@@ -144,10 +185,10 @@ html[data-platform-theme="obsidian"] {
   --sidebar-border: 217 33% 17%;
   --sidebar-ring: 158 64% 52%;
 
-  --brand-gold: #34D399;
-  --brand-gold-light: #A7F3D0;
-  --brand-bronze: #047857;
-  --brand-accent-rgb: 52, 211, 153;
+  --brand-gold: var(--palette-accent-bright);
+  --brand-gold-light: var(--palette-accent-bright);
+  --brand-bronze: var(--palette-accent);
+  --brand-accent-rgb: var(--palette-accent-rgb);
 
   --bg-canvas: #07090E;
   --surface-card: rgba(15, 23, 42, 0.62);
@@ -157,11 +198,11 @@ html[data-platform-theme="obsidian"] {
   --text-primary: #F8FAFC;
   --text-secondary: #CBD5E1;
   --text-muted: #94A3B8;
-  --accent-primary: #34D399;
-  --accent-secondary: #A855F7;
-  --purple-accent: #A855F7;
-  --purple-glow-color: 168, 85, 247;
-  --emerald-glow-color: 52, 211, 153;
+  --accent-primary: var(--palette-accent-bright);
+  --accent-secondary: var(--palette-secondary);
+  --purple-accent: var(--palette-secondary);
+  --purple-glow-color: var(--palette-secondary-rgb);
+  --emerald-glow-color: var(--palette-accent-rgb);
 
   --gd-surface-page: var(--bg-canvas);
   --gd-surface-card: var(--surface-card);
@@ -169,7 +210,7 @@ html[data-platform-theme="obsidian"] {
   --gd-surface-control: var(--surface-raised);
   --gd-border: var(--border-subtle);
   --gd-border-subtle: var(--border-subtle);
-  --gd-border-focus: rgba(52, 211, 153, 0.60);
+  --gd-border-focus: rgba(var(--palette-accent-rgb), 0.60);
   --gd-content: var(--text-primary);
   --gd-content-text: var(--text-primary);
   --gd-content-muted: var(--text-muted);

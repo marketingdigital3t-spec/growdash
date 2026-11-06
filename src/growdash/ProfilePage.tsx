@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, LockKeyhole, Mail, Palette, Save, ShieldCheck, UserRound } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
 import { PlatformThemePicker } from "@/components/settings/PlatformThemePicker";
+import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { AuthenticatorMfaCard } from "@/components/auth/AuthenticatorMfaCard";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -27,12 +27,12 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { theme, setTheme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: workspace } = useWorkspace();
   const { data: plans = [] } = usePlans();
   const { data: subscription } = useWorkspaceSubscription(workspace?.id);
   const { data: accessState } = useWorkspaceAccessState(workspace?.id);
+  const { accent, mode, setMode } = useAccentTheme();
   const [form, setForm] = useState({ full_name: "", phone: "", gender: "", job_title: "", avatar_url: "", density: "comfortable" });
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
@@ -65,7 +65,11 @@ export default function ProfilePage() {
 
   const saveProfile = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).from("profiles").update({ ...form, theme }).eq("user_id", user!.id);
+      // The persisted `theme` column mirrors the platform theme so other
+      // surfaces that read the profile stay in sync with the visual contract.
+      // The reading mode is stored as-is. It is no longer derived from the
+      // palette: Esmeralda and Obsidian are both readable in either mode.
+      const { error } = await (supabase as any).from("profiles").update({ ...form, theme: mode }).eq("user_id", user!.id);
       if (error) {
         if (!/phone|gender|job_title|avatar_url|theme|density|schema cache/i.test(error.message)) throw error;
         const legacy = await supabase.from("profiles").update({ full_name: form.full_name }).eq("user_id", user!.id);
@@ -170,15 +174,15 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="appearance" className="gd-panel p-5 sm:p-7">
-          <h2 className="font-black">Tema da plataforma</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Escolha entre Esmeralda e Obsidian. A preferência fica salva na sua conta e vale para todos os dispositivos.</p>
+          <h2 className="font-black">Cor da plataforma</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Escolha a cor de destaque. A preferência fica salva na sua conta e vale para todos os dispositivos.</p>
           <div className="mt-4"><PlatformThemePicker /></div>
           <div className="mt-7 border-t border-border pt-6">
             <h2 className="font-black">Modo de leitura</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Ajuste fino para operações longas ou ambientes muito iluminados.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Claro ou escuro, independente da cor escolhida acima.</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <AppearanceCard active={theme === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setTheme("dark")} />
-              <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
+              <AppearanceCard active={mode === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setMode("dark")} />
+              <AppearanceCard active={mode === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setMode("light")} />
             </div>
           </div>
           <div className="mt-6 max-w-sm"><Field label="Densidade da interface"><Select value={form.density} onValueChange={(value) => setForm({ ...form, density: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comfortable">Confortável</SelectItem><SelectItem value="compact">Compacta</SelectItem></SelectContent></Select></Field></div>

@@ -258,7 +258,10 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      {/* The inline bootstrap in index.html resolves the platform theme before
+          the first paint and writes it to localStorage["theme"], so
+          next-themes hydrates on the same value instead of forcing a mode. */}
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
           <Toaster />
           <Sonner />

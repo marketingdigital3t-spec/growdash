@@ -125,10 +125,9 @@ describe("frontend theme and responsive contracts", () => {
   it("ships both platform themes with the premium surface contract", () => {
     expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
     expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
-    expect(premiumStyles).toContain("--accent-primary: #047857");
-    expect(premiumStyles).toContain("--accent-primary: #34D399");
-    expect(premiumStyles).toContain("--accent-secondary: #6D28D9");
-    expect(premiumStyles).toContain("--accent-secondary: #A855F7");
+    expect(premiumStyles).toContain("--palette-accent: #047857");
+    expect(premiumStyles).toContain("--palette-accent: #A855F7");
+    expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
   });
 
   it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
@@ -144,7 +143,7 @@ describe("frontend theme and responsive contracts", () => {
       "utf8",
     );
     expect(themeHook).toContain('root.dataset.platformTheme = palette.html');
-    expect(themeHook).toContain('root.classList.toggle("dark", palette.isDark)');
+    expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
     expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
     expect(themeHook).not.toContain("metallic-gold");
   });
@@ -177,8 +176,8 @@ describe("frontend theme and responsive contracts", () => {
     );
     expect(appSidebar).toContain("Modo Claro");
     expect(appSidebar).toContain("Modo Escuro");
-    expect(appSidebar).toContain('aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}');
-    expect(layout).toContain('aria-label={accent === "obsidian" ? "Ativar modo claro" : "Ativar modo escuro"}');
+    expect(appSidebar).toContain('aria-label={mode === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}');
+    expect(layout).toContain('aria-label={mode === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}');
     expect(appSidebar).not.toContain("Tema Esmeralda");
     expect(layout).not.toContain("Tema Esmeralda");
   });
