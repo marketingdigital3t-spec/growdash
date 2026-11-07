@@ -21,6 +21,7 @@ import {
   Trophy,
   UserRound,
   UsersRound,
+  X,
   XCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
@@ -51,6 +52,12 @@ import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage, mergeCRMStageSources } from "@/lib/crmPipelineStages";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
+import {
+  countActiveAdvancedFilters,
+  filterDealsByAdvancedCriteria,
+  type CRMAdvancedFilterState,
+} from "@/lib/crmAdvancedFilters";
+import { CRMAdvancedFiltersSheet } from "@/components/crm/CRMAdvancedFiltersSheet";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { useInsights } from "@/hooks/useInsights";
@@ -228,11 +235,11 @@ export default function CrmPage() {
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,
-    // O quadro é o espelho do pipeline atual do RD. O calendário continua
-    // restrito aos indicadores abaixo; aplicar o período na leitura do quadro
-    // fazia uma conta sem negócios criados ontem parecer vazia, mesmo com
-    // negociações abertas e válidas no funil do RD.
-    dateScope: "pipeline",
+    // O quadro e a lista leem o mesmo recorte do calendário, como no RD
+    // Station: as etapas do funil continuam todas visíveis, mas cada cartão
+    // aparece apenas dentro do período (ou dos filtros) selecionado.
+    // "Máximo" mantém a leitura integral do histórico.
+    dateScope: preset === "max" ? "pipeline" : "period",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, isError: salesError, error: salesQueryError } = useSales({
@@ -282,6 +289,9 @@ export default function CrmPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [owner, setOwner] = useState("all");
+  // Filtros avançados no padrão do RD Station CRM: datas (criação, fechamento,
+  // último contato), faixa de valor, campanha, fonte e produto.
+  const [advancedFilters, setAdvancedFilters] = useState<CRMAdvancedFilterState>({});
   const [selectedDeal, setSelectedDeal] = useState<RDDealLite | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
@@ -443,8 +453,9 @@ export default function CrmPage() {
     endDate,
     dateRule: "created_at_for_open_closed_at_for_won",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
-  // O quadro mantém o pipeline atual completo; somente os indicadores usam
-  // o recorte civil escolhido no calendário.
+  // O quadro mantém a estrutura completa do funil (todas as etapas), mas os
+  // cartões dentro das colunas respeitam o período e os filtros ativos — igual
+  // ao RD Station. "Máximo" preserva o histórico integral sem corte de data.
   const dealsInPipeline = scopedDeals;
   const dealsInSelectedPeriod = useMemo(
     () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, { ...rdScope, accountIds: [], funnelIds: [] })),
@@ -460,27 +471,140 @@ export default function CrmPage() {
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [dealsInPipeline],
   );
+  // Opções dos selects da gaveta de filtros, derivadas do espelho atual do RD.
+  const availableCampaigns = useMemo(
+    () => Array.from(new Set(dealsInPipeline
+      .map((deal) => deal.campaign || deal.utm_campaign || deal.meta_campaign_name || "")
+      .filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [dealsInPipeline],
+  );
+  const availableSources = useMemo(
+    () => Array.from(new Set(dealsInPipeline
+      .map((deal) => deal.source || deal.utm_source || deal.meta_platform || "")
+      .filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [dealsInPipeline],
+  );
+  const availableProducts = useMemo(
+    () => Array.from(new Set(dealsInPipeline
+      .map((deal) => deal.rd_product_name || "")
+      .filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [dealsInPipeline],
+  );
   const normalizedQuery = normalize(query);
-  const deals = useMemo(() => dealsInPipeline.filter((deal) => {
-    const bucket = classifyLead(deal);
-    if (status === "open" && !["open", "qualified"].includes(bucket)) return false;
-    if (status === "won" && bucket !== "won") return false;
-    if (status === "lost" && !["lost", "disqualified"].includes(bucket)) return false;
-    if (owner !== "all" && deal.deal_owner_name !== owner) return false;
-    if (!normalizedQuery) return true;
-    return normalize([
-      deal.contact_name,
-      deal.contact_email,
-      deal.rd_stage_name,
-      deal.deal_owner_name,
-      deal.rd_product_name,
-      deal.rd_campaign_name,
-      deal.utm_source,
-      deal.utm_campaign,
-      deal.lead_city,
-      deal.lead_state,
-    ].filter(Boolean).join(" ")).includes(normalizedQuery);
-  }), [dealsInPipeline, normalizedQuery, owner, status]);
+  // Chips de filtros ativos, no padrão do RD Station: cada um remove o seu
+  // próprio recorte e o quadro volta a refletir o restante do pipeline.
+  const activeFilterChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; clear: () => void }> = [];
+    const formatDay = (value: string) => {
+      const [year, month, day] = value.split("-");
+      return `${day}/${month}/${year}`;
+    };
+    if (advancedFilters.createdAt?.start || advancedFilters.createdAt?.end) {
+      const start = advancedFilters.createdAt.start;
+      const end = advancedFilters.createdAt.end;
+      const label = start && end
+        ? `Data de criação: ${formatDay(start)} - ${formatDay(end)}`
+        : start ? `Data de criação: a partir de ${formatDay(start)}` : `Data de criação: até ${formatDay(end!)}`;
+      chips.push({
+        key: "createdAt",
+        label,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, createdAt: null })),
+      });
+    }
+    if (advancedFilters.closedAt?.start || advancedFilters.closedAt?.end) {
+      const start = advancedFilters.closedAt.start;
+      const end = advancedFilters.closedAt.end;
+      const label = start && end
+        ? `Data de fechamento: ${formatDay(start)} - ${formatDay(end)}`
+        : start ? `Data de fechamento: a partir de ${formatDay(start)}` : `Data de fechamento: até ${formatDay(end!)}`;
+      chips.push({
+        key: "closedAt",
+        label,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, closedAt: null })),
+      });
+    }
+    if (advancedFilters.lastContactAt?.start || advancedFilters.lastContactAt?.end) {
+      const start = advancedFilters.lastContactAt.start;
+      const end = advancedFilters.lastContactAt.end;
+      const label = start && end
+        ? `Último contato: ${formatDay(start)} - ${formatDay(end)}`
+        : start ? `Último contato: a partir de ${formatDay(start)}` : `Último contato: até ${formatDay(end!)}`;
+      chips.push({
+        key: "lastContactAt",
+        label,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, lastContactAt: null })),
+      });
+    }
+    if (typeof advancedFilters.minValue === "number" || typeof advancedFilters.maxValue === "number") {
+      const min = typeof advancedFilters.minValue === "number" ? `R$ ${advancedFilters.minValue.toLocaleString("pt-BR")}` : "R$ 0,00";
+      const max = typeof advancedFilters.maxValue === "number" ? `R$ ${advancedFilters.maxValue.toLocaleString("pt-BR")}` : "R$ 0,00";
+      chips.push({
+        key: "value",
+        label: `Valor: ${min} - ${max}`,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, minValue: null, maxValue: null })),
+      });
+    }
+    if (advancedFilters.campaign) {
+      chips.push({
+        key: "campaign",
+        label: `Campanha: ${advancedFilters.campaign}`,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, campaign: null })),
+      });
+    }
+    if (advancedFilters.source) {
+      chips.push({
+        key: "source",
+        label: `Fonte: ${advancedFilters.source}`,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, source: null })),
+      });
+    }
+    if (advancedFilters.product) {
+      chips.push({
+        key: "product",
+        label: `Produto: ${advancedFilters.product}`,
+        clear: () => setAdvancedFilters((prev) => ({ ...prev, product: null })),
+      });
+    }
+    return chips;
+  }, [advancedFilters]);
+  // O recorte do calendário vale para o quadro e para a lista: sem ele a tela
+  // ignorava a data selecionada e mostrava o funil inteiro. "Máximo" e a
+  // remoção do chip de período devolvem o histórico completo.
+  const calendarPeriod = useMemo(() => {
+    if (preset === "max") return null;
+    if (advancedFilters.createdAt?.start || advancedFilters.createdAt?.end) return null;
+    return {
+      start: businessDateKey(startDate),
+      end: businessDateKey(endDate),
+    };
+  }, [advancedFilters.createdAt, endDate, preset, startDate]);
+  const boardScopeFilters = useMemo<CRMAdvancedFilterState>(() => ({
+    ...advancedFilters,
+    createdAt: advancedFilters.createdAt ?? calendarPeriod,
+  }), [advancedFilters, calendarPeriod]);
+  const deals = useMemo(() => {
+    const scoped = filterDealsByAdvancedCriteria(dealsInPipeline, boardScopeFilters);
+    return scoped.filter((deal) => {
+      const bucket = classifyLead(deal);
+      if (status === "open" && !["open", "qualified"].includes(bucket)) return false;
+      if (status === "won" && bucket !== "won") return false;
+      if (status === "lost" && !["lost", "disqualified"].includes(bucket)) return false;
+      if (owner !== "all" && deal.deal_owner_name !== owner) return false;
+      if (!normalizedQuery) return true;
+      return normalize([
+        deal.contact_name,
+        deal.contact_email,
+        deal.rd_stage_name,
+        deal.deal_owner_name,
+        deal.rd_product_name,
+        deal.rd_campaign_name,
+        deal.utm_source,
+        deal.utm_campaign,
+        deal.lead_city,
+        deal.lead_state,
+      ].filter(Boolean).join(" ")).includes(normalizedQuery);
+    });
+  }, [boardScopeFilters, dealsInPipeline, normalizedQuery, owner, status]);
 
   const stats = useMemo(() => {
     // KPIs describe the selected account/date scope, never a transient board
@@ -898,7 +1022,7 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro espelha o pipeline atual; os indicadores respeitam o período selecionado.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro e os indicadores respeitam o período selecionado e os filtros ativos.</p></div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
@@ -914,7 +1038,34 @@ export default function CrmPage() {
               <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
             ))}
           </div>
+          <CRMAdvancedFiltersSheet
+            filters={advancedFilters}
+            onApplyFilters={setAdvancedFilters}
+            availableCampaigns={availableCampaigns}
+            availableSources={availableSources}
+            availableProducts={availableProducts}
+            triggerClassName="h-11 w-full gap-2 border-border/80 bg-background/50 text-xs font-semibold xl:w-auto"
+          />
         </div>
+        {/* Chips de filtros ativos, no padrão do RD Station CRM */}
+        {(activeFilterChips.length > 0) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
+            <span className="rounded-full bg-muted/60 px-3 py-1 text-[10px] font-black text-foreground">
+              {number.format(deals.length)} {deals.length === 1 ? "Negociação" : "Negociações"}
+            </span>
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => chip.clear()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-background/60 px-3 py-1 text-[10px] font-semibold text-muted-foreground transition hover:border-border hover:text-foreground"
+              >
+                {chip.label}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
           <span>{crmBoardSummaryLabel(crmAvailability.state, deals.length)}{!["loading", "unavailable"].includes(crmAvailability.state) && <> · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</>}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
