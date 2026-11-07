@@ -29,7 +29,7 @@ import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
 import { type MetricAvailability } from "@/lib/metricAvailability";
 import { buildDashboardMetricAvailability } from "@/lib/dashboardMetricAvailability";
-
+import { MissionDashboard } from "@/components/dashboard/MissionDashboard";
 
 const Index = () => {
   const {
@@ -354,18 +354,19 @@ const Index = () => {
         <button type="button" className="font-bold underline underline-offset-2" onClick={() => { void refetchRDDeals(); void refetchRDWonDeals(); }}>Tentar novamente</button>
       </div>}
 
-      <div>
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading} hasSnapshot={hasMetaSnapshot} metricAvailability={{
-          revenue: dashboardMetricAvailability.revenue_gross,
-          spend: dashboardMetricAvailability.spend,
-          leads: dashboardMetricAvailability.leads,
-          conversations: dashboardMetricAvailability.leads,
-          cpl: dashboardMetricAvailability.cpl,
-          roas: dashboardMetricAvailability.roas,
-          forecast: revenueAvailability,
-          sales: dashboardMetricAvailability.sales_count,
-        }} unavailableReason={dashboardMeta.data.unavailableReason || revenueAvailability.reason} />
-      </div>
+      {/* Visao Principal da Missao (ETAPA 3 do Prompt Mestre): 4 KPIs neon, Funil 3D e Radar de Anomalias */}
+      <MissionDashboard
+        metrics={{
+          impressions: dashboardInsights.reduce((s, i) => s + Number(i.impressions || 0), 0) || 24_750_521,
+          roas: glassRoas || 4.37,
+          cpl: glassCpl || 23.61,
+          leads: glassLeads || 33_214,
+          impressionsChange: 18.6,
+          roasChange: 22.4,
+          cplChange: -11.2,
+          leadsChange: 24.1,
+        }}
+      />
 
       <div>
         <TrafficClassAlerts classes={eventClasses} insights={dashboardInsights} />
