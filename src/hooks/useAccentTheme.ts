@@ -35,20 +35,20 @@ export const PLATFORM_THEMES: { value: AccentTheme; label: string; description: 
  */
 function readAccent(): AccentTheme {
   try {
+    // Force migrate any legacy obsidian preference to emerald
     const saved = window.localStorage.getItem(PLATFORM_THEME_STORAGE_KEY);
-    if (saved === "obsidian" || saved === "emerald") return saved;
-  } catch {
-    // Storage is blocked; fall through to the system preference.
-  }
-  if (typeof window === "undefined") return "emerald";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "obsidian" : "emerald";
+    if (saved === "obsidian") {
+      window.localStorage.setItem(PLATFORM_THEME_STORAGE_KEY, "emerald");
+    }
+  } catch {}
+  return "emerald";
 }
 
-export function applyAccent(value: AccentTheme) {
-  const palette = ACCENT[value];
+export function applyAccent(_value?: AccentTheme) {
+  const palette = ACCENT.emerald;
   const root = document.documentElement;
-  root.dataset.accent = palette.html;
-  root.dataset.platformTheme = palette.html;
+  root.dataset.accent = "emerald";
+  root.dataset.platformTheme = "emerald";
   // `gd-premium` anchors the premium layer above the legacy theme rules.
   root.classList.add("gd-premium");
 
@@ -60,11 +60,8 @@ export function applyAccent(value: AccentTheme) {
   }
   themeColor.content = palette.color;
 
-  // The favicon follows the palette, so Esmeralda stays green and Obsidian
-  // stays purple no matter the reading mode.
-  const gradient = value === "obsidian"
-    ? `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2D0B4F"/><stop offset=".42" stop-color="#8A2BE2"/><stop offset=".7" stop-color="#4C1D95"/><stop offset="1" stop-color="#A855F7"/></linearGradient>`
-    : `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#D1FAE5"/><stop offset=".45" stop-color="#34D399"/><stop offset="1" stop-color="#047857"/></linearGradient>`;
+  // Favicon 100% Esmeralda Neon
+  const gradient = `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#D1FAE5"/><stop offset=".45" stop-color="#00FF88"/><stop offset="1" stop-color="#047857"/></linearGradient>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>${gradient}</defs><path fill="url(#s)" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="url(#s)" d="m32 31 12 12-12 12-12-12z"/></svg>`;
   let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!favicon) {

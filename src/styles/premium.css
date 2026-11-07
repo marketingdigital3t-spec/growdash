@@ -56,33 +56,28 @@ html[data-platform-theme="emerald"] {
   --palette-favicon-end: #10B981;
 }
 
-/* --- Palette: Obsidian Neon (100% pure purple — ZERO green) ---------------- */
+/* Fallback defensivo: mesmo se algum seletor legado injetar data-platform-theme="obsidian",
+   a cor é forçada a ser 100% Esmeralda Neon verde — ZERO roxo em toda a plataforma. */
 html[data-platform-theme="obsidian"] {
-  --palette-accent: #BC13FE;
-  --palette-accent-bright: #E879F9;
-  --palette-accent-soft: rgba(188, 19, 254, .16);
-  --palette-accent-rgb: 188, 19, 254;
-  --palette-secondary: #7C3AED;
-  --palette-secondary-rgb: 124, 58, 237;
-  --card-glow-color: 188, 19, 254;
-  --purple-glow-color: 188, 19, 254;
-  --emerald-glow-color: 188, 19, 254; /* Anula qualquer verde em Obsidian */
-
-  --primary: 285 99% 54% !important;
-  --ring: 285 99% 54% !important;
-  --sidebar-primary: 285 99% 54% !important;
-  --sidebar-ring: 285 99% 54% !important;
-  --gd-emerald: #BC13FE !important;
-  --gd-emerald-bright: #E879F9 !important;
-  --gd-emerald-soft: rgba(188, 19, 254, .16) !important;
-  --gd-emerald-border: rgba(188, 19, 254, .35) !important;
-
-  /* Glow neon intenso roxo elétrico */
-  --palette-glow-accent: 0 0 28px -2px rgba(188, 19, 254, 0.55), 0 0 10px 1px rgba(232, 121, 249, 0.65);
-  --palette-glow-secondary: 0 0 24px -4px rgba(188, 19, 254, 0.40), 0 0 8px -2px rgba(232, 121, 249, 0.45);
-  --palette-favicon-start: #4C1D95;
-  --palette-favicon-mid: #BC13FE;
-  --palette-favicon-end: #E879F9;
+  --palette-accent: #10B981 !important;
+  --palette-accent-bright: #00FF88 !important;
+  --palette-accent-soft: rgba(16, 185, 129, .16) !important;
+  --palette-accent-rgb: 16, 185, 129 !important;
+  --palette-secondary: #059669 !important;
+  --palette-secondary-rgb: 5, 150, 105 !important;
+  --card-glow-color: 16, 185, 129 !important;
+  --purple-glow-color: 16, 185, 129 !important;
+  --emerald-glow-color: 16, 185, 129 !important;
+  --primary: 160 84% 39% !important;
+  --ring: 158 64% 52% !important;
+  --sidebar-primary: 160 84% 39% !important;
+  --sidebar-ring: 158 64% 52% !important;
+  --gd-emerald: #10B981 !important;
+  --gd-emerald-bright: #00FF88 !important;
+  --gd-emerald-soft: rgba(16, 185, 129, .16) !important;
+  --gd-emerald-border: rgba(16, 185, 129, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(16, 185, 129, 0.55), 0 0 10px 1px rgba(0, 255, 136, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(16, 185, 129, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45) !important;
 }
 
 /* --- Mode: light surfaces -------------------------------------------------- */
@@ -172,25 +167,25 @@ html:not(.dark) {
   --gd-status-inactive: #64748B;
 
   --gd-glow-emerald: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
-  --gd-glow-purple: 0 0 26px -6px rgba(109, 40, 217, 0.30), 0 0 10px -3px rgba(168, 85, 247, 0.34);
+  --gd-glow-purple: 0 0 24px -4px rgba(16, 185, 129, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
 }
 
-/* --- Mode: dark surfaces --------------------------------------------------- */
+/* --- Mode: dark surfaces (Esmeralda Puro — idêntico à Imagem 2 aprovada) ---- */
 html.dark {
   color-scheme: dark;
 
-  --background: 223 33% 4%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
+  --background: 160 30% 3.5%;
+  --foreground: 150 40% 98%;
+  --card: 156 30% 8.5%;
+  --card-foreground: 150 40% 98%;
+  --popover: 156 30% 8.5%;
+  --popover-foreground: 150 40% 98%;
   --primary: 158 64% 52%;
   --primary-foreground: 163 90% 7%;
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
+  --secondary: 158 24% 13%;
+  --secondary-foreground: 150 40% 98%;
+  --muted: 158 24% 13%;
+  --muted-foreground: 156 16% 65%;
   --accent: 158 26% 14%;
   --accent-foreground: 152 76% 80%;
   --destructive: 358 75% 59%;
@@ -199,18 +194,18 @@ html.dark {
   --success-foreground: 163 90% 7%;
   --warning: 38 92% 50%;
   --warning-foreground: 38 90% 8%;
-  --border: 217 33% 17%;
-  --input: 218 32% 21%;
+  --border: 158 25% 18%;
+  --input: 158 24% 16%;
   --ring: 158 64% 52%;
   --radius: 0.875rem;
 
-  --sidebar-background: 218 33% 6%;
-  --sidebar-foreground: 213 27% 84%;
+  --sidebar-background: 160 35% 4%;
+  --sidebar-foreground: 150 25% 85%;
   --sidebar-primary: 158 64% 52%;
   --sidebar-primary-foreground: 163 90% 7%;
-  --sidebar-accent: 216 32% 15%;
+  --sidebar-accent: 158 30% 12%;
   --sidebar-accent-foreground: 152 76% 80%;
-  --sidebar-border: 217 33% 17%;
+  --sidebar-border: 158 25% 16%;
   --sidebar-ring: 158 64% 52%;
 
   --brand-gold: var(--palette-accent-bright);
@@ -218,19 +213,19 @@ html.dark {
   --brand-bronze: var(--palette-accent);
   --brand-accent-rgb: var(--palette-accent-rgb);
 
-  --bg-canvas: #07090E;
-  --surface-card: rgba(15, 23, 42, 0.62);
-  --surface-raised: rgba(30, 41, 59, 0.74);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5E1;
+  --bg-canvas: #060B08;
+  --surface-card: linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96));
+  --surface-raised: rgba(20, 42, 29, 0.96);
+  --border-subtle: rgba(16, 185, 129, 0.28);
+  --border-strong: rgba(16, 185, 129, 0.45);
+  --text-primary: #FFFFFF;
+  --text-secondary: #D1FAE5;
   --text-muted: #94A3B8;
-  --accent-primary: var(--palette-accent-bright);
-  --accent-secondary: var(--palette-secondary);
-  --purple-accent: var(--palette-secondary);
-  --purple-glow-color: var(--card-glow-color);
-  --emerald-glow-color: var(--palette-accent-rgb);
+  --accent-primary: #00FF88;
+  --accent-secondary: #10B981;
+  --purple-accent: #10B981;
+  --purple-glow-color: 16, 185, 129;
+  --emerald-glow-color: 16, 185, 129;
 
   --gd-surface-page: var(--bg-canvas);
   --gd-surface-card: var(--surface-card);
@@ -259,7 +254,7 @@ html.dark {
   --gd-status-inactive: #94A3B8;
 
   --gd-glow-emerald: 0 0 24px -4px rgba(52, 211, 153, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.50);
-  --gd-glow-purple: 0 0 30px -6px rgba(138, 43, 226, 0.42), 0 0 10px -3px rgba(168, 85, 247, 0.46);
+  --gd-glow-purple: 0 0 28px -2px rgba(16, 185, 129, 0.55), 0 0 10px 1px rgba(0, 255, 136, 0.65);
 }
 
 /* --------------------------------------------------------------------------
@@ -310,11 +305,11 @@ html .brand-shell.growdash-app-shell::after {
    cascade even against the historical `!important` gradient overrides.
    -------------------------------------------------------------------------- */
 
-/* Level 1 — the glass surface itself. Declared here (not only in tokens.css)
-   because tokens.css loads before index.css, and the legacy `.gd-metric-card`
-   rules would otherwise paint over the translucency. */
+/* Level 1 — the glass surface itself (Esmeralda Puro — Imagem 2 aprovada).
+   Uses `background: var(--surface-card)` because gradients are images, not colors. */
 .gd-glass-card {
-  background-color: var(--gd-surface-card) !important;
+  background: var(--surface-card) !important;
+  background-color: var(--surface-card-color) !important;
   backdrop-filter: blur(14px) saturate(135%);
   -webkit-backdrop-filter: blur(14px) saturate(135%);
   box-shadow: var(--gd-shadow-card) !important;
@@ -354,10 +349,29 @@ html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashbo
 
 html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
-  background-image:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.045) 0%, transparent 40%),
-    radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.13) 0%, transparent 15rem);
-  border-color: rgba(var(--palette-accent-rgb), 0.18) !important;
+  background: linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96)) !important;
+  border-color: rgba(16, 185, 129, 0.28) !important;
+  box-shadow: inset 0 1px rgba(52, 211, 153, 0.08), 0 14px 32px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Ícone de status do card de KPI (quadradinho verde esmeralda com pulso neon — Imagem 2) */
+.brand-shell .gd-metric-card .gd-metric-icon,
+.brand-shell .dashboard-terra-card .gd-metric-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #00FF88 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 14px -3px rgba(16, 185, 129, 0.35) !important;
+}
+
+.brand-shell .gd-metric-card .gd-metric-icon svg,
+.brand-shell .dashboard-terra-card .gd-metric-icon svg {
+  color: #00FF88 !important;
+  stroke: #00FF88 !important;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.65)) !important;
 }
 
 /* Luminous top edge — 100% pure to the active theme palette */
@@ -368,9 +382,9 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
   inset: 0 10% auto 10%;
   height: 1px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(var(--palette-accent-rgb), 0.65), rgba(var(--palette-accent-bright), 0.50), transparent);
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.75), rgba(0, 255, 136, 0.65), transparent);
   content: "";
-  opacity: 0.65;
+  opacity: 0.70;
   pointer-events: none;
 }
 
@@ -552,8 +566,8 @@ html:not(.dark) .brand-shell .brand-topbar {
 
 .brand-shell [role="tablist"] {
   position: relative;
-  background: rgba(15, 23, 42, 0.45) !important;
-  border: 1px solid rgba(var(--palette-accent-rgb), 0.18) !important;
+  background: rgba(6, 16, 11, 0.65) !important;
+  border: 1px solid rgba(var(--palette-accent-rgb), 0.25) !important;
   backdrop-filter: blur(14px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
   border-radius: 999px !important;
@@ -885,6 +899,7 @@ html.gd-premium .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-ca
   -webkit-backdrop-filter: blur(14px) saturate(135%);
 }
 
+/* Tema Escuro: Fundo dos cards idêntico à Imagem 2 (verde esmeralda florestal escuro sobre preto) */
 html.gd-premium.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
       .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
@@ -894,10 +909,52 @@ html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
   :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
       .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
       .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
-  background-image:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.045) 0%, transparent 40%),
-    radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.13) 0%, transparent 15rem) !important;
-  border-color: rgba(var(--palette-accent-rgb), 0.18) !important;
+  background: linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96)) !important;
+  background-color: rgba(10, 24, 16, 0.96) !important;
+  background-image: linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96)) !important;
+  border: 1px solid rgba(16, 185, 129, 0.28) !important;
+  box-shadow: inset 0 1px rgba(52, 211, 153, 0.08), 0 14px 32px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Tema Claro: Fundo translúcido branco elegante com borda esmeralda suave */
+html.gd-premium:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium:not(.dark) .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background: rgba(255, 255, 255, 0.88) !important;
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  background-image: none !important;
+  border: 1px solid rgba(6, 78, 59, 0.12) !important;
+  box-shadow: 0 10px 30px -18px rgba(6, 78, 59, 0.22), 0 2px 6px -3px rgba(6, 78, 59, 0.08) !important;
+}
+
+/* Ícone de status dos cards de KPI com o quadradinho verde esmeralda idêntico à Imagem 2 */
+html.gd-premium .brand-shell .gd-metric-icon,
+html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 12px -2px rgba(16, 185, 129, 0.30) !important;
+}
+
+html.gd-premium .brand-shell .gd-metric-icon svg,
+html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon svg {
+  color: #00FF88 !important;
+  stroke: #00FF88 !important;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.70)) !important;
+}
+
+/* Donut de distribuição por plataforma: harmônico em verde esmeralda */
+html.gd-premium .brand-shell .platform-distribution-card .recharts-pie-sector:first-child path {
+  fill: #10B981 !important;
 }
 
 /* Legacy: `.brand-shell[data-dashboard-scene="true"] … blur(10px) !important` —

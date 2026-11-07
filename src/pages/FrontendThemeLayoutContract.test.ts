@@ -127,15 +127,15 @@ describe("frontend theme and responsive contracts", () => {
     expect(premiumStyles).toContain("--palette-accent: #10B981");
     expect(premiumStyles).toContain("--palette-accent-bright: #00FF88");
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
-    // Both palettes are supported with pure accents: Esmeralda is green, Obsidian is purple neon.
-    expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
-    expect(premiumStyles).toContain("--palette-accent: #BC13FE");
-    expect(premiumStyles).toContain("--palette-accent-bright: #E879F9");
+    // Pure Esmeralda Neon contract: ZERO purple neon anywhere in production styles.
+    expect(premiumStyles).not.toContain("#BC13FE");
+    expect(premiumStyles).not.toContain("#E879F9");
+    expect(premiumStyles).not.toContain("#A855F7");
   });
 
   it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
     expect(premiumStyles).toContain("backdrop-filter: blur(14px) saturate(135%)");
-    expect(premiumStyles).toContain("--purple-glow-color: var(--card-glow-color)");
+    expect(premiumStyles).toContain("--purple-glow-color: 16, 185, 129");
     expect(premiumStyles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(premiumStyles).toContain("animation-duration: 0.01ms !important");
     expect(premiumStyles).toContain("@keyframes gd-neon-flash");
@@ -146,10 +146,18 @@ describe("frontend theme and responsive contracts", () => {
       fileURLToPath(new URL("../hooks/useAccentTheme.ts", import.meta.url)),
       "utf8",
     );
-    expect(themeHook).toContain('root.dataset.platformTheme = palette.html');
+    expect(themeHook).toContain('root.dataset.platformTheme = "emerald"');
     expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
     expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
     expect(themeHook).not.toContain("metallic-gold");
+  });
+
+  it("renders dark cards with pure forest emerald over black matching approved Image 2", () => {
+    expect(premiumStyles).toContain("linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96)) !important");
+    expect(premiumStyles).toContain("border: 1px solid rgba(16, 185, 129, 0.28) !important");
+    expect(premiumStyles).toContain("--bg-canvas: #060B08");
+    expect(premiumStyles).not.toContain("--surface-card: rgba(15, 23, 42");
+    expect(premiumStyles).not.toContain("--card: 222 47% 11%");
   });
 
   it("wins the cascade against the legacy gradients that pin the shell flat", () => {
