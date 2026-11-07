@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { FunnelKPIs } from "@/components/funnel-analysis/FunnelKPIs";
 import { FunnelStageDistribution } from "@/components/funnel-analysis/FunnelStageDistribution";
 import { FunnelStageConversion } from "@/components/funnel-analysis/FunnelStageConversion";
+import { FunnelOrbitalInteractive } from "@/components/funnel-analysis/FunnelOrbitalInteractive";
 import { FunnelLeadsEvolution } from "@/components/funnel-analysis/FunnelLeadsEvolution";
 import { FunnelBottlenecks } from "@/components/funnel-analysis/FunnelBottlenecks";
 import { FunnelSourceTable } from "@/components/funnel-analysis/FunnelSourceTable";
@@ -832,6 +833,23 @@ export default function FunnelAnalysis() {
               roas={mediaMetrics.roas}
               salesConversionRate={funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available ? mediaMetrics.salesConversionRate : null}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
+            />
+          </MotionItem>
+
+          {/* Funil Orbital interativo: comparativo por etapa e destaque do gargalo */}
+          <MotionItem>
+            <FunnelOrbitalInteractive
+              stages={[
+                { key: "leads", label: "LEADS", current: periodAnalytics.totalLeads ?? 0 },
+                { key: "qualified", label: "QUALIFICADOS", current: periodAnalytics.qualifiedLeads ?? 0 },
+                { key: "opportunities", label: "NEGOCIAÇÕES", current: periodAnalytics.conversions ?? 0 },
+                { key: "won", label: "CLIENTES", current: periodAnalytics.stages.find((s) => s.is_won)?.count ?? 0 },
+              ]}
+              conversionRates={[
+                periodAnalytics.qualificationRate ?? 0,
+                periodAnalytics.conversionRate ?? 0,
+                periodAnalytics.avgTicket > 0 ? periodAnalytics.revenue / Math.max(periodAnalytics.avgTicket, 1) : 0,
+              ]}
             />
           </MotionItem>
 

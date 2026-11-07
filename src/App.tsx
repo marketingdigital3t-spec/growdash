@@ -68,6 +68,7 @@ const QuadroPage = lazyWithRetry(() => import("@/growdash/QuadroPage"), "quadro"
 const LegalPage = lazyWithRetry(() => import("@/pages/LegalPage"), "legal");
 const JornadaPage = lazyWithRetry(() => import("@/pages/Jornada"), "jornada");
 const ComandosPage = lazyWithRetry(() => import("@/pages/Comandos"), "comandos");
+const AgendaTurmasPage = lazyWithRetry(() => import("@/pages/AgendaTurmas"), "agenda-turmas");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -330,7 +331,7 @@ export default function App() {
                         a redirect so old bookmarks and cached menu chunks do
                         not land on the dashboard by accident. */}
                     <Route path="alerts" element={<Navigate to="/alertas" replace />} />
-                    <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<EventClasses />)}</RequirePage>} />
+                    <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<AgendaTurmasPage />)}</RequirePage>} />
                     <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
                     <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
                     <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />

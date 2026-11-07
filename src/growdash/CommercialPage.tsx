@@ -19,6 +19,7 @@ import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PageHeading } from "./shared";
+import { CrewRanking } from "@/components/dashboard/CrewRanking";
 import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking, resolveCommercialSaleAttribution, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
 import { getExpertAccountIds, validateSellerAvatarFile, type CommercialExpertAccountLink } from "@/lib/commercialFilters";
 
@@ -252,7 +253,8 @@ export default function CommercialPage() {
     expertDirectoryIsError ? expertDirectoryError : null,
   ].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error));
   const salesUnavailable = salesIsError && sales.length === 0;
-  const goalState = goalsIsError ? (goalData?.rows?.length ? "stale" : "unavailable") : goalsIsLoading && !goalData?.rows?.length ? "loading" : "ready";
+  const hasGoalRows = Boolean(goalData && Array.isArray(goalData.rows) && goalData.rows.length > 0);
+  const goalState = goalsIsError ? (hasGoalRows ? "stale" : "unavailable") : goalsIsLoading && !hasGoalRows ? "loading" : "ready";
   return (
     <div className="gd-module-shell commercial-ranking-shell mx-auto max-w-[1600px] space-y-5" data-commercial-ranking>
       <PageHeading
@@ -275,6 +277,19 @@ export default function CommercialPage() {
           <p className="mt-1 text-sm text-amber-100/80">Não foi possível consultar as vendas deste período. Nenhum zero foi inferido; tente novamente quando a fonte estiver disponível.</p>
         </section>
       ) : <>
+        {/* Ranking da Tripulação no formato de missão (ETAPA 7) */}
+        <CrewRanking
+          members={rankedSellers.map((seller, index) => ({
+            id: seller.seller,
+            rank: index + 1,
+            name: seller.seller,
+            role: index === 0 ? "Comandante da Missão" : "Especialista Comercial",
+            salesCount: seller.count,
+            totalRevenue: seller.revenue,
+            individualGoal: Math.max(1, Math.round(seller.revenue / Math.max(0.6, seller.performance / 100))),
+          }))}
+        />
+
         <div className="commercial-ranking-tabs" role="tablist" aria-label="Escopo do ranking comercial">
           <button type="button" role="tab" aria-selected={rankingScope === "expert"} className={rankingScope === "expert" ? "is-active gd-commercial-tab-active" : ""} onClick={() => { setRankingScope("expert"); setRankingPage(0); }}>Por expert</button>
           <button type="button" role="tab" aria-selected={rankingScope === "global"} className={rankingScope === "global" ? "is-active gd-commercial-tab-active" : ""} onClick={() => { setRankingScope("global"); setRankingPage(0); }}>Global da empresa</button>
