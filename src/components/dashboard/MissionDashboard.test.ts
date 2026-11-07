@@ -51,13 +51,15 @@ describe("ETAPA 3 — Dashboard Completo da Missão", () => {
     expect(anomalyRadarSource).toContain("Ver todos os alertas");
   });
 
-  it("organiza o MissionDashboard em grade 2/3 (funil) e 1/3 (radar)", () => {
+  it("organiza o MissionDashboard com os 4 blocos solicitados (Investimento, Leads, CPL, Faturamento)", () => {
+    expect(missionDashboardSource).toContain('label="Investimento"');
+    expect(missionDashboardSource).toContain('label="Leads"');
+    expect(missionDashboardSource).toContain('label="CPL"');
+    expect(missionDashboardSource).toContain('label="Faturamento"');
     expect(missionDashboardSource).toContain("lg:col-span-8");
     expect(missionDashboardSource).toContain("lg:col-span-4");
-    expect(missionDashboardSource).toContain("KpiCard");
     expect(missionDashboardSource).toContain("OrbitalFunnel");
     expect(missionDashboardSource).toContain("AnomalyRadar");
-    expect(missionDashboardSource).toContain("FuelBar");
   });
 
   it("integra o MissionDashboard no Index.tsx", () => {

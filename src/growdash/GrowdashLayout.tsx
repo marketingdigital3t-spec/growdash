@@ -553,12 +553,20 @@ export default function GrowdashLayout() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {/* Versao compacta do combustivel no header */}
-            <FuelBar compact className="hidden md:flex" />
             {/* Pill FASE: TERRA / ORBITA / GALAXIA */}
             <PhasePill />
           </div>
         </header>
+
+        {/* Barra COMBUSTIVEL DA MISSAO fixada no topo na barra superior */}
+        {(pathname === "/" || pathname === "/painel-expert") && (
+          <div className="sticky top-14 z-20 w-full border-b border-card-border/60 bg-background/85 px-3 py-2.5 backdrop-blur-xl transition-all sm:px-6">
+            <div className="mx-auto max-w-[1920px]">
+              <FuelBar className="shadow-md" />
+            </div>
+          </div>
+        )}
+
         <main
           className={cn(
             "growdash-main min-w-0 max-w-full overflow-x-clip px-[var(--gd-page-gutter)] py-[var(--gd-page-gutter)] pb-[calc(var(--gd-page-gutter)+env(safe-area-inset-bottom))]",
@@ -568,9 +576,6 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
-          {/* A barra de combustivel full pertence ao cockpit da Missao
-              (MissionDashboard). Mantem-la apenas aqui duplicaria o card no
-              Dashboard e a deixaria fora da RouteErrorBoundary do modulo. */}
           <div
             className={cn(
               "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",

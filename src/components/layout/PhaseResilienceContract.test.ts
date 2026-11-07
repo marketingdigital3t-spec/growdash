@@ -79,12 +79,14 @@ describe("Resiliencia do shell contra fase corrompida (AppErrorBoundary)", () =>
     expect(cosmicObject).not.toMatch(/PHASES\[\s*phase\s*\]/);
   });
 
-  it("o shell nao duplica a FuelBar full fora da cockpit da Missao", () => {
-    // A FuelBar full pertence ao MissionDashboard. Renderiza-la tambem no
-    // shell a colocava fora da RouteErrorBoundary do modulo.
+  it("fixa a FuelBar na sidebar superior sem duplicar dentro do cockpit", () => {
+    // A barra COMBUSTIVEL DA MISSAO fica fixada no topo (sticky) da barra
+    // superior do shell e nao e renderizada novamente dentro do cockpit.
+    expect(growdashLayout).toContain("sticky top-14 z-20");
+    expect(growdashLayout).toContain("<FuelBar className=\"shadow-md\" />");
     expect(growdashLayout).not.toContain(
       '{(pathname === "/" || pathname === "/painel-expert") && <FuelBar className="mb-4" />}',
     );
-    expect(missionDashboard).toContain("<FuelBar />");
+    expect(missionDashboard).not.toContain("<FuelBar />");
   });
 });

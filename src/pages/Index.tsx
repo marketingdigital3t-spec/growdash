@@ -354,17 +354,15 @@ const Index = () => {
         <button type="button" className="font-bold underline underline-offset-2" onClick={() => { void refetchRDDeals(); void refetchRDWonDeals(); }}>Tentar novamente</button>
       </div>}
 
-      {/* Visao Principal da Missao (ETAPA 3 do Prompt Mestre): 4 KPIs neon, Funil 3D e Radar de Anomalias */}
+      {/* 4 blocos fundamentais: Investimento, Leads, CPL, Vendas e Faturamento + Funil 3D e Radar */}
       <MissionDashboard
         metrics={{
-          impressions: dashboardInsights.reduce((s, i) => s + Number(i.impressions || 0), 0) || 24_750_521,
-          roas: glassRoas || 4.37,
-          cpl: glassCpl || 23.61,
-          leads: glassLeads || 33_214,
-          impressionsChange: 18.6,
-          roasChange: 22.4,
-          cplChange: -11.2,
-          leadsChange: 24.1,
+          spend: glassSpend,
+          leads: glassLeads,
+          cpl: glassCpl,
+          sales: glassSales.totalQuantity,
+          revenue: glassSales.totalGross,
+          roas: glassRoas,
         }}
       />
 
