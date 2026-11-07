@@ -552,20 +552,16 @@ export default function GrowdashLayout() {
             <HeaderCosmicBrand pageTitle={pathname === "/" ? "Dashboard" : pathname.replace(/^\//, "").replace(/-/g, " ")} />
           </div>
 
+          {/* Combustivel da Missao integrado no centro da barra superior (sidebar superior) */}
+          <div className="hidden md:flex flex-1 min-w-[280px] max-w-xl mx-2 lg:mx-4">
+            <FuelBar topbar className="w-full" />
+          </div>
+
           <div className="flex items-center gap-3 shrink-0">
             {/* Pill FASE: TERRA / ORBITA / GALAXIA */}
             <PhasePill />
           </div>
         </header>
-
-        {/* Barra COMBUSTIVEL DA MISSAO fixada no topo na barra superior */}
-        {(pathname === "/" || pathname === "/painel-expert") && (
-          <div className="sticky top-14 z-20 w-full border-b border-card-border/60 bg-background/85 px-3 py-2.5 backdrop-blur-xl transition-all sm:px-6">
-            <div className="mx-auto max-w-[1920px]">
-              <FuelBar className="shadow-md" />
-            </div>
-          </div>
-        )}
 
         <main
           className={cn(

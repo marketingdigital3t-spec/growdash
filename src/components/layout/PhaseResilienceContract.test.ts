@@ -79,11 +79,10 @@ describe("Resiliencia do shell contra fase corrompida (AppErrorBoundary)", () =>
     expect(cosmicObject).not.toMatch(/PHASES\[\s*phase\s*\]/);
   });
 
-  it("fixa a FuelBar na sidebar superior sem duplicar dentro do cockpit", () => {
-    // A barra COMBUSTIVEL DA MISSAO fica fixada no topo (sticky) da barra
-    // superior do shell e nao e renderizada novamente dentro do cockpit.
-    expect(growdashLayout).toContain("sticky top-14 z-20");
-    expect(growdashLayout).toContain("<FuelBar className=\"shadow-md\" />");
+  it("integra a FuelBar dentro da barra superior sem duplicar no cockpit nem criar faixa solta", () => {
+    // A barra COMBUSTIVEL DA MISSAO fica integrada dentro do proprio header sticky
+    // no topo, entre o titulo e a pill de fase, sem criar bloco solto embaixo.
+    expect(growdashLayout).toContain('<FuelBar topbar className="w-full" />');
     expect(growdashLayout).not.toContain(
       '{(pathname === "/" || pathname === "/painel-expert") && <FuelBar className="mb-4" />}',
     );

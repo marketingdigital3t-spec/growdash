@@ -11,6 +11,8 @@ import { formatCurrency, formatPercent } from "@/lib/format/formatPtBr";
 interface FuelBarProps {
   /** Se true, renderiza a versao compacta para headers de abas internas. */
   compact?: boolean;
+  /** Se true, renderiza a versao integrada na barra superior (topbar horizontal). */
+  topbar?: boolean;
   /** Meta personalizada para a fase Galaxia (padrao R$ 250.000). */
   galaxyGoal?: number;
   className?: string;
@@ -25,6 +27,7 @@ interface FuelBarProps {
  */
 export function FuelBar({
   compact = false,
+  topbar = false,
   galaxyGoal,
   className = "",
 }: FuelBarProps) {
@@ -36,6 +39,39 @@ export function FuelBar({
     Number.isFinite(galaxyGoal) ? galaxyGoal : undefined,
   );
   const nextInSight = isNextPhaseInSight(current, phase);
+
+  if (topbar) {
+    return (
+      <div className={`flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-card-border/70 bg-card-bg/60 px-3 py-1.5 shadow-sm backdrop-blur-md ${className}`}>
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-card-border bg-primary/10 text-primary-neon">
+          <Fuel className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 grow">
+          <div className="flex items-baseline justify-between gap-2 text-[10px]">
+            <span className="truncate font-bold uppercase tracking-[0.12em] text-primary-neon">
+              Combustível da Missão
+            </span>
+            <span className="font-semibold text-text-secondary tabular-nums">
+              {formatCurrency(current)} de {formatCurrency(target)} | <b className="font-bold text-text-primary">{formatPercent(percent, 0)}</b>
+            </span>
+          </div>
+          <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full border border-card-border bg-bg-elevated/80 shadow-inner">
+            <div
+              className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${percent}%` }}
+            >
+              <span className="absolute right-0 top-0 h-full w-2 bg-white/70 shadow-[0_0_8px_1px_#ffffff]" />
+            </div>
+          </div>
+        </div>
+        {nextInSight && (
+          <span className="hidden xl:inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/15 px-2 py-0.5 text-[9px] font-bold text-warning animate-pulse shrink-0">
+            <Sparkles className="h-2.5 w-2.5" /> Próxima fase
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (compact) {
     return (
