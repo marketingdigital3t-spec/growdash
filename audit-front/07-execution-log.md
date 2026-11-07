@@ -66,6 +66,14 @@ O Prompt Master em `/audit-front/06-remediation-prompt-front.md` foi iniciado co
   - Criado e integrado nas telas de Configurações (`src/pages/Settings.tsx`), Perfil (`src/growdash/ProfilePage.tsx`), Topbar e Sidebar (`AppSidebar.tsx` e `GrowdashLayout.tsx`), permitindo a alternância imediata com preview visual dos dois temas.
 
 - **Evidências de Validação:**
-  - Build Vite concluído em 6.40s sem nenhum erro.
-  - 801 testes unitários passando em 177 suítes no Vitest (3 novos testes de contrato de design system).
+  - Build Vite concluído sem erros.
+  - 857 testes unitários passando em 187 suítes no Vitest.
   - Testado e comprovado no navegador via automação Playwright/DevTools com alternância dinâmica validada (`toggleWorks: true`).
+
+### Etapas 2 a 6: Cockpit, Funil 3D, Radar, Atmosfera e Acessibilidade (CONCLUÍDO)
+
+- **ETAPA 2 (Commit `52b041e`):** Layout Global com Starfield Canvas 2D nativo a 60 FPS, Objetos Cósmicos por fase (Terra, Órbita, Galáxia), Barra de Combustível da Missão, Nível da Nave no menu lateral e tela de Jornada da Nave (`/jornada`).
+- **ETAPA 3 (Commit `1ac465a`):** Cockpit Mission Dashboard com 4 KpiCards neon tabulares, Funil Orbital 3D cônico com foguete animado, Radar de Anomalias com feixe giratório 360° e métricas avançadas integradas no `Index.tsx`.
+- **ETAPA 4 (Commit `90755b7`):** Atmosfera Cósmica com `.gd-nebula-bg` e textura fixa de ruído orgânico SVG `.gd-noise-overlay` a 3.5% de opacidade nos containers principais (`GrowdashLayout` e `AppLayout`).
+- **ETAPA 5 (Commit `978de48`):** Migração tela por tela das rotas críticas: Radar de Anomalias no topo de Alertas (`/alertas`), Funil de Conversão (`/analise-de-funis`), Configurações com Seletor Obsidian/Esmeralda (`/configuracoes`) e Tráfego Pago (`/campanhas`).
+- **ETAPA 6 (Commit `acd9efd`):** Acessibilidade estrita com suporte a `prefers-reduced-motion` em animações cósmicas e do radar, números tabulares para legibilidade de dados e garantia de contraste WCAG AA.
