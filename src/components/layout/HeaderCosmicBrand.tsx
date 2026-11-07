@@ -1,6 +1,6 @@
 import { Globe, Orbit, Sparkles } from "lucide-react";
 import { useEffectivePhase } from "@/lib/phase/phaseStore";
-import { PHASES, PHASE_SUBTITLES, type Phase } from "@/lib/phase/phase";
+import { getPhaseInfo, getPhaseSubtitle, sanitizePhase, type Phase } from "@/lib/phase/phase";
 
 interface HeaderCosmicBrandProps {
   /** Titulo da aba ativa (ex.: "TRÁFEGO PAGO"). Se omitido, usa "GROWDASH". */
@@ -26,9 +26,9 @@ function PhaseCosmicIcon({ phase }: { phase: Phase }) {
  * `--text-secondary`. Regra: nunca usar travessao longo (em-dash).
  */
 export function HeaderCosmicBrand({ pageTitle, className = "" }: HeaderCosmicBrandProps) {
-  const phase = useEffectivePhase();
-  const info = PHASES[phase];
-  const subtitle = PHASE_SUBTITLES[phase];
+  const phase = sanitizePhase(useEffectivePhase());
+  const info = getPhaseInfo(phase);
+  const subtitle = getPhaseSubtitle(phase);
   const titlePrefix = pageTitle ? pageTitle.toUpperCase() : "GROWDASH";
 
   return (

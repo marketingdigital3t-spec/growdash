@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
-import { PHASES, getPhaseProgress } from "@/lib/phase/phase";
+import { getPhaseInfo, getPhaseProgress, sanitizePhase } from "@/lib/phase/phase";
 
 interface ShipLevelCardProps {
   collapsed?: boolean;
@@ -15,10 +15,10 @@ interface ShipLevelCardProps {
  * acesso a pagina de Jornada.
  */
 export function ShipLevelCard({ collapsed = false, className = "" }: ShipLevelCardProps) {
-  const phase = useEffectivePhase();
+  const phase = sanitizePhase(useEffectivePhase());
   const monthlyRevenue = usePhaseStore((state) => state.monthlyRevenue);
-  const info = PHASES[phase];
-  const progress = getPhaseProgress(monthlyRevenue, phase);
+  const info = getPhaseInfo(phase);
+  const progress = Number.isFinite(monthlyRevenue) ? getPhaseProgress(monthlyRevenue, phase) : 0;
 
   if (collapsed) {
     return (

@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import {
   getPhase,
   resolvePhaseWithHistory,
+  sanitizePhase,
   type Phase,
   type PhaseHistoryEntry,
 } from "@/lib/phase/phase";
@@ -102,11 +103,11 @@ export const usePhaseStore = create<PhaseStore>()(
   ),
 );
 
-/** Fase efetiva: o override de desenvolvimento tem prioridade. */
+/** Fase efetiva: o override de desenvolvimento tem prioridade e o retorno e sempre sanitizado. */
 export function useEffectivePhase(): Phase {
   const currentPhase = usePhaseStore((state) => state.currentPhase);
   const devOverride = usePhaseStore((state) => state.devOverride);
-  return devOverride ?? currentPhase;
+  return sanitizePhase(devOverride ?? currentPhase);
 }
 
 export { getPhase };

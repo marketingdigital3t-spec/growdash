@@ -67,6 +67,7 @@ const AgentTrainingPage = lazyWithRetry(() => import("@/growdash/AgentTrainingPa
 const QuadroPage = lazyWithRetry(() => import("@/growdash/QuadroPage"), "quadro");
 const LegalPage = lazyWithRetry(() => import("@/pages/LegalPage"), "legal");
 const JornadaPage = lazyWithRetry(() => import("@/pages/Jornada"), "jornada");
+const ComandosPage = lazyWithRetry(() => import("@/pages/Comandos"), "comandos");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -292,6 +293,7 @@ export default function App() {
                     <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="jornada" element={<ResilientRoute><JornadaPage /></ResilientRoute>} />
+                    <Route path="comandos" element={<ResilientRoute><ComandosPage /></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<ResilientRoute><RequirePage page="crm"><CrmPage /></RequirePage></ResilientRoute>} />

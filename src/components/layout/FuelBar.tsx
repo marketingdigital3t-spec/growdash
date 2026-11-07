@@ -3,6 +3,7 @@ import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
 import {
   getFuelProgress,
   isNextPhaseInSight,
+  sanitizePhase,
   type Phase,
 } from "@/lib/phase/phase";
 import { formatCurrency, formatPercent } from "@/lib/format/formatPtBr";

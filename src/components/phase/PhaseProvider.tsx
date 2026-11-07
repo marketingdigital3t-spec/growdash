@@ -1,20 +1,65 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
-import type { Phase } from "@/lib/phase/phase";
+import { PHASES, type Phase } from "@/lib/phase/phase";
+import { PhaseTransitionOverlay } from "@/components/phase/PhaseTransitionOverlay";
+import { AchievementModal } from "@/components/phase/AchievementModal";
 
 /**
- * Aplica `data-phase` no <html> e mantem o layout em sincronia com a fase
- * efetiva (faturamento do mes ou override de desenvolvimento).
+ * Aplica `data-phase` no <html> e orquestra a experiencia cinematografica
+ * de evolucao de fase + modal de conquista hexagonal (secao 8).
  */
 export function PhaseProvider({ children }: { children: ReactNode }) {
   const phase = useEffectivePhase();
+  const monthlyRevenue = usePhaseStore((state) => state.monthlyRevenue);
+  const lastPhaseRef = useRef<Phase>(phase);
+
+  const [activeTransition, setActiveTransition] = useState<{
+    from: Phase;
+    to: Phase;
+    revenue: number;
+  } | null>(null);
+  const [achievementPhase, setAchievementPhase] = useState<Phase | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.phase = phase;
     document.documentElement.dataset.spacePhase = phase;
-  }, [phase]);
 
-  return <>{children}</>;
+    const previous = lastPhaseRef.current;
+    if (previous && previous !== phase) {
+      const prevOrder = PHASES[previous].order;
+      const nextOrder = PHASES[phase].order;
+      // Dispara animacao apenas quando SOBE de fase
+      if (nextOrder > prevOrder) {
+        setActiveTransition({ from: previous, to: phase, revenue: monthlyRevenue || PHASES[phase].min });
+      }
+    }
+    lastPhaseRef.current = phase;
+  }, [phase, monthlyRevenue]);
+
+  const handleTransitionComplete = () => {
+    const target = activeTransition?.to ?? null;
+    setActiveTransition(null);
+    if (target) {
+      setAchievementPhase(target);
+    }
+  };
+
+  return (
+    <>
+      {children}
+      {/* Animacao cinematografica em tela cheia */}
+      <PhaseTransitionOverlay
+        transition={activeTransition}
+        onComplete={handleTransitionComplete}
+      />
+      {/* Badge de conquista hexagonal com opcao de compartilhamento */}
+      <AchievementModal
+        phase={achievementPhase}
+        revenue={monthlyRevenue || (achievementPhase ? PHASES[achievementPhase].min : 0)}
+        onClose={() => setAchievementPhase(null)}
+      />
+    </>
+  );
 }
 
 /** Seletor de fase para desenvolvimento (Ctrl+Shift+P). */

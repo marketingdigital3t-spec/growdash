@@ -59,6 +59,14 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: [],
       },
       {
+        label: "Comandos",
+        path: "/comandos",
+        icon: BrainCircuit,
+        description: "Central de inteligência e ações executáveis com IA da missão.",
+        metrics: [],
+        highlights: ["Pausar anúncios caros", "Redistribuir verba", "Corrigir gargalos"],
+      },
+      {
         label: "Painel do Expert",
         path: "/painel-expert",
         icon: BarChart3,

@@ -1,5 +1,5 @@
 import { useEffectivePhase } from "@/lib/phase/phaseStore";
-import { PHASES, type Phase } from "@/lib/phase/phase";
+import { getPhaseInfo, sanitizePhase, type Phase } from "@/lib/phase/phase";
 
 interface PhasePillProps {
   overridePhase?: Phase;
@@ -13,8 +13,8 @@ interface PhasePillProps {
  */
 export function PhasePill({ overridePhase, className = "" }: PhasePillProps) {
   const activePhase = useEffectivePhase();
-  const phase = overridePhase ?? activePhase;
-  const info = PHASES[phase];
+  const phase = sanitizePhase(overridePhase ?? activePhase);
+  const info = getPhaseInfo(phase);
 
   return (
     <span

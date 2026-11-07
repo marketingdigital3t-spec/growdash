@@ -29,6 +29,33 @@ export const PHASE_FUEL_CEILINGS: Record<Phase, number> = {
   galaxia: 250_000,
 };
 
+/**
+ * Sanitiza qualquer valor de entrada para uma Phase valida.
+ * Garante que estados legados, storage corrompido ou nulos nunca quebrem a aplicacao.
+ */
+export function sanitizePhase(value: unknown): Phase {
+  if (value === "orbita" || value === "galaxia") return value;
+  return "terra";
+}
+
+/** Retorna as informacoes da fase com fallback 100% seguro contra undefined/null. */
+export function getPhaseInfo(phase: unknown) {
+  const safe = sanitizePhase(phase);
+  return PHASES[safe];
+}
+
+/** Retorna o subtitulo da fase com fallback seguro. */
+export function getPhaseSubtitle(phase: unknown): string {
+  const safe = sanitizePhase(phase);
+  return PHASE_SUBTITLES[safe];
+}
+
+/** Retorna o teto de combustivel da fase com fallback seguro. */
+export function getPhaseFuelCeiling(phase: unknown): number {
+  const safe = sanitizePhase(phase);
+  return PHASE_FUEL_CEILINGS[safe];
+}
+
 export function getPhase(monthlyRevenue: number): Phase {
   if (monthlyRevenue === Number.POSITIVE_INFINITY) return "galaxia";
   const revenue = Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0;

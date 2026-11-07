@@ -1,6 +1,6 @@
 import { Activity, CheckCircle2, Clock, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffectivePhase } from "@/lib/phase/phaseStore";
-import { PHASES } from "@/lib/phase/phase";
+import { getPhaseInfo, sanitizePhase } from "@/lib/phase/phase";
 
 interface GlobalFooterProps {
   onRefresh?: () => void;
@@ -19,8 +19,8 @@ export function GlobalFooter({
   isRefreshing = false,
   className = "",
 }: GlobalFooterProps) {
-  const phase = useEffectivePhase();
-  const info = PHASES[phase];
+  const phase = sanitizePhase(useEffectivePhase());
+  const info = getPhaseInfo(phase);
 
   return (
     <footer
