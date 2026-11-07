@@ -73,6 +73,23 @@ export default {
             raised: "var(--gd-surface-raised)",
             control: "var(--gd-surface-control)",
           },
+          /* Tokens de fase: Terra / Orbita / Galaxia */
+          phase: {
+            base: "var(--bg-base)",
+            elevated: "var(--bg-elevated)",
+            card: "var(--card-bg)",
+            cardBorder: "var(--card-border)",
+            cardBorderActive: "var(--card-border-active)",
+            primary: "var(--primary)",
+            neon: "var(--primary-neon)",
+            soft: "var(--primary-soft)",
+            accent: "var(--accent)",
+            success: "var(--success)",
+            warning: "var(--warning)",
+            danger: "var(--danger)",
+            info: "var(--info)",
+            star: "var(--star-color)",
+          },
           border: {
             DEFAULT: "var(--gd-border)",
             subtle: "var(--gd-border-subtle)",
@@ -102,6 +119,12 @@ export default {
         "gd-card": "var(--gd-shadow-card)",
         "gd-glow": "var(--gd-glow-emerald)",
         "gd-glow-purple": "var(--gd-glow-purple)",
+        "phase-glow": "var(--glow-sm)",
+        "phase-glow-lg": "var(--glow-lg)",
+      },
+      fontFamily: {
+        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

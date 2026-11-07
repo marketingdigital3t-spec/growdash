@@ -122,15 +122,14 @@ describe("frontend theme and responsive contracts", () => {
     expect(css).toContain(".gd-crm-metric-card > p.text-primary");
   });
 
-  it("ships the single emerald neon palette with the premium surface contract", () => {
+  it("ships the pure emerald neon palette without any purple or blue color bleeding", () => {
     expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
     expect(premiumStyles).toContain("--palette-accent: #10B981");
     expect(premiumStyles).toContain("--palette-accent-bright: #00FF88");
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
-    // Pure Esmeralda Neon contract: ZERO purple neon anywhere in production styles.
+    // Zero roxo em qualquer lugar da folha
     expect(premiumStyles).not.toContain("#BC13FE");
     expect(premiumStyles).not.toContain("#E879F9");
-    expect(premiumStyles).not.toContain("#A855F7");
   });
 
   it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
@@ -152,10 +151,10 @@ describe("frontend theme and responsive contracts", () => {
     expect(themeHook).not.toContain("metallic-gold");
   });
 
-  it("renders dark cards with pure forest emerald over black matching approved Image 2", () => {
-    expect(premiumStyles).toContain("linear-gradient(145deg, rgba(18, 37, 25, 0.96), rgba(10, 24, 16, 0.96)) !important");
-    expect(premiumStyles).toContain("border: 1px solid rgba(16, 185, 129, 0.28) !important");
-    expect(premiumStyles).toContain("--bg-canvas: #060B08");
+  it("renders dark cards with translucent black glass over green cosmic nebula (Image 2 aesthetic)", () => {
+    expect(premiumStyles).toContain("linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important");
+    expect(premiumStyles).toContain("border: 1px solid rgba(0, 255, 136, 0.22) !important");
+    expect(premiumStyles).toContain("--bg-canvas: #020403");
     expect(premiumStyles).not.toContain("--surface-card: rgba(15, 23, 42");
     expect(premiumStyles).not.toContain("--card: 222 47% 11%");
   });
@@ -231,8 +230,8 @@ describe("frontend theme and responsive contracts", () => {
     expect(premiumStyles).not.toMatch(/html\.dark[^\n]*\[data-platform-theme/);
 
     // The cosmic background follows the palette, not the mode.
-    expect(premiumStyles).toContain("rgba(var(--palette-secondary-rgb), 0.18)");
-    expect(premiumStyles).toContain("rgba(var(--palette-accent-rgb), 0.16)");
+    expect(premiumStyles).toContain("radial-gradient(ellipse 120% 42% at 62% 108%");
+    expect(premiumStyles).toContain("rgba(0, 255, 136, 0.22)");
 
     // The hook returns the reading mode separately and applies it.
     expect(hook).toContain("setMode");

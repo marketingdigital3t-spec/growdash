@@ -10,6 +10,7 @@ import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { PhaseProvider, PhaseDevSwitcher } from "@/components/phase/PhaseProvider";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, latestBuildRecoveryUrl, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
@@ -265,13 +266,15 @@ export default function App() {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <Router>
-            <AuthProvider>
-              <AccentInitializer>
-                <MarkApplicationBooted />
-                <AppErrorBoundary>
-                  <Suspense fallback={<LoadingModule />}>
-                    <Routes>
+          <PhaseProvider>
+            <PhaseDevSwitcher />
+            <Router>
+              <AuthProvider>
+                <AccentInitializer>
+                  <MarkApplicationBooted />
+                  <AppErrorBoundary>
+                    <Suspense fallback={<LoadingModule />}>
+                      <Routes>
                   <Route path="/termos" element={<LegalPage />} />
                   <Route path="/privacidade" element={<LegalPage />} />
                   <Route path="/cookies" element={<LegalPage />} />
@@ -365,8 +368,9 @@ export default function App() {
                   </Suspense>
                 </AppErrorBoundary>
               </AccentInitializer>
-            </AuthProvider>
-          </Router>
+              </AuthProvider>
+            </Router>
+          </PhaseProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

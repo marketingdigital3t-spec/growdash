@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
 import { SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
+import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
 import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
@@ -193,7 +194,12 @@ export default function GrowdashLayout() {
   const goalAccountLabel = adAccountId === "all"
     ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
     : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
-  const spacePhase: SpacePhase = goalRevenue >= 500_000 ? "galaxia" : goalRevenue >= 100_000 ? "orbita" : "terra";
+  const setMonthlyRevenue = usePhaseStore((state) => state.setMonthlyRevenue);
+  useEffect(() => {
+    setMonthlyRevenue(goalRevenue);
+  }, [goalRevenue, setMonthlyRevenue]);
+  const effectivePhase = useEffectivePhase();
+  const spacePhase: SpacePhase = effectivePhase;
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
