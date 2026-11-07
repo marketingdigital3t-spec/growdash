@@ -41,6 +41,13 @@ import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
 import { SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
+import { Starfield } from "@/components/cosmic/Starfield";
+import { CosmicObject } from "@/components/cosmic/CosmicObject";
+import { FuelBar } from "@/components/layout/FuelBar";
+import { PhasePill } from "@/components/layout/PhasePill";
+import { ShipLevelCard } from "@/components/layout/ShipLevelCard";
+import { HeaderCosmicBrand } from "@/components/layout/HeaderCosmicBrand";
+import { GlobalFooter } from "@/components/layout/GlobalFooter";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
 import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
@@ -312,6 +319,10 @@ export default function GrowdashLayout() {
 
   return (
     <div className="brand-shell growdash-app-shell relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+      {/* Fundo estrelado em Canvas 2D a 60fps com parallax suave */}
+      <Starfield />
+      {/* Elemento cosmico exclusivo da fase ativa (Terra, Orbita, Galaxia) */}
+      <CosmicObject />
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
@@ -454,6 +465,8 @@ export default function GrowdashLayout() {
         </TooltipProvider>
 
         <div className="shrink-0 border-t border-white/10 p-2">
+          {/* Card "NÍVEL DA NAVE" exibindo a fase atual e barra de progresso */}
+          <ShipLevelCard collapsed={!showSidebarLabels} className="mb-2" />
           <button
             type="button"
             onClick={() => setMode(mode === "dark" ? "light" : "dark")}
@@ -512,28 +525,36 @@ export default function GrowdashLayout() {
         // the content canvas. The collapsed state keeps its existing offset.
         effectiveCollapsed ? "lg:pl-16" : "lg:pl-[236px]",
       )}>
-        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-foreground shadow-sm sm:px-5">
-          <button
-            type="button"
-            onClick={() => setMobileOpen(true)}
-            className="mr-3 rounded-md p-1.5 text-white/75 hover:bg-white/10 lg:hidden"
-            aria-label="Abrir menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
-            <BrandMark className="brand-mark-premium h-7 w-7" />
-          </NavLink>
-          <button
-            type="button"
-            onClick={() => !editor && setCollapsed((value) => !value)}
-            className={cn("mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 lg:block", editor && "pointer-events-none opacity-30")}
-            aria-label={effectiveCollapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
-          </button>
-          <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
-            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} revenueLoading={monthlyWonDealsQuery.isLoading || loadingAdAccounts} revenueError={monthlyWonDealsQuery.isError} revenueSnapshotAvailable={monthlyWonDealsQuery.dataUpdatedAt > 0} />
+        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-3 border-b px-3 py-2.5 text-foreground shadow-sm sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="rounded-md p-1.5 text-white/75 hover:bg-white/10 lg:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
+              <BrandMark className="brand-mark-premium h-7 w-7" />
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => !editor && setCollapsed((value) => !value)}
+              className={cn("hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 lg:block", editor && "pointer-events-none opacity-30")}
+              aria-label={effectiveCollapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
+            </button>
+            {/* Cabecalho cosmico da fase com icone da missao */}
+            <HeaderCosmicBrand pageTitle={pathname === "/" ? "Dashboard" : pathname.replace(/^\//, "").replace(/-/g, " ")} />
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Versao compacta do combustivel no header */}
+            <FuelBar compact className="hidden md:flex" />
+            {/* Pill FASE: TERRA / ORBITA / GALAXIA */}
+            <PhasePill />
           </div>
         </header>
         <main
@@ -545,7 +566,7 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
-          {(pathname === "/" || pathname === "/painel-expert") && <SpaceMissionStrip phase={spacePhase} realized={goalRevenue} target={goalTarget} />}
+          {(pathname === "/" || pathname === "/painel-expert") && <FuelBar className="mb-4" />}
           <div
             className={cn(
               "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",
@@ -566,6 +587,8 @@ export default function GrowdashLayout() {
                 <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
               </PageTransition>
             </RouteErrorBoundary>
+            {/* Rodapé global da missão com integracoes, saude da nave e refresh */}
+            <GlobalFooter onRefresh={() => void backgroundSync.refresh(true)} isRefreshing={backgroundSync.state === "refreshing"} />
           </div>
         </main>
       </div>

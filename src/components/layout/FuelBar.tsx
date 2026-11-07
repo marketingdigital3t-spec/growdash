@@ -1,0 +1,106 @@
+import { Fuel, Sparkles, TrendingUp } from "lucide-react";
+import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
+import {
+  getFuelProgress,
+  isNextPhaseInSight,
+  type Phase,
+} from "@/lib/phase/phase";
+import { formatCurrency, formatPercent } from "@/lib/format/formatPtBr";
+
+interface FuelBarProps {
+  /** Se true, renderiza a versao compacta para headers de abas internas. */
+  compact?: boolean;
+  /** Meta personalizada para a fase Galaxia (padrao R$ 250.000). */
+  galaxyGoal?: number;
+  className?: string;
+}
+
+/**
+ * Barra "COMBUSTÍVEL DA MISSÃO".
+ *
+ * Exibe o faturamento do mes corrente em relacao ao teto da fase ativa.
+ * Utiliza o gradiente da fase (`--gradient-fuel`), brilho na ponta e exibe
+ * o chip "Proxima fase a vista" quando ultrapassa 90% do teto.
+ */
+export function FuelBar({
+  compact = false,
+  galaxyGoal,
+  className = "",
+}: FuelBarProps) {
+  const phase = useEffectivePhase();
+  const monthlyRevenue = usePhaseStore((state) => state.monthlyRevenue);
+  const { current, target, percent } = getFuelProgress(monthlyRevenue, phase, galaxyGoal);
+  const nextInSight = isNextPhaseInSight(current, phase);
+
+  if (compact) {
+    return (
+      <div className={`flex min-w-[220px] max-w-[320px] items-center gap-2.5 text-xs ${className}`}>
+        <Fuel className="h-3.5 w-3.5 shrink-0 text-primary-neon" />
+        <div className="min-w-0 grow space-y-1">
+          <div className="flex items-center justify-between gap-2 text-[10px]">
+            <span className="truncate font-bold uppercase tracking-wider text-primary-neon">
+              Combustível
+            </span>
+            <span className="font-bold tabular-nums text-text-primary">
+              {formatPercent(percent, 0)}
+            </span>
+          </div>
+          <div className="relative h-1.5 w-full overflow-hidden rounded-full border border-card-border bg-bg-elevated">
+            <div
+              className="gd-fuel-fill h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section
+      aria-label="Combustível da Missão"
+      className={`relative overflow-hidden rounded-2xl border border-card-border bg-card-bg p-4 shadow-glow-sm backdrop-blur-xl sm:p-5 ${className}`}
+    >
+      {/* Reflexo luminoso no topo do card */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-neon to-transparent opacity-60" />
+
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-card-border bg-primary/10 text-primary-neon shadow-glow-sm">
+              <Fuel className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-primary-neon sm:text-sm">
+                Combustível da Missão
+              </h2>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                {formatCurrency(current)} de {formatCurrency(target)} |{" "}
+                <strong className="font-bold text-text-primary tabular-nums">
+                  {formatPercent(percent, 0)}
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          {nextInSight && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/15 px-3 py-1 text-[11px] font-bold text-warning animate-pulse shadow-glow-sm">
+              <Sparkles className="h-3 w-3" /> Próxima fase à vista
+            </span>
+          )}
+        </div>
+
+        {/* Trilho e preenchimento da barra */}
+        <div className="relative h-3 w-full overflow-hidden rounded-full border border-card-border bg-bg-elevated/80 shadow-inner">
+          <div
+            className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out"
+            style={{ width: `${percent}%` }}
+          >
+            {/* Brilho neon na ponta de avanco da barra */}
+            <span className="absolute right-0 top-0 h-full w-3 bg-white/70 shadow-[0_0_12px_2px_#ffffff]" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
