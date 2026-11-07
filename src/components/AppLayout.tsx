@@ -6,7 +6,8 @@ import { PageTransition } from "@/components/PageTransition";
 export function AppLayout() {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full gd-nebula-bg relative">
+        <div className="gd-noise-overlay pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
         <AppSidebar />
         <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">

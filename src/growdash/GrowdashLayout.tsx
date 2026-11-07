@@ -318,7 +318,9 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="brand-shell growdash-app-shell relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+    <div className="brand-shell growdash-app-shell gd-nebula-bg relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+      {/* Textura de ruido organico fixo com 3.5% de opacidade (ETAPA 4) */}
+      <div className="gd-noise-overlay pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
       {/* Fundo estrelado em Canvas 2D a 60fps com parallax suave */}
       <Starfield />
       {/* Elemento cosmico exclusivo da fase ativa (Terra, Orbita, Galaxia) */}
