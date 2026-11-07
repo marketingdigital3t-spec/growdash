@@ -26,10 +26,9 @@
    the mode blocks set the surfaces.
    -------------------------------------------------------------------------- */
 
-/* --- Palette: Esmeralda Neon Elétrico (única paleta oficial da plataforma) - */
+/* --- Palette: Esmeralda Neon Elétrico (100% pure green — ZERO purple) ---- */
 :root,
-html[data-platform-theme="emerald"],
-html[data-platform-theme="obsidian"] {
+html[data-platform-theme="emerald"] {
   --palette-accent: #10B981;
   --palette-accent-bright: #00FF88;
   --palette-accent-soft: rgba(16, 185, 129, .16);
@@ -37,7 +36,7 @@ html[data-platform-theme="obsidian"] {
   --palette-secondary: #059669;
   --palette-secondary-rgb: 5, 150, 105;
   --card-glow-color: 16, 185, 129;
-  --purple-glow-color: 16, 185, 129; /* 100% verde esmeralda neon em toda a plataforma */
+  --purple-glow-color: 16, 185, 129; /* Anula qualquer roxo em Esmeralda */
   --emerald-glow-color: 16, 185, 129;
 
   --primary: 160 84% 39% !important;
@@ -55,6 +54,35 @@ html[data-platform-theme="obsidian"] {
   --palette-favicon-start: #D1FAE5;
   --palette-favicon-mid: #00FF88;
   --palette-favicon-end: #10B981;
+}
+
+/* --- Palette: Obsidian Neon (100% pure purple — ZERO green) ---------------- */
+html[data-platform-theme="obsidian"] {
+  --palette-accent: #BC13FE;
+  --palette-accent-bright: #E879F9;
+  --palette-accent-soft: rgba(188, 19, 254, .16);
+  --palette-accent-rgb: 188, 19, 254;
+  --palette-secondary: #7C3AED;
+  --palette-secondary-rgb: 124, 58, 237;
+  --card-glow-color: 188, 19, 254;
+  --purple-glow-color: 188, 19, 254;
+  --emerald-glow-color: 188, 19, 254; /* Anula qualquer verde em Obsidian */
+
+  --primary: 285 99% 54% !important;
+  --ring: 285 99% 54% !important;
+  --sidebar-primary: 285 99% 54% !important;
+  --sidebar-ring: 285 99% 54% !important;
+  --gd-emerald: #BC13FE !important;
+  --gd-emerald-bright: #E879F9 !important;
+  --gd-emerald-soft: rgba(188, 19, 254, .16) !important;
+  --gd-emerald-border: rgba(188, 19, 254, .35) !important;
+
+  /* Glow neon intenso roxo elétrico */
+  --palette-glow-accent: 0 0 28px -2px rgba(188, 19, 254, 0.55), 0 0 10px 1px rgba(232, 121, 249, 0.65);
+  --palette-glow-secondary: 0 0 24px -4px rgba(188, 19, 254, 0.40), 0 0 8px -2px rgba(232, 121, 249, 0.45);
+  --palette-favicon-start: #4C1D95;
+  --palette-favicon-mid: #BC13FE;
+  --palette-favicon-end: #E879F9;
 }
 
 /* --- Mode: light surfaces -------------------------------------------------- */
@@ -114,7 +142,7 @@ html:not(.dark) {
   --accent-primary: var(--palette-accent);
   --accent-secondary: var(--palette-secondary);
   --purple-accent: var(--palette-secondary);
-  --purple-glow-color: var(--palette-secondary-rgb);
+  --purple-glow-color: var(--card-glow-color);
   --emerald-glow-color: var(--palette-accent-rgb);
 
   --gd-surface-page: var(--bg-canvas);
@@ -201,7 +229,7 @@ html.dark {
   --accent-primary: var(--palette-accent-bright);
   --accent-secondary: var(--palette-secondary);
   --purple-accent: var(--palette-secondary);
-  --purple-glow-color: var(--palette-secondary-rgb);
+  --purple-glow-color: var(--card-glow-color);
   --emerald-glow-color: var(--palette-accent-rgb);
 
   --gd-surface-page: var(--bg-canvas);
@@ -1083,6 +1111,48 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
   :is(.gd-metric-icon, .dashboard-reference-icon, .gd-platform-icon) {
   background: rgba(var(--palette-accent-rgb), 0.14) !important;
   border-color: rgba(var(--palette-accent-rgb), 0.32) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+/* The sidebar chip and the topbar avatar were the last surfaces painted with
+   a hard-coded emerald. They follow the palette like every other accent. */
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-chip,
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip,
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link:hover .gd-sidebar-nav-chip,
+.brand-shell .gd-sidebar-nav-chip {
+  background: rgba(var(--palette-accent-rgb), 0.20) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.32) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell .brand-topbar .topbar-goal-progress-track {
+  background: rgba(var(--palette-accent-rgb), 0.16) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.35) !important;
+}
+
+.brand-shell .brand-topbar .topbar-goal-progress-fill {
+  background: var(--palette-accent) !important;
+  box-shadow: 0 0 10px rgba(var(--palette-accent-rgb), 0.55) !important;
+}
+
+.brand-shell :is(.brand-topbar, .brand-sidebar) :is([class*="border-primary"], .text-primary) {
+  border-color: rgba(var(--palette-accent-rgb), 0.65) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell .brand-sidebar span[class*="from-primary"] {
+  background-image: linear-gradient(135deg, rgba(var(--palette-accent-rgb), 0.90) 0%, rgba(var(--palette-accent-rgb), 0.45) 100%) !important;
+}
+
+.brand-shell :is(.bg-primary\/10, .bg-primary\/15, .bg-primary\/20) {
+  background-color: rgba(var(--palette-accent-rgb), 0.15) !important;
+}
+
+.brand-shell [class*="border-emerald"] {
+  border-color: rgba(var(--palette-accent-rgb), 0.35) !important;
+}
+
+.brand-shell [class*="text-emerald"] {
   color: var(--palette-accent-bright) !important;
 }
 

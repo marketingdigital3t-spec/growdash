@@ -90,7 +90,7 @@ describe("frontend theme and responsive contracts", () => {
     expect(modulePage).toContain("aria-label={`Excluir automação ${automation.name}`}");
     expect(financePage).toContain('aria-label="Incluir imposto Meta no cálculo"');
     expect(settingsPage).toContain("PlatformThemePicker");
-    expect(themePicker).toContain('aria-label="Modo de leitura da plataforma"');
+    expect(themePicker).toContain('aria-label="Cor da plataforma"');
     expect(themePicker).toContain('aria-pressed={active}');
     expect(platformRules).toContain('aria-label="Ativar regra"');
     expect(platformRules).toContain('aria-label="Usar como fallback"');
@@ -127,14 +127,15 @@ describe("frontend theme and responsive contracts", () => {
     expect(premiumStyles).toContain("--palette-accent: #10B981");
     expect(premiumStyles).toContain("--palette-accent-bright: #00FF88");
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
-    // The obsidian palette is gone: no purple accent may remain.
-    expect(premiumStyles).not.toContain("#BC13FE");
-    expect(premiumStyles).not.toContain("#E879F9");
+    // Both palettes are supported with pure accents: Esmeralda is green, Obsidian is purple neon.
+    expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
+    expect(premiumStyles).toContain("--palette-accent: #BC13FE");
+    expect(premiumStyles).toContain("--palette-accent-bright: #E879F9");
   });
 
   it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
     expect(premiumStyles).toContain("backdrop-filter: blur(14px) saturate(135%)");
-    expect(premiumStyles).toContain("--purple-glow-color: var(--palette-secondary-rgb)");
+    expect(premiumStyles).toContain("--purple-glow-color: var(--card-glow-color)");
     expect(premiumStyles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(premiumStyles).toContain("animation-duration: 0.01ms !important");
     expect(premiumStyles).toContain("@keyframes gd-neon-flash");
@@ -147,9 +148,8 @@ describe("frontend theme and responsive contracts", () => {
     );
     expect(themeHook).toContain('root.dataset.platformTheme = palette.html');
     expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
-    expect(themeHook).toContain('export type AccentTheme = "emerald"');
+    expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
     expect(themeHook).not.toContain("metallic-gold");
-    expect(themeHook).not.toContain("obsidian");
   });
 
   it("wins the cascade against the legacy gradients that pin the shell flat", () => {
