@@ -1,6 +1,6 @@
 import { Globe, Orbit, Sparkles, Award, CheckCircle2, Lock } from "lucide-react";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
-import { PHASES, PHASE_SUBTITLES, type Phase } from "@/lib/phase/phase";
+import { PHASES, getPhaseInfo, getPhaseSubtitle, type Phase } from "@/lib/phase/phase";
 import { formatCurrency, formatDateBr } from "@/lib/format/formatPtBr";
 
 const PHASE_CONFIG: Record<
@@ -39,7 +39,7 @@ export default function JornadaPage() {
   const history = usePhaseStore((state) => state.phaseHistory);
   const monthlyRevenue = usePhaseStore((state) => state.monthlyRevenue);
 
-  const orderOf = (p: Phase) => PHASES[p].order;
+  const orderOf = (p: Phase) => getPhaseInfo(p).order;
   const currentOrder = orderOf(currentPhase);
 
   return (
@@ -115,7 +115,7 @@ export default function JornadaPage() {
                     FASE {config.label}
                   </h3>
                   <p className="text-xs text-text-muted">{config.range}</p>
-                  <p className="text-[11px] text-text-secondary">{PHASE_SUBTITLES[phaseKey]}</p>
+                  <p className="text-[11px] text-text-secondary">{getPhaseSubtitle(phaseKey)}</p>
                 </div>
               </article>
             );

@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   getFuelProgress,
   getPhase,
+  getPhaseFuelCeiling,
+  getPhaseInfo,
+  getPhaseProgress,
+  getPhaseSubtitle,
   isNextPhaseInSight,
   resolvePhaseWithHistory,
+  sanitizePhase,
   PHASES,
   type PhaseState,
 } from "./phase";
@@ -56,6 +61,41 @@ describe("motor de fases — calculo por faturamento", () => {
     expect(isNextPhaseInSight(89_999, "orbita")).toBe(false);
     expect(isNextPhaseInSight(90_000, "orbita")).toBe(true);
     expect(isNextPhaseInSight(500_000, "galaxia")).toBe(false); // Galaxia ja e o topo
+  });
+
+  it("sanitiza fase corrompida vinda do storage para Terra sem quebrar a aplicacao", () => {
+    // Um `growdash:phase` persistido por uma versao anterior, corrompido ou
+    // editedo na mao nao pode derrubar o shell da aplicacao. Antes, qualquer
+    // valor fora do enum quebrava PHASES[phase].label e derrubava a AppErrorBoundary.
+    expect(sanitizePhase("orbita")).toBe("orbita");
+    expect(sanitizePhase("galaxia")).toBe("galaxia");
+    expect(sanitizePhase("terra")).toBe("terra");
+
+    for (const invalid of [undefined, null, "", "space", "TERRA", 1, true, {}, [], Number.NaN]) {
+      expect(sanitizePhase(invalid)).toBe("terra");
+    }
+  });
+
+  it("nunca devolve undefined nos acessores publicos da fase", () => {
+    for (const invalid of [undefined, null, "", "space", 42, {}]) {
+      expect(getPhaseInfo(invalid)).toBeDefined();
+      expect(getPhaseInfo(invalid).label).toBeTruthy();
+      expect(getPhaseInfo(invalid).order).toBeGreaterThan(0);
+      expect(getPhaseSubtitle(invalid)).toBeTruthy();
+      expect(getPhaseFuelCeiling(invalid)).toBeGreaterThan(0);
+    }
+  });
+
+  it("mantem o progresso de combustivel seguro para fase invalida e receita nao finita", () => {
+    expect(() => getFuelProgress(Number.NaN, "space" as never)).not.toThrow();
+    const progress = getFuelProgress(Number.NaN, "space" as never);
+    expect(progress.current).toBe(0);
+    expect(progress.percent).toBe(0);
+    expect(progress.target).toBeGreaterThan(0);
+
+    expect(() => getPhaseProgress(Number.NaN, "space" as never)).not.toThrow();
+    expect(Number.isFinite(getPhaseProgress(Number.NaN, "space" as never))).toBe(true);
+    expect(isNextPhaseInSight(Number.NaN, "space" as never)).toBe(false);
   });
 
   it("sobe de fase imediatamente", () => {

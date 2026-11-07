@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { PHASES, type Phase } from "@/lib/phase/phase";
+import { getPhaseInfo, type Phase } from "@/lib/phase/phase";
 import { formatCurrency } from "@/lib/format/formatPtBr";
 import { SpaceRocket } from "@/components/space/SpaceRocket";
 
@@ -49,7 +49,7 @@ export function PhaseTransitionOverlay({ transition, onComplete }: PhaseTransiti
 
   if (!transition) return null;
 
-  const targetInfo = PHASES[transition.to];
+  const targetInfo = getPhaseInfo(transition.to);
   const isGalaxia = transition.to === "galaxia";
   const isOrbita = transition.to === "orbita";
 

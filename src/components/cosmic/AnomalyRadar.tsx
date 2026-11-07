@@ -1,6 +1,5 @@
 import { NavLink } from "react-router-dom";
 import { ChevronRight, Info, Radar, ShieldAlert, Sparkles } from "lucide-react";
-import { useEffectivePhase } from "@/lib/phase/phaseStore";
 
 export type AnomalySeverity = "alta" | "media" | "ok";
 
@@ -96,8 +95,6 @@ export function AnomalyRadar({
   lastUpdatedText = "ATUALIZADO AGORA",
   className = "",
 }: AnomalyRadarProps) {
-  const phase = useEffectivePhase();
-
   return (
     <section
       aria-labelledby="anomaly-radar-title"

@@ -69,9 +69,10 @@ export function getFuelProgress(
   phase: Phase,
   galaxyGoal?: number,
 ): { current: number; target: number; percent: number } {
-  const target = phase === "galaxia"
+  const safePhase = sanitizePhase(phase);
+  const target = safePhase === "galaxia"
     ? (galaxyGoal && galaxyGoal > 0 ? galaxyGoal : PHASE_FUEL_CEILINGS.galaxia)
-    : PHASE_FUEL_CEILINGS[phase];
+    : PHASE_FUEL_CEILINGS[safePhase];
   const current = Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0;
   const percent = target > 0 ? Math.max(0, Math.min(100, (current / target) * 100)) : 0;
   return { current, target, percent };
@@ -79,9 +80,10 @@ export function getFuelProgress(
 
 /** Percentual de combustível consumido dentro da fase atual (para a proxima). */
 export function getPhaseProgress(monthlyRevenue: number, phase: Phase): number {
+  const safePhase = sanitizePhase(phase);
   const revenue = Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0;
-  if (phase === "galaxia") return 100;
-  const ceiling = PHASE_FUEL_CEILINGS[phase];
+  if (safePhase === "galaxia") return 100;
+  const ceiling = PHASE_FUEL_CEILINGS[safePhase];
   return ceiling > 0 ? Math.max(0, Math.min(100, (revenue / ceiling) * 100)) : 0;
 }
 
@@ -109,14 +111,15 @@ export function resolvePhaseWithHistory(
   isMonthBoundary = false,
 ): { phase: Phase; changed: boolean; direction: "up" | "down" | "none" } {
   const computed = getPhase(monthlyRevenue);
-  if (computed === state.currentPhase) return { phase: computed, changed: false, direction: "none" };
+  const current = sanitizePhase(state.currentPhase);
+  if (computed === current) return { phase: computed, changed: false, direction: "none" };
 
-  const currentOrder = PHASES[state.currentPhase].order;
+  const currentOrder = PHASES[current].order;
   const computedOrder = PHASES[computed].order;
 
   if (computedOrder < currentOrder && !isMonthBoundary) {
     // Descida travada: a fase so cai no fechamento do mes.
-    return { phase: state.currentPhase, changed: false, direction: "none" };
+    return { phase: current, changed: false, direction: "none" };
   }
 
   return {
@@ -127,8 +130,8 @@ export function resolvePhaseWithHistory(
 }
 
 export function isNextPhaseInSight(monthlyRevenue: number, phase: Phase): boolean {
+  const safePhase = sanitizePhase(phase);
   const revenue = Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0;
-  if (phase === "galaxia") return false;
-  const next = phase === "terra" ? "orbita" : "galaxia";
-  return revenue >= PHASE_FUEL_CEILINGS[phase] * 0.9;
+  if (safePhase === "galaxia") return false;
+  return revenue >= PHASE_FUEL_CEILINGS[safePhase] * 0.9;
 }

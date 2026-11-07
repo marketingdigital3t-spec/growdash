@@ -4,6 +4,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { OrbitalFunnel } from "@/components/cosmic/OrbitalFunnel";
 import { AnomalyRadar } from "@/components/cosmic/AnomalyRadar";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
+import { sanitizePhase } from "@/lib/phase/phase";
 import { formatCurrency, formatInteger, formatMultiple } from "@/lib/format/formatPtBr";
 
 interface MissionDashboardProps {
@@ -37,7 +38,7 @@ export function MissionDashboard({
   metrics,
   className = "",
 }: MissionDashboardProps) {
-  const phase = useEffectivePhase();
+  const phase = sanitizePhase(useEffectivePhase());
   const storeRevenue = usePhaseStore((state) => state.monthlyRevenue);
   const currentRevenue = propRevenue ?? storeRevenue;
 
@@ -75,7 +76,20 @@ export function MissionDashboard({
     },
   }[phase];
 
-  const activeMetrics = metrics ?? defaultMetricsByPhase;
+  // O fallback da fase Terra garante que nenhuma entrada invalida de metricas
+  // possa deixar a cockpit sem dados e derrubar o render do modulo.
+  const fallbackMetrics = { ...defaultMetricsByPhase.terra };
+  const activeMetrics = metrics ?? defaultMetricsByPhase ?? fallbackMetrics;
+  const safeMetrics = {
+    impressions: Number.isFinite(activeMetrics.impressions) ? activeMetrics.impressions : 0,
+    roas: Number.isFinite(activeMetrics.roas) ? activeMetrics.roas : 0,
+    cpl: Number.isFinite(activeMetrics.cpl) ? activeMetrics.cpl : 0,
+    leads: Number.isFinite(activeMetrics.leads) ? activeMetrics.leads : 0,
+    impressionsChange: Number.isFinite(activeMetrics.impressionsChange) ? activeMetrics.impressionsChange : undefined,
+    roasChange: Number.isFinite(activeMetrics.roasChange) ? activeMetrics.roasChange : undefined,
+    cplChange: Number.isFinite(activeMetrics.cplChange) ? activeMetrics.cplChange : undefined,
+    leadsChange: Number.isFinite(activeMetrics.leadsChange) ? activeMetrics.leadsChange : undefined,
+  };
 
   return (
     <div className={`space-y-5 sm:space-y-6 ${className}`}>
@@ -87,8 +101,8 @@ export function MissionDashboard({
         {/* Impressoes */}
         <KpiCard
           label="Impressões"
-          value={formatInteger(activeMetrics.impressions)}
-          changePercent={activeMetrics.impressionsChange}
+          value={formatInteger(safeMetrics.impressions)}
+          changePercent={safeMetrics.impressionsChange}
           icon={<Eye className="h-5 w-5" />}
           sparklineData={[14, 18, 16, 24, 22, 30, 28, 36, 32, 42, 38, 48]}
         />
@@ -96,8 +110,8 @@ export function MissionDashboard({
         {/* ROAS */}
         <KpiCard
           label="ROAS"
-          value={formatMultiple(activeMetrics.roas, 2)}
-          changePercent={activeMetrics.roasChange}
+          value={formatMultiple(safeMetrics.roas, 2)}
+          changePercent={safeMetrics.roasChange}
           icon={<Crosshair className="h-5 w-5" />}
           sparklineData={[2.4, 2.8, 3.1, 2.9, 3.4, 3.8, 3.5, 4.0, 3.9, 4.37]}
         />
@@ -105,8 +119,8 @@ export function MissionDashboard({
         {/* CPL — queda e positiva (invertChangeColor) */}
         <KpiCard
           label="CPL"
-          value={formatCurrency(activeMetrics.cpl)}
-          changePercent={activeMetrics.cplChange}
+          value={formatCurrency(safeMetrics.cpl)}
+          changePercent={safeMetrics.cplChange}
           invertChangeColor
           icon={<DollarSign className="h-5 w-5" />}
           sparklineData={[32, 30, 31, 28, 29, 26, 27, 24, 25, 23.61]}
@@ -115,8 +129,8 @@ export function MissionDashboard({
         {/* Leads */}
         <KpiCard
           label="Leads"
-          value={formatInteger(activeMetrics.leads)}
-          changePercent={activeMetrics.leadsChange}
+          value={formatInteger(safeMetrics.leads)}
+          changePercent={safeMetrics.leadsChange}
           icon={<Users className="h-5 w-5" />}
           sparklineData={[120, 160, 140, 220, 200, 280, 260, 320, 300, 380, 350, 420]}
         />
@@ -126,7 +140,7 @@ export function MissionDashboard({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 sm:gap-6">
         {/* Funil Orbital da Missao em 2/3 da largura (8 colunas) */}
         <div className="lg:col-span-8">
-          <OrbitalFunnel monthlyRevenue={currentRevenue} />
+          <OrbitalFunnel monthlyRevenue={Number.isFinite(currentRevenue) ? currentRevenue : 0} />
         </div>
 
         {/* Radar de Anomalias em 1/3 da largura (4 colunas) */}

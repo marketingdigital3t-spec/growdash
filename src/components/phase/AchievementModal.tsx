@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Award, Check, Copy, Share2, Sparkles, X } from "lucide-react";
-import { PHASES, type Phase } from "@/lib/phase/phase";
+import { getPhaseInfo, type Phase } from "@/lib/phase/phase";
 import { formatCurrency, formatDateBr } from "@/lib/format/formatPtBr";
 
 interface AchievementModalProps {
@@ -18,7 +18,7 @@ export function AchievementModal({ phase, revenue, date, onClose }: AchievementM
 
   if (!phase) return null;
 
-  const info = PHASES[phase];
+  const info = getPhaseInfo(phase);
   const isGalaxia = phase === "galaxia";
   const isOrbita = phase === "orbita";
   const neonColor = isGalaxia ? "#B15CFF" : isOrbita ? "#FFC21A" : "#3D9BFF";

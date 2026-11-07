@@ -568,7 +568,9 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
-          {(pathname === "/" || pathname === "/painel-expert") && <FuelBar className="mb-4" />}
+          {/* A barra de combustivel full pertence ao cockpit da Missao
+              (MissionDashboard). Mantem-la apenas aqui duplicaria o card no
+              Dashboard e a deixaria fora da RouteErrorBoundary do modulo. */}
           <div
             className={cn(
               "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",

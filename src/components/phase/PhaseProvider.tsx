@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
-import { PHASES, type Phase } from "@/lib/phase/phase";
+import { getPhaseInfo, sanitizePhase, type Phase } from "@/lib/phase/phase";
 import { PhaseTransitionOverlay } from "@/components/phase/PhaseTransitionOverlay";
 import { AchievementModal } from "@/components/phase/AchievementModal";
 
@@ -26,11 +26,11 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
 
     const previous = lastPhaseRef.current;
     if (previous && previous !== phase) {
-      const prevOrder = PHASES[previous].order;
-      const nextOrder = PHASES[phase].order;
+      const prevOrder = getPhaseInfo(previous).order;
+      const nextOrder = getPhaseInfo(phase).order;
       // Dispara animacao apenas quando SOBE de fase
       if (nextOrder > prevOrder) {
-        setActiveTransition({ from: previous, to: phase, revenue: monthlyRevenue || PHASES[phase].min });
+        setActiveTransition({ from: previous, to: phase, revenue: monthlyRevenue || getPhaseInfo(phase).min });
       }
     }
     lastPhaseRef.current = phase;
@@ -55,7 +55,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
       {/* Badge de conquista hexagonal com opcao de compartilhamento */}
       <AchievementModal
         phase={achievementPhase}
-        revenue={monthlyRevenue || (achievementPhase ? PHASES[achievementPhase].min : 0)}
+        revenue={monthlyRevenue || (achievementPhase ? getPhaseInfo(achievementPhase).min : 0)}
         onClose={() => setAchievementPhase(null)}
       />
     </>

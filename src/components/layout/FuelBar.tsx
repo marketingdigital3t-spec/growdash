@@ -28,9 +28,13 @@ export function FuelBar({
   galaxyGoal,
   className = "",
 }: FuelBarProps) {
-  const phase = useEffectivePhase();
+  const phase = sanitizePhase(useEffectivePhase());
   const monthlyRevenue = usePhaseStore((state) => state.monthlyRevenue);
-  const { current, target, percent } = getFuelProgress(monthlyRevenue, phase, galaxyGoal);
+  const { current, target, percent } = getFuelProgress(
+    Number.isFinite(monthlyRevenue) ? monthlyRevenue : 0,
+    phase,
+    Number.isFinite(galaxyGoal) ? galaxyGoal : undefined,
+  );
   const nextInSight = isNextPhaseInSight(current, phase);
 
   if (compact) {
