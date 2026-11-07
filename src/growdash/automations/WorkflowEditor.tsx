@@ -12,6 +12,7 @@ import { validateWorkflowDefinition } from "./workflowValidation";
 import { connectionFromHandles, edgePath, moveWorkflowNode, nodeById, WORKFLOW_NODE_HEIGHT, WORKFLOW_NODE_WIDTH } from "./workflowCanvas";
 import { automationTriggerType } from "./automationRuntime";
 import { withRequestTimeout } from "@/lib/resilience";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 const labels: Record<WorkflowNodeType, string> = {
   "webhook.trigger": "Webhook",
@@ -181,7 +182,7 @@ export function WorkflowEditor() {
       if (saved && validateWorkflowDefinition(saved).ok) {
         const savedDefinition = saved as WorkflowDefinition;
         const next = { ...savedDefinition, active: data.status === "active", version: Number(data.workflow_version || savedDefinition.version || 1) } as WorkflowDefinition;
-        setWorkflow(next); localStorage.setItem(storageKey(workspace.id), JSON.stringify(next));
+        setWorkflow(next); safeSetLocalStorage(storageKey(workspace.id), JSON.stringify(next));
       }
     })();
   }, [workspace?.id, user?.id, loadedWorkspace]);
@@ -231,7 +232,7 @@ export function WorkflowEditor() {
   const save = async (nextStatus?: "draft" | "active" | "paused") => {
     if (!validation.ok) { setMessage(validationErrors.join(" ")); return; }
     if (nextStatus === "active" && !runnableValidation.ok) { setMessage(runnableValidationErrors.join(" ")); return; }
-    localStorage.setItem(storageKey(workspace?.id), JSON.stringify(workflow));
+    safeSetLocalStorage(storageKey(workspace?.id), JSON.stringify(workflow));
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Rascunho salvo neste navegador; conecte um workspace para persistir na conta."); return; }
     const client = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<{ error: { message: string } | null }> } };
     const status = nextStatus || (workflow.active ? "active" : "draft");
@@ -291,7 +292,7 @@ export function WorkflowEditor() {
     setMessage(decision === "approved" ? "Aprovação confirmada; execução retomada." : "Execução rejeitada.");
     await loadApprovals(); await loadRuns();
   };
-  const duplicate = () => { const suffix = `-copy-${Date.now()}`; const idMap = new Map(workflow.nodes.map((node) => [node.id, `${node.id}${suffix}`])); const copy = { ...workflow, id: crypto.randomUUID(), name: `${workflow.name} — cópia`, version: 1, active: false, nodes: workflow.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })), connections: workflow.connections.map((edge) => ({ ...edge, source: idMap.get(edge.source) || edge.source, target: idMap.get(edge.target) || edge.target })) }; localStorage.setItem(storageKey(workspace?.id), JSON.stringify(copy)); setWorkflow(copy); setSelectedId(null); setMessage("Cópia criada como rascunho."); };
+  const duplicate = () => { const suffix = `-copy-${Date.now()}`; const idMap = new Map(workflow.nodes.map((node) => [node.id, `${node.id}${suffix}`])); const copy = { ...workflow, id: crypto.randomUUID(), name: `${workflow.name} — cópia`, version: 1, active: false, nodes: workflow.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })), connections: workflow.connections.map((edge) => ({ ...edge, source: idMap.get(edge.source) || edge.source, target: idMap.get(edge.target) || edge.target })) }; safeSetLocalStorage(storageKey(workspace?.id), JSON.stringify(copy)); setWorkflow(copy); setSelectedId(null); setMessage("Cópia criada como rascunho."); };
 
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
     <section className="gd-panel min-h-[560px] overflow-hidden p-4">

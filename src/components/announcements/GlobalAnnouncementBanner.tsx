@@ -5,6 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { selectAnnouncementForPath, type PlatformAnnouncement } from "@/lib/platformAnnouncements";
 import { useAuth } from "@/contexts/AuthContext";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 function safeExternalUrl(value?: string | null) {
   if (!value) return null;
@@ -58,7 +59,7 @@ export function GlobalAnnouncementBanner() {
   return (
     <aside className="relative mb-4 overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-[0_18px_50px_-36px_hsl(var(--primary)/.75)]" aria-label={selected.title || "Anúncio da plataforma"}>
       {externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="group block">{picture}<span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">Abrir <ExternalLink className="h-3 w-3" /></span></a> : internalPath ? <Link to={internalPath} className="group block">{picture}<span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">Abrir <ExternalLink className="h-3 w-3" /></span></Link> : picture}
-      {selected.dismissible !== false && <button type="button" onClick={() => { window.localStorage.setItem(`growdash:announcement-dismissed:${user?.id || "anonymous"}:${selected.id}`, selected.updated_at || selected.id); setDismissVersion((value) => value + 1); }} className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg backdrop-blur-md transition hover:bg-black/85" aria-label="Fechar anúncio"><X className="h-4 w-4" /></button>}
+      {selected.dismissible !== false && <button type="button" onClick={() => { safeSetLocalStorage(`growdash:announcement-dismissed:${user?.id || "anonymous"}:${selected.id}`, selected.updated_at || selected.id); setDismissVersion((value) => value + 1); }} className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg backdrop-blur-md transition hover:bg-black/85" aria-label="Fechar anúncio"><X className="h-4 w-4" /></button>}
     </aside>
   );
 }

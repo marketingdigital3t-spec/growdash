@@ -33,6 +33,25 @@
           // Plataforma 100% Esmeralda Neon pura. Sem roxo, sem obsidian.
           var platform = 'emerald';
           try { localStorage.setItem('growdash:accent-theme', 'emerald'); } catch(e) {}
+          // Purga preventiva: localStorage cheio estoura QuotaExceededError e
+          // derruba o React inteiro no primeiro setItem. Libera espaco antes
+          // de qualquer modulo escrever no storage.
+          try {
+            var bytes = 0;
+            for (var k in localStorage) {
+              if (Object.prototype.hasOwnProperty.call(localStorage, k)) bytes += (localStorage[k] || '').length * 2;
+            }
+            if (bytes > 3 * 1024 * 1024) {
+              var discardable = ['growdash:rd-', 'growdash:last-', 'growdash:runtime-diagnostics', 'growdash:runtime-recovery', 'cache'];
+              for (var i = localStorage.length - 1; i >= 0; i--) {
+                var key = localStorage.key(i);
+                if (!key) continue;
+                for (var d = 0; d < discardable.length; d++) {
+                  if (key.indexOf(discardable[d]) !== -1) { localStorage.removeItem(key); break; }
+                }
+              }
+            }
+          } catch (e) {}
           var storedMode = localStorage.getItem('theme');
           var mode = storedMode === 'light' ? 'light' : 'dark';
           var root = document.documentElement;

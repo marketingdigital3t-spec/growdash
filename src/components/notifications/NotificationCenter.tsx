@@ -43,7 +43,7 @@ export function NotificationCenter() {
       notification.close();
     };
     sent.add(browserCandidate.id);
-    window.localStorage.setItem(BROWSER_SENT_KEY, JSON.stringify(Array.from(sent).slice(-100)));
+    try { window.localStorage.setItem(BROWSER_SENT_KEY, JSON.stringify(Array.from(sent).slice(-100))); } catch { /* cota de storage cheia: a preferencia e apenas local */ }
   }, [browserCandidate, browserEnabled, markRead, navigate]);
 
   return <>

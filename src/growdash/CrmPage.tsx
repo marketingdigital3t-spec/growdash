@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { safeSetLocalStorage } from "@/lib/localCache";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
@@ -434,7 +435,7 @@ export default function CrmPage() {
   ), [connectedFunnelNameById, storedStages]);
 
   useEffect(() => {
-    window.localStorage.setItem("growdash:crm-view", view);
+    safeSetLocalStorage("growdash:crm-view", view);
     const next = new URLSearchParams(searchParams);
     if (view === "ai") next.set("tab", "ai"); else next.delete("tab");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });

@@ -6,6 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useSmartAlertPreferences } from "@/hooks/useSmartAlertPreferences";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { campaignNotifications, filterNotifications, filterNotificationsByPreferences, type GrowdashNotification } from "@/lib/notificationCenter";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 function readKey(userId?: string, workspaceId?: string) {
   return `growdash:notifications:read:${userId || "anonymous"}:${workspaceId || "legacy"}`;
@@ -66,7 +67,7 @@ export function useNotificationCenter() {
 
   function persist(next: Set<string>) {
     setRead(next);
-    window.localStorage.setItem(readKey(user?.id, workspace?.id), JSON.stringify(Array.from(next)));
+    safeSetLocalStorage(readKey(user?.id, workspace?.id), JSON.stringify(Array.from(next)));
   }
 
   return {

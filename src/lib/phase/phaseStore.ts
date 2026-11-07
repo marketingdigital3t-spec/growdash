@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import {
   getPhase,
   resolvePhaseWithHistory,
@@ -7,6 +7,30 @@ import {
   type Phase,
   type PhaseHistoryEntry,
 } from "@/lib/phase/phase";
+import { safeSetLocalStorage } from "@/lib/localCache";
+
+/**
+ * Storage seguro que NUNCA deixa uma `QuotaExceededError` escapar.
+ * A cota do navegador pode estourar com caches historicos acumulados; a
+ * falha precisa ficar contida para nao derrubar o React durante o render.
+ */
+const safePhaseStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    safeSetLocalStorage(name, value);
+  },
+  removeItem: (name: string): void => {
+    try {
+      localStorage.removeItem(name);
+    } catch {}
+  },
+};
 
 type PhaseStore = {
   currentPhase: Phase;
@@ -94,10 +118,11 @@ export const usePhaseStore = create<PhaseStore>()(
     }),
     {
       name: "growdash:phase",
+      storage: createJSONStorage(() => safePhaseStorage),
       partialize: (state) => ({
         currentPhase: state.currentPhase,
         highestPhaseEver: state.highestPhaseEver,
-        phaseHistory: state.phaseHistory,
+        phaseHistory: (state.phaseHistory || []).slice(-10),
       }),
     },
   ),

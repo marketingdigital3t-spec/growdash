@@ -12,6 +12,7 @@ import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { cn } from "@/lib/utils";
 import { businessDateKey } from "@/lib/businessDate";
 import { summarizeMetaRdParity } from "@/lib/metaRdParity";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -30,7 +31,7 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
   function toggleMonitored() {
     const next = !monitored;
     setMonitored(next);
-    window.localStorage.setItem("growdash:crm-ai-monitored", String(next));
+    safeSetLocalStorage("growdash:crm-ai-monitored", String(next));
   }
 
   return <div className="mt-4 space-y-4">

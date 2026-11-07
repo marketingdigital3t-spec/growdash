@@ -35,6 +35,7 @@ import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
 import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
+import { safeSetLocalStorage } from "@/lib/localCache";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,8 +105,8 @@ export default function AgentsOfficePage() {
   const { data: deals = [], isFetching: loadingDeals } = useRDDealsForPeriod({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
   const { data: sales = [] } = useSales({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
 
-  useEffect(() => { localStorage.setItem("growdash:agent-statuses", JSON.stringify(statuses)); }, [statuses]);
-  useEffect(() => { localStorage.setItem("growdash:agent-accounts", JSON.stringify(assignments)); }, [assignments]);
+  useEffect(() => { safeSetLocalStorage("growdash:agent-statuses", JSON.stringify(statuses)); }, [statuses]);
+  useEffect(() => { safeSetLocalStorage("growdash:agent-accounts", JSON.stringify(assignments)); }, [assignments]);
   useEffect(() => { gameMinutesRef.current = gameMinutes; }, [gameMinutes]);
   useEffect(() => { statusesRef.current = statuses; }, [statuses]);
   useEffect(() => { timeSpeedRef.current = timeSpeed; }, [timeSpeed]);

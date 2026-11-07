@@ -1,3 +1,29 @@
+// Limpeza preventiva contra QuotaExceededError: se o localStorage acumulou
+// mais de 3MB de caches historicos do RD/Meta, purga as chaves descartaveis
+// antes de o React inicializar.
+try {
+  var totalBytes = 0;
+  for (var k in localStorage) {
+    if (Object.prototype.hasOwnProperty.call(localStorage, k)) {
+      totalBytes += (localStorage[k] || "").length * 2;
+    }
+  }
+  if (totalBytes > 3 * 1024 * 1024) {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var key = localStorage.key(i);
+      if (
+        key &&
+        (key.indexOf("cache") !== -1 ||
+          key.indexOf("growdash:rd-") !== -1 ||
+          key.indexOf("growdash:runtime-diagnostics") !== -1 ||
+          key.indexOf("growdash:last-") !== -1)
+      ) {
+        localStorage.removeItem(key);
+      }
+    }
+  }
+} catch (e) {}
+
 // Keep a broken/blocked entry module from leaving the app on a permanent
 // loading screen. React marks the boot only after it commits a visible shell,
 // not merely when the entry module begins evaluating.

@@ -21,6 +21,7 @@ import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficR
 import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { buildDailyLeadReport, buildLeadQualitySummary, type DailyLeadReport, type LeadQualitySummary } from "@/lib/leadQualityReport";
 import type { DatePreset } from "@/hooks/useDateFilter";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "costPerOpportunity" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
@@ -161,7 +162,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
     if (!file) return;
     if (file.size > 2_000_000) { toast({ title: "Imagem muito grande", description: "Use um banner de até 2 MB.", variant: "destructive" }); return; }
     const reader = new FileReader();
-    reader.onload = () => { const value = String(reader.result || ""); setBanner(value); window.localStorage.setItem(`growdash:report-banner:${accountId}`, value); };
+    reader.onload = () => { const value = String(reader.result || ""); setBanner(value); safeSetLocalStorage(`growdash:report-banner:${accountId}`, value); };
     reader.readAsDataURL(file);
   }
   async function generate() {

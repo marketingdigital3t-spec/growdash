@@ -13,6 +13,7 @@ import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/ty
 import { Download, Check, AlertCircle } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
 import { cn } from "@/lib/utils";
+import { safeSetLocalStorage } from "@/lib/localCache";
 
 // Use the same self-hosted font base as Growdash Flow. This page can mount
 // Excalidraw directly, without going through the flow editor module.
@@ -84,7 +85,7 @@ export default function QuadroPage() {
           ...scene,
           updatedAt: new Date().toISOString(),
         };
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        safeSetLocalStorage(STORAGE_KEY, JSON.stringify(payload));
         setPersistenceState("saved");
       } catch {
         setPersistenceState("error");

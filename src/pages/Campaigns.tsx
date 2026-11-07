@@ -78,6 +78,7 @@ import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierar
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
+import { safeSetLocalStorage } from "@/lib/localCache";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults, selectOfficialCampaignResult } from "@/lib/campaignResultEvents";
@@ -282,8 +283,8 @@ export default function Campaigns() {
   const pageSize = 50;
 
   useEffect(() => {
-    localStorage.setItem("growdash:meta-columns-v4", JSON.stringify(Array.from(visibleColumns)));
-    localStorage.setItem("growdash:meta-breakdown", breakdown);
+    safeSetLocalStorage("growdash:meta-columns-v4", JSON.stringify(Array.from(visibleColumns)));
+    safeSetLocalStorage("growdash:meta-breakdown", breakdown);
   }, [visibleColumns, breakdown]);
 
   useEffect(() => {
