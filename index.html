@@ -33,10 +33,9 @@
           // Palette and reading mode are independent: the palette picks the
           // accent colour (green or purple) and the mode picks the surfaces
           // (light or dark). Both palettes support both modes.
-          var stored = localStorage.getItem('growdash:accent-theme');
-          var platform = stored === 'obsidian' ? 'obsidian' : (stored === 'emerald' ? 'emerald' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'obsidian' : 'emerald'));
+          var platform = 'emerald';
           var storedMode = localStorage.getItem('theme');
-          var mode = storedMode === 'light' ? 'light' : (storedMode === 'dark' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+          var mode = storedMode === 'light' ? 'light' : 'dark';
           var root = document.documentElement;
           root.dataset.accent = platform;
           root.dataset.platformTheme = platform;

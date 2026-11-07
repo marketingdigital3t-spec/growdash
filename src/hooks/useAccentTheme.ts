@@ -3,45 +3,29 @@ import { useCallback, useEffect, useState } from "react";
 /**
  * Platform theme (fonte única de verdade do visual).
  *
- * Two independent dimensions:
- *   - `data-platform-theme` on <html> = the PALETTE (emerald = green,
- *     obsidian = purple). It only decides the accent colours.
+ * The platform ships ONE palette — Esmeralda Neon — and two reading modes:
+ *   - `data-platform-theme` on <html> = always "emerald" (the accent
+ *     colours: emerald neon, glass, luminous borders).
  *   - the `.dark` class on <html>   = the READING MODE (light or dark),
  *     owned by next-themes. It only decides the surface colours.
  *
- * Every combination is valid, so Esmeralda can be read in light or dark and
- * Obsidian can be read in light or dark. The `.dark` class is kept in sync
- * because ~100 legacy rules in `index.css` still depend on it.
+ * The `.dark` class is kept in sync because ~100 legacy rules in
+ * `index.css` still depend on it.
  */
-export type AccentTheme = "obsidian" | "emerald";
+export type AccentTheme = "emerald";
 export type ReadingMode = "light" | "dark";
 export const PLATFORM_THEME_STORAGE_KEY = "growdash:accent-theme";
 
 const ACCENT: Record<AccentTheme, { html: string; color: string }> = {
-  obsidian: { html: "obsidian", color: "#07090E" },
   emerald: { html: "emerald", color: "#F4F8F6" },
 };
 
-export const PLATFORM_THEMES: { value: AccentTheme; label: string; description: string }[] = [
-  { value: "obsidian", label: "Obsidian", description: "Paleta violeta sobre preto cósmico." },
-  { value: "emerald", label: "Esmeralda", description: "Paleta verde sobre superfícies translúcidas." },
-];
-
 /**
- * Resolves the platform palette. This MUST mirror the inline bootstrap in
- * `index.html` exactly: when the bootstrap writes `obsidian` because the
- * browser prefers dark, the hook has to agree, otherwise next-themes
- * re-applies the `.dark` class right after and the two layers fight.
+ * The platform palette is fixed. The reading mode lives in `localStorage`
+ * under "theme" and is owned by next-themes.
  */
 function readAccent(): AccentTheme {
-  try {
-    const saved = window.localStorage.getItem(PLATFORM_THEME_STORAGE_KEY);
-    if (saved === "obsidian" || saved === "emerald") return saved;
-  } catch {
-    // Storage is blocked; fall through to the system preference.
-  }
-  if (typeof window === "undefined") return "emerald";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "obsidian" : "emerald";
+  return "emerald";
 }
 
 export function applyAccent(value: AccentTheme) {
@@ -60,11 +44,8 @@ export function applyAccent(value: AccentTheme) {
   }
   themeColor.content = palette.color;
 
-  // The favicon follows the palette, so Esmeralda stays green and Obsidian
-  // stays purple no matter the reading mode.
-  const gradient = value === "obsidian"
-    ? `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2D0B4F"/><stop offset=".42" stop-color="#8A2BE2"/><stop offset=".7" stop-color="#4C1D95"/><stop offset="1" stop-color="#A855F7"/></linearGradient>`
-    : `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#D1FAE5"/><stop offset=".45" stop-color="#34D399"/><stop offset="1" stop-color="#047857"/></linearGradient>`;
+  // The favicon follows the single platform palette: emerald neon.
+  const gradient = `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#D1FAE5"/><stop offset=".45" stop-color="#00FF88"/><stop offset="1" stop-color="#047857"/></linearGradient>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>${gradient}</defs><path fill="url(#s)" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="url(#s)" d="m32 31 12 12-12 12-12-12z"/></svg>`;
   let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!favicon) {

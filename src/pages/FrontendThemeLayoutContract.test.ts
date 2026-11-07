@@ -90,7 +90,7 @@ describe("frontend theme and responsive contracts", () => {
     expect(modulePage).toContain("aria-label={`Excluir automação ${automation.name}`}");
     expect(financePage).toContain('aria-label="Incluir imposto Meta no cálculo"');
     expect(settingsPage).toContain("PlatformThemePicker");
-    expect(themePicker).toContain('aria-label="Tema da plataforma"');
+    expect(themePicker).toContain('aria-label="Modo de leitura da plataforma"');
     expect(themePicker).toContain('aria-pressed={active}');
     expect(platformRules).toContain('aria-label="Ativar regra"');
     expect(platformRules).toContain('aria-label="Usar como fallback"');
@@ -122,19 +122,22 @@ describe("frontend theme and responsive contracts", () => {
     expect(css).toContain(".gd-crm-metric-card > p.text-primary");
   });
 
-  it("ships both platform themes with the premium surface contract", () => {
+  it("ships the single emerald neon palette with the premium surface contract", () => {
     expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
-    expect(premiumStyles).toContain('html[data-platform-theme="obsidian"]');
     expect(premiumStyles).toContain("--palette-accent: #10B981");
-    expect(premiumStyles).toContain("--palette-accent: #BC13FE");
+    expect(premiumStyles).toContain("--palette-accent-bright: #00FF88");
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
+    // The obsidian palette is gone: no purple accent may remain.
+    expect(premiumStyles).not.toContain("#BC13FE");
+    expect(premiumStyles).not.toContain("#E879F9");
   });
 
   it("keeps the premium layer on glass, luminous borders and reduced motion", () => {
     expect(premiumStyles).toContain("backdrop-filter: blur(14px) saturate(135%)");
-    expect(premiumStyles).toContain("rgba(var(--purple-glow-color), 0.55)");
+    expect(premiumStyles).toContain("--purple-glow-color: var(--palette-secondary-rgb)");
     expect(premiumStyles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(premiumStyles).toContain("animation-duration: 0.01ms !important");
+    expect(premiumStyles).toContain("@keyframes gd-neon-flash");
   });
 
   it("keeps the platform theme as the single source of truth for the visual contract", () => {
@@ -144,8 +147,9 @@ describe("frontend theme and responsive contracts", () => {
     );
     expect(themeHook).toContain('root.dataset.platformTheme = palette.html');
     expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
-    expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
+    expect(themeHook).toContain('export type AccentTheme = "emerald"');
     expect(themeHook).not.toContain("metallic-gold");
+    expect(themeHook).not.toContain("obsidian");
   });
 
   it("wins the cascade against the legacy gradients that pin the shell flat", () => {
@@ -209,10 +213,10 @@ describe("frontend theme and responsive contracts", () => {
       "utf8",
     );
 
-    // Palette: Esmeralda sets green accents, Obsidian sets purple accents.
+    // Palette: a single emerald neon palette drives every accent.
     expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-accent:\s*#10B981/);
-    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-secondary:\s*#047857/);
-    expect(premiumStyles).toMatch(/\[data-platform-theme="obsidian"\][\s\S]*?--palette-accent:\s*#BC13FE/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-secondary:\s*#059669/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-accent-bright:\s*#00FF88/);
 
     // Mode: the dark block depends only on `.dark`, not on the palette.
     expect(premiumStyles).toContain("html.dark {");
