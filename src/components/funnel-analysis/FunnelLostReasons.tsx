@@ -30,7 +30,7 @@ export function FunnelLostReasons({ a }: { a: FunnelAnalytics }) {
         <section>
           <h3 className="mb-2 text-xs font-semibold text-foreground">Perdas registradas</h3>
           {data.length === 0 ? reasonList([], "Nenhuma perda registrada.", "loss") : (
-          <ol className="space-y-2.5" aria-label="Ranking de motivos de perda">
+          <ol className="max-h-[320px] overflow-y-auto growdash-scrollbar pr-1 space-y-2.5" aria-label="Ranking de motivos de perda">
             {data.map((row, index) => (
               <li key={row.name} className="rounded-lg border border-border/50 bg-background/35 px-3 py-2.5">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">

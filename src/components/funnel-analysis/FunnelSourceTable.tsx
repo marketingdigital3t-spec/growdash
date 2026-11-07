@@ -16,7 +16,7 @@ export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
         <p className="mt-1 text-xs font-normal text-muted-foreground">Qualidade de origem: <b className={quality >= 80 ? "text-emerald-500" : quality >= 50 ? "text-amber-500" : "text-red-500"}>{quality.toFixed(0)}% preenchida</b> · CPL/CAC por origem só aparece quando o custo Meta estiver ligado à mesma UTM, evitando rateio artificial.</p>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="max-h-[320px] overflow-y-auto overflow-x-auto growdash-scrollbar pr-1">
           <table className="w-full min-w-[480px] text-xs">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border/40">

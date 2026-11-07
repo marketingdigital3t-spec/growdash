@@ -1291,3 +1291,64 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
   stroke: var(--palette-accent) !important;
 }
 
+
+/* --------------------------------------------------------------------------
+   13. Phase palettes — Terra prata, Orbita dourada, Galaxia roxa
+   --------------------------------------------------------------------------
+   The premium layer is the authoritative theme, but it previously painted every
+   surface in a fixed emerald. That made the three mission phases visually
+   identical and broke the reference composition. Each phase now owns its
+   accent so the shell really is black + silver, black + gold, and black +
+   purple, exactly as the phase means.
+   -------------------------------------------------------------------------- */
+
+.brand-shell[data-space-phase="terra"] {
+  --phase-accent: 226, 232, 240;
+  --phase-accent-bright: #f8fafc;
+  --phase-accent-dim: #94a3b8;
+}
+.brand-shell[data-space-phase="orbita"] {
+  --phase-accent: 255, 193, 7;
+  --phase-accent-bright: #ffe082;
+  --phase-accent-dim: #a66b00;
+}
+.brand-shell[data-space-phase="galaxia"] {
+  --phase-accent: 168, 85, 247;
+  --phase-accent-bright: #d8b4fe;
+  --phase-accent-dim: #6c3483;
+}
+
+/* Cards follow the phase instead of the fixed emerald. */
+html.gd-premium.dark .brand-shell[data-space-phase]
+  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *),
+html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background: linear-gradient(145deg, rgba(var(--phase-accent), 0.07), rgba(4, 5, 7, 0.86)) !important;
+  background-color: rgba(5, 6, 8, 0.82) !important;
+  border: 1px solid rgba(var(--phase-accent), 0.24) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--phase-accent), 0.16),
+    0 18px 40px -20px rgba(0, 0, 0, 0.78) !important;
+}
+
+/* The mission fuel bar, KPI cards and radar glow in the phase accent. */
+.brand-shell[data-space-phase] :is(.gd-fuel-fill, .gd-label, .text-primary-neon) {
+  color: var(--phase-accent-bright) !important;
+}
+.brand-shell[data-space-phase] .gd-fuel-fill {
+  background: linear-gradient(90deg, rgba(var(--phase-accent), 0.55), var(--phase-accent-bright)) !important;
+  box-shadow: 0 0 12px rgba(var(--phase-accent), 0.55) !important;
+}
+.brand-shell[data-space-phase] .gd-glow-border {
+  background: linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+    linear-gradient(135deg, rgba(var(--phase-accent), 0.55) 0%, rgba(var(--phase-accent), 0.22) 55%, rgba(255, 255, 255, 0.1) 100%) border-box !important;
+}
+.brand-shell[data-space-phase] .gd-glow-border:hover {
+  box-shadow: 0 0 30px -6px rgba(var(--phase-accent), 0.45) !important;
+}

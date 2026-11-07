@@ -18,13 +18,23 @@ export async function edgeFunctionErrorDetails(error: unknown): Promise<EdgeFunc
   const context = (error as FunctionErrorLike | null)?.context;
   let status = context instanceof Response ? context.status : undefined;
   let payload: Record<string, unknown> | null = null;
+  let rawBody = "";
 
   if (context instanceof Response) {
-    try { payload = asRecord(await context.clone().json()); } catch { /* gateway may return non-JSON */ }
+    // The gateway can answer with plain text (HTML error pages, empty bodies).
+    // Reading text first keeps the real reason visible instead of degrading
+    // every failure into an opaque "non-2xx" message.
+    const body = await context.clone().text();
+    rawBody = body.trim();
+    if (rawBody) {
+      try { payload = asRecord(JSON.parse(rawBody)); } catch { payload = null; }
+    }
   }
 
   const nested = asRecord(payload?.details) ?? asRecord(payload?.meta_error);
-  const message = String(payload?.error_description ?? payload?.error ?? payload?.message ?? nested?.message ?? fallback);
+  const payloadMessage = payload?.error_description ?? payload?.error ?? payload?.message ?? nested?.message;
+  const bodyMessage = !payloadMessage && rawBody && rawBody.length <= 400 ? rawBody : "";
+  const message = String(payloadMessage ?? bodyMessage ?? "") || fallback;
   const code = payload?.code ?? payload?.error_code ?? nested?.code;
   const subcode = payload?.subcode ?? payload?.error_subcode ?? nested?.error_subcode;
   if (!status && typeof payload?.http_status === "number") status = payload.http_status;
@@ -45,9 +55,15 @@ export async function getEdgeFunctionErrorMessage(error: unknown, fallback: stri
   const context = (error as FunctionErrorLike | null)?.context;
   let action = "";
   if (context instanceof Response) {
-    const payload = asRecord(await context.clone().json().catch(() => null));
-    if (typeof payload?.action === "string") action = ` ${payload.action}`;
+    const raw = await context.clone().text();
+    try {
+      const payload = asRecord(JSON.parse(raw));
+      if (typeof payload?.action === "string") action = ` ${payload.action}`;
+    } catch { /* gateway may answer with plain text */ }
   }
-  const message = details.message.includes("non-2xx") ? fallback : details.message;
+  // Only fall back when the gateway gave us nothing usable. A "non-2xx"
+  // message combined with a real body must keep the real reason visible.
+  const unusable = !details.message || details.message === "Não foi possível executar a função." || /^\s*non-2xx\s*$/i.test(details.message);
+  const message = unusable ? fallback : details.message;
   return `${message}${action}`;
 }

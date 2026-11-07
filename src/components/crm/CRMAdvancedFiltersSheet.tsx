@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { Calendar as CalendarIcon, SlidersHorizontal, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -10,8 +10,92 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import type { CRMAdvancedFilterState } from "@/lib/crmAdvancedFilters";
 import { countActiveAdvancedFilters } from "@/lib/crmAdvancedFilters";
+
+function CRMDateRangePickerField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: { start: string | null; end: string | null };
+  onChange: (val: { start: string | null; end: string | null } | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasRange = Boolean(value?.start || value?.end);
+
+  const selectedRange: DateRange | undefined = value?.start
+    ? {
+        from: parseISO(value.start),
+        to: value.end ? parseISO(value.end) : undefined,
+      }
+    : undefined;
+
+  const formattedLabel = (() => {
+    if (!value?.start) return "Selecionar período no calendário…";
+    const s = format(parseISO(value.start), "dd/MM/yyyy", { locale: ptBR });
+    if (!value.end) return `A partir de ${s}`;
+    const e = format(parseISO(value.end), "dd/MM/yyyy", { locale: ptBR });
+    return `${s} – ${e}`;
+  })();
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-bold text-foreground">{label}</Label>
+        {hasRange && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className={`w-full justify-start text-left text-xs font-medium h-10 gap-2.5 border-border ${
+              hasRange ? "border-primary/50 text-foreground bg-primary/5" : "text-muted-foreground"
+            }`}
+          >
+            <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate font-mono text-[11px]">{formattedLabel}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0 border border-border bg-card shadow-2xl z-[220]">
+          <Calendar
+            mode="range"
+            selected={selectedRange}
+            onSelect={(range) => {
+              if (!range) {
+                onChange(null);
+                return;
+              }
+              const startStr = range.from ? format(range.from, "yyyy-MM-dd") : null;
+              const endStr = range.to ? format(range.to, "yyyy-MM-dd") : startStr;
+              onChange({ start: startStr, end: endStr });
+              if (range.from && range.to) {
+                setOpen(false);
+              }
+            }}
+            locale={ptBR}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 interface CRMAdvancedFiltersSheetProps {
   filters: CRMAdvancedFilterState;
@@ -128,116 +212,26 @@ export function CRMAdvancedFiltersSheet({
             </div>
           </div>
 
-          {/* 2. Data de criação */}
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-foreground">Data de criação</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                aria-label="Data de criação inicial"
-                value={draft.createdAt?.start ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    createdAt: {
-                      start: e.target.value || null,
-                      end: prev.createdAt?.end || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-              <Input
-                type="date"
-                aria-label="Data de criação final"
-                value={draft.createdAt?.end ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    createdAt: {
-                      start: prev.createdAt?.start || null,
-                      end: e.target.value || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-            </div>
-          </div>
+          {/* 2. Data de criação com seletor de intervalo no calendário */}
+          <CRMDateRangePickerField
+            label="Data de criação"
+            value={draft.createdAt}
+            onChange={(val) => setDraft((prev) => ({ ...prev, createdAt: val }))}
+          />
 
-          {/* 3. Data de fechamento */}
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-foreground">Data de fechamento (Ganhos/Perdidos)</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                aria-label="Data de fechamento inicial"
-                value={draft.closedAt?.start ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    closedAt: {
-                      start: e.target.value || null,
-                      end: prev.closedAt?.end || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-              <Input
-                type="date"
-                aria-label="Data de fechamento final"
-                value={draft.closedAt?.end ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    closedAt: {
-                      start: prev.closedAt?.start || null,
-                      end: e.target.value || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-            </div>
-          </div>
+          {/* 3. Data de fechamento (Ganhos/Perdidos) com seletor de intervalo */}
+          <CRMDateRangePickerField
+            label="Data de fechamento (Ganhos/Perdidos)"
+            value={draft.closedAt}
+            onChange={(val) => setDraft((prev) => ({ ...prev, closedAt: val }))}
+          />
 
-          {/* 4. Data de último contato (stage_updated_at) */}
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-foreground">Data de último contato / movimentação</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                aria-label="Data de último contato inicial"
-                value={draft.lastContactAt?.start ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    lastContactAt: {
-                      start: e.target.value || null,
-                      end: prev.lastContactAt?.end || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-              <Input
-                type="date"
-                aria-label="Data de último contato final"
-                value={draft.lastContactAt?.end ?? ""}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    lastContactAt: {
-                      start: prev.lastContactAt?.start || null,
-                      end: e.target.value || null,
-                    },
-                  }))
-                }
-                className="h-10 text-xs"
-              />
-            </div>
-          </div>
+          {/* 4. Data de último contato / movimentação com seletor de intervalo */}
+          <CRMDateRangePickerField
+            label="Data de último contato / movimentação"
+            value={draft.lastContactAt}
+            onChange={(val) => setDraft((prev) => ({ ...prev, lastContactAt: val }))}
+          />
 
           {/* 5. Campanha */}
           <div className="space-y-2">

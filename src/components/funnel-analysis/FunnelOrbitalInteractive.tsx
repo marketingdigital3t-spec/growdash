@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, ChevronDown, Target } from "lucide-react";
 import { formatInteger, formatPercent } from "@/lib/format/formatPtBr";
 import { useEffectivePhase } from "@/lib/phase/phaseStore";
+import { SpaceRocket } from "@/components/space/SpaceRocket";
 
 export interface OrbitalStage {
   key: string;
@@ -62,64 +63,76 @@ export function FunnelOrbitalInteractive({
         </span>
       </div>
 
-      {/* Pilha de aneis clicaveis */}
-      <div className="my-5 flex flex-col items-center gap-2.5">
-        {stages.map((stage, index) => {
-          const widthPercent = 100 - index * (72 / Math.max(stages.length - 1, 1));
-          const isSelected = selectedIndex === index;
-          const isBottleneck = index === resolvedBottleneck + 1;
-          const rate = rates[index];
+      {/* Pilha conica de aneis em perspectiva com proporcao real de funil */}
+      <div className="relative my-6 flex min-h-[320px] items-center justify-center">
+        {/* Foguete em orbita conica na esquerda */}
+        <div className="pointer-events-none absolute left-3 top-1/3 z-20 -rotate-45 sm:left-10" aria-hidden="true">
+          <div className="relative text-primary drop-shadow-[0_0_14px_currentColor] animate-pulse motion-reduce:animate-none">
+            <SpaceRocket className="h-12 w-12 sm:h-14 sm:w-14" />
+            <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-primary blur-[3px] opacity-75" />
+          </div>
+        </div>
 
-          return (
-            <button
-              key={stage.key}
-              type="button"
-              onClick={() => setSelectedIndex(isSelected ? null : index)}
-              aria-pressed={isSelected}
-              className="group relative flex w-full items-center justify-center transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              style={{ width: `${widthPercent}%` }}
-            >
-              <div
-                className="flex w-full items-center justify-center rounded-[999px/50%] border py-3 text-center transition-all"
-                style={{
-                  borderColor: isBottleneck
-                    ? "var(--danger)"
-                    : isSelected
-                    ? "var(--primary-neon)"
-                    : "var(--card-border-active)",
-                  backgroundColor: "rgba(7, 18, 12, 0.55)",
-                  boxShadow: isBottleneck
-                    ? "0 0 18px -4px var(--danger)"
-                    : isSelected
-                    ? "0 0 20px -4px var(--primary-neon)"
-                    : "0 0 12px -6px var(--primary-neon)",
-                }}
+        {/* Funil conico centralizado com max-width proporcional */}
+        <div className="relative z-10 mx-auto flex w-full max-w-[500px] flex-col items-center gap-2.5 sm:max-w-[540px]">
+          {stages.map((stage, index) => {
+            // Largura conica de 100% ate 40% para ter forma real de funil 3D
+            const widthPercent = 100 - index * (60 / Math.max(stages.length - 1, 1));
+            const isSelected = selectedIndex === index;
+            const isBottleneck = index === resolvedBottleneck + 1;
+            const rate = rates[index];
+
+            return (
+              <button
+                key={stage.key}
+                type="button"
+                onClick={() => setSelectedIndex(isSelected ? null : index)}
+                aria-pressed={isSelected}
+                className="group relative flex w-full items-center justify-center transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                style={{ width: `${widthPercent}%` }}
               >
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-muted group-hover:text-text-secondary sm:text-[10px]">
-                    {stage.label}
-                  </span>
-                  <strong className="font-display text-xs font-bold text-text-primary tabular-nums sm:text-sm">
-                    {formatInteger(stage.current)}
-                  </strong>
-                </div>
-              </div>
-
-              {/* Taxa de conversao entre etapas */}
-              {typeof rate === "number" && (
-                <span
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 rounded-md border px-2 py-0.5 text-[10px] font-bold tabular-nums shadow-sm ${
-                    isBottleneck
-                      ? "border-danger/40 bg-danger/10 text-danger"
-                      : "border-card-border bg-bg-elevated/80 text-primary-neon"
-                  }`}
+                <div
+                  className="flex w-full items-center justify-center rounded-[999px/50%] border py-3 text-center transition-all"
+                  style={{
+                    borderColor: isBottleneck
+                      ? "var(--danger)"
+                      : isSelected
+                      ? "var(--primary-neon)"
+                      : "var(--card-border-active)",
+                    backgroundColor: "rgba(7, 18, 12, 0.55)",
+                    boxShadow: isBottleneck
+                      ? "0 0 18px -4px var(--danger)"
+                      : isSelected
+                      ? "0 0 20px -4px var(--primary-neon)"
+                      : "0 0 12px -6px var(--primary-neon)",
+                  }}
                 >
-                  {rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-muted group-hover:text-text-secondary sm:text-[10px]">
+                      {stage.label}
+                    </span>
+                    <strong className="font-display text-xs font-bold text-text-primary tabular-nums sm:text-sm">
+                      {formatInteger(stage.current)}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Taxa de conversao entre etapas alinhada */}
+                {typeof rate === "number" && (
+                  <span
+                    className={`absolute -right-16 sm:-right-20 top-1/2 -translate-y-1/2 rounded-md border px-2 py-0.5 text-[10px] font-bold tabular-nums shadow-sm ${
+                      isBottleneck
+                        ? "border-danger/40 bg-danger/10 text-danger"
+                        : "border-card-border bg-bg-elevated/80 text-primary-neon"
+                    }`}
+                  >
+                    {rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Detalhamento da etapa selecionada */}
