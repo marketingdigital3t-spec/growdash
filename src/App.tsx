@@ -138,29 +138,45 @@ function MarkApplicationBooted() {
   return null;
 }
 
-type AppErrorBoundaryState = { failed: boolean; retryBlocked: boolean; attempts: number };
+type AppErrorBoundaryState = {
+  failed: boolean;
+  retryBlocked: boolean;
+  attempts: number;
+  error: Error | null;
+  showDetails: boolean;
+};
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBoundaryState> {
-  state: AppErrorBoundaryState = { failed: false, retryBlocked: false, attempts: 0 };
+  state: AppErrorBoundaryState = {
+    failed: false,
+    retryBlocked: false,
+    attempts: 0,
+    error: null,
+    showDetails: false,
+  };
 
-  static getDerivedStateFromError(): AppErrorBoundaryState {
-    return { failed: true, retryBlocked: false, attempts: 0 };
+  static getDerivedStateFromError(error: Error): Partial<AppErrorBoundaryState> {
+    return { failed: true, error, retryBlocked: false };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Keep diagnostic context in the browser without exposing it in the UI.
     recordRuntimeDiagnostic("application", error);
     console.error("Growdash render error", error, info.componentStack);
     recoverLatestBuildOnce("application", error);
   }
 
   retry = () => {
-    const recovery = consumeRecoveryAttempt("application");
-    if (recovery.blocked) {
-      this.setState({ retryBlocked: true, attempts: recovery.attempts });
-      return;
-    }
-    this.setState({ failed: false, retryBlocked: false, attempts: recovery.attempts });
+    clearRecoveryAttempts("application");
+    clearRecoveryAttempts("chunk-reload");
+    window.location.reload();
+  };
+
+  resetCache = () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {}
+    window.location.assign("/");
   };
 
   goHome = () => {
@@ -171,16 +187,57 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 
   render() {
     if (this.state.failed) {
-      return <div className="grid min-h-screen place-items-center bg-background px-4 text-center text-foreground">
-        <div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl">
-          <p className="text-lg font-black">{this.state.retryBlocked ? "Esta tela continua indisponível" : "Não foi possível abrir esta tela."}</p>
-          <p className="mt-2 text-sm text-muted-foreground">{this.state.retryBlocked ? "As tentativas nesta tela foram interrompidas para evitar um ciclo. Seus dados não foram alterados." : "O módulo falhou ao renderizar. Tente o módulo uma vez; a plataforma não será recarregada automaticamente."}</p>
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {!this.state.retryBlocked && <button type="button" onClick={this.retry} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar este módulo</button>}
-            <button type="button" onClick={this.goHome} className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-bold transition hover:bg-muted">Ir para o início</button>
+      return (
+        <div className="grid min-h-screen place-items-center bg-background px-4 text-center text-foreground">
+          <div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl">
+            <p className="text-lg font-black">Não foi possível abrir esta tela.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ocorreu uma falha durante a renderização. Você pode tentar recarregar ou limpar os dados locais de cache.
+            </p>
+
+            {this.state.error && (
+              <div className="mt-4 text-left">
+                <button
+                  type="button"
+                  onClick={() => this.setState((prev) => ({ showDetails: !prev.showDetails }))}
+                  className="text-xs font-semibold text-primary underline underline-offset-2"
+                >
+                  {this.state.showDetails ? "Ocultar detalhes técnicos" : "Ver detalhes técnicos"}
+                </button>
+                {this.state.showDetails && (
+                  <pre className="mt-2 max-h-36 overflow-auto rounded-lg bg-muted/60 p-2.5 font-mono text-[11px] text-destructive leading-relaxed whitespace-pre-wrap">
+                    {this.state.error.name}: {this.state.error.message}
+                  </pre>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={this.retry}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90"
+              >
+                Recarregar página
+              </button>
+              <button
+                type="button"
+                onClick={this.resetCache}
+                className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-bold transition hover:bg-muted"
+              >
+                Limpar dados locais
+              </button>
+              <button
+                type="button"
+                onClick={this.goHome}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted"
+              >
+                Início
+              </button>
+            </div>
           </div>
         </div>
-      </div>;
+      );
     }
     return this.props.children;
   }

@@ -125,7 +125,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dates = useMemo(() => resolvePreset(preset, customRange, clockNow), [preset, customRange, clockNow]);
-  const businessUnitId = workspace?.units.find((unit) => unit.kind === segment)?.id;
+  const businessUnitId = (workspace?.units || []).find((unit) => unit?.kind === segment)?.id;
   const value = useMemo<GlobalFiltersValue>(() => ({
     adAccountId,
     setAdAccountId,
