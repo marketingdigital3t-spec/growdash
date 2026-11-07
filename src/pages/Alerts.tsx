@@ -15,6 +15,7 @@ import { format, parseISO, nextMonday, differenceInDays, isMonday } from "date-f
 import { ptBR } from "date-fns/locale";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
+import { AnomalyRadar } from "@/components/cosmic/AnomalyRadar";
 
 function LastTopUpInline({ accountId }: { accountId: string }) {
   const { data } = useLastTopUp(accountId);
@@ -330,8 +331,15 @@ export default function Alerts() {
   return (
     <MotionPage className="space-y-6 min-w-0 overflow-hidden">
       <MotionItem>
-        <h1 className="text-2xl font-bold">Alertas</h1>
-        <p className="text-sm text-muted-foreground mt-1">Status das campanhas e alertas automáticos</p>
+        <h1 className="text-2xl font-bold">Alertas e Radar de Anomalias</h1>
+        <p className="text-sm text-muted-foreground mt-1">Monitoramento em tempo real de desvios operacionais e saúde de campanhas</p>
+      </MotionItem>
+
+      {/* Radar de Anomalias em Destaque no Topo (ETAPA 5.3) */}
+      <MotionItem>
+        <div className="max-w-2xl">
+          <AnomalyRadar />
+        </div>
       </MotionItem>
 
       {/* Campaign Health Status */}
