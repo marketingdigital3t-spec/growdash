@@ -117,10 +117,9 @@ export default function Auth() {
     <section className="auth-hero-panel" aria-label="Growdash">
       <div className="auth-neural-field" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
       <div className="auth-hero-smoke auth-hero-smoke-a" aria-hidden="true" /><div className="auth-hero-smoke auth-hero-smoke-b" aria-hidden="true" />
-      <div className="auth-hero-symbol mb-4" aria-hidden="true">
-        <div className="relative h-44 w-44 overflow-hidden rounded-3xl border border-sky-400/30 shadow-[0_0_40px_-5px_rgba(0,168,255,0.6)]">
-          <img src={rocketLogo} alt="Growdash Mission Control" className="h-full w-full object-cover" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+      <div className="auth-hero-symbol" aria-hidden="true">
+        <div className="auth-hero-rocket-frame">
+          <img src={rocketLogo} alt="Growdash Mission Control" />
         </div>
       </div>
       <div className="auth-hero-copy">
