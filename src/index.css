@@ -202,7 +202,7 @@
     --sidebar-primary: 160 84% 39%;
     --sidebar-icon-active: 158 64% 52%;
     --sidebar-ring: 158 64% 52%;
-    --brand-gold: #10b981;
+    --brand-gold: #00a8ff;
     --brand-gold-light: #6ee7b7;
     --brand-bronze: #047857;
     --brand-accent-rgb: 16, 185, 129;
@@ -2395,7 +2395,7 @@ html:not(.dark) .commercial-ranking-shell option {
    Growdash green accent. This final layer intentionally wins over legacy
    Terra/blue and monochrome declarations without changing data behavior. */
 :root {
-  --gd-emerald: #10b981;
+  --gd-emerald: #00a8ff;
   --gd-emerald-bright: #34d399;
   --gd-emerald-deep: #047857;
   --gd-emerald-soft: rgba(16, 185, 129, .14);
@@ -2411,7 +2411,7 @@ html:not(.dark) .commercial-ranking-shell option {
 }
 
 html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
-  background: linear-gradient(135deg, #07120b 0%, #08130d 52%, #0a1711 100%) !important;
+  background: linear-gradient(135deg, #050811 0%, #070c18 52%, #0a1224 100%) !important;
   color: #f5f7f6 !important;
 }
 
@@ -2460,7 +2460,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) {
   background: var(--gd-accent) !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
@@ -2471,7 +2471,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 /* Commercial ranking had a self-contained blue/gold palette. Keep its
    hierarchy, but bind all visible surfaces, controls and accents to emerald. */
 .brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) {
-  background: #0c1b12 !important;
+  background: #0a1224 !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) {
   color: var(--gd-accent-bright) !important;
@@ -2479,7 +2479,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 }
 .brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) {
   background-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="border-white"], [class*="bg-white"], [class*="text-slate-"]) {
   border-color: rgba(52, 211, 153, .18) !important;
@@ -3053,7 +3053,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 .growdash-core-account-heading b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .growdash-core-account-heading small { display: block; margin-top: 2px; color: rgba(255,255,255,.45); font-size: 8px; }
 .growdash-core-account-heading > span { flex: 0 0 auto; border-radius: 999px; padding: 3px 6px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
-.growdash-core-account-heading > span.is-healthy { background: rgba(52,211,153,.12); color: #67e8b4; }
+.growdash-core-account-heading > span.is-healthy { background: rgba(56,189,248,.18); color: #67e8b4; }
 .growdash-core-account-heading > span.is-attention { background: rgba(251,191,36,.12); color: #fcd34d; }
 .growdash-core-account-heading > span.is-critical { background: rgba(248,113,113,.12); color: #fca5a5; }
 .growdash-core-account-heading > span.is-no-data { background: rgba(255,255,255,.08); color: rgba(255,255,255,.52); }
@@ -3794,7 +3794,7 @@ html[data-accent="monochrome"] {
   --sidebar-primary: 160 84% 39% !important;
   --sidebar-icon-active: 158 64% 52% !important;
   --sidebar-ring: 158 64% 52% !important;
-  --brand-gold: #10b981 !important;
+  --brand-gold: #00a8ff !important;
   --brand-gold-light: #6ee7b7 !important;
   --brand-bronze: #047857 !important;
   --brand-accent-rgb: 16, 185, 129 !important;
@@ -14528,22 +14528,22 @@ html[data-space-phase="galaxia"],
   --gd-semantic-primary: #a855f7 !important;
   --gd-content-border: rgba(168, 85, 247, 0.3) !important;
 }
-html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #07120b 0%, #08130d 52%, #0a1711 100%) !important; color: #f5f7f6 !important; }
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #050811 0%, #070c18 52%, #0a1224 100%) !important; color: #f5f7f6 !important; }
 html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #f5fbf7 0%, #fff 55%, #edf8f0 100%) !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { border-color: var(--gd-accent-border) !important; }
-html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important; box-shadow: inset 0 1px rgba(52,211,153,.08), 0 14px 32px rgba(0,0,0,.24) !important; }
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: linear-gradient(145deg, rgba(8,15,30,0.95), rgba(4,8,18,0.98)) !important; box-shadow: inset 0 1px rgba(56,189,248,0.12), 0 14px 32px rgba(0,0,0,.24) !important; }
 html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: rgba(255,255,255,.94) !important; box-shadow: 0 12px 28px rgba(16,80,40,.08) !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="text-blue"], [class*="text-sky"], [class*="text-cyan"], [class*="text-violet"], [class*="text-indigo"], [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"], [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { color: var(--gd-accent) !important; border-color: var(--gd-accent-border) !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { background-color: var(--gd-accent-soft) !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) { background: var(--gd-accent) !important; border-color: var(--gd-accent) !important; color: #062015 !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) { background: var(--gd-accent) !important; border-color: var(--gd-accent) !important; color: #040810 !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) { color: var(--gd-accent-bright) !important; }
-.brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) { background: #0c1b12 !important; }
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) { background: #0a1224 !important; }
 .brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) { color: var(--gd-accent-bright) !important; border-color: var(--gd-accent-border) !important; }
-.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) { background-color: var(--gd-accent) !important; color: #062015 !important; }
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) { background-color: var(--gd-accent) !important; color: #040810 !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .dashboard-summary-strip-surface,
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric {
   border-color: var(--gd-accent-border) !important;
-  background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important;
+  background: linear-gradient(145deg, rgba(8,15,30,0.95), rgba(4,8,18,0.98)) !important;
 }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric-icon,
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-metric-icon {
@@ -14555,15 +14555,15 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 .brand-shell .commercial-ranking-tabs button.is-active,
 .brand-shell .crm-page [role="tab"][aria-selected="true"] {
   background: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   border-color: var(--gd-accent) !important;
-  box-shadow: 0 0 0 1px rgba(52,211,153,.2), 0 8px 18px rgba(16,185,129,.18) !important;
+  box-shadow: 0 0 0 1px rgba(56,189,248,.25), 0 8px 18px rgba(0,168,255,0.25) !important;
 }
 .gd-expert-tab-active,
 .gd-commercial-tab-active {
-  background: #10b981 !important;
-  color: #062015 !important;
-  border-color: #10b981 !important;
+  background: #00a8ff !important;
+  color: #040810 !important;
+  border-color: #00a8ff !important;
 }
 
 /* Accent-only surface contract -------------------------------------------
@@ -14572,7 +14572,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
    actions. This block intentionally sits last so the historical theme
    layers above cannot repaint KPI/content surfaces green. */
 :root {
-  --gd-accent: #10b981;
+  --gd-accent: #00a8ff;
   --gd-accent-bright: #34d399;
   --gd-accent-soft: rgba(16, 185, 129, .12);
   --gd-accent-border: rgba(16, 185, 129, .26);
@@ -14580,7 +14580,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 
 html[data-accent] {
   --brand-accent-rgb: 16, 185, 129 !important;
-  --brand-gold: #10b981 !important;
+  --brand-gold: #00a8ff !important;
   --brand-gold-light: #34d399 !important;
   --primary: 160 84% 39% !important;
   --primary-foreground: 160 42% 7% !important;
@@ -14701,7 +14701,7 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-ca
 .brand-shell .finance-page button[data-state="active"] {
   border-color: var(--gd-accent) !important;
   background: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
 }
 
@@ -14713,7 +14713,7 @@ html:not(.dark) body .brand-shell .finance-page .finance-tab[role="tab"][data-st
   border-color: var(--gd-accent) !important;
   background: var(--gd-accent) !important;
   background-image: none !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
 }
 
@@ -14749,7 +14749,7 @@ html[data-accent="metallic-gold"] {
 .brand-shell .commercial-page,
 .brand-shell .integrations-page {
   --gd-semantic-primary: var(--gd-accent) !important;
-  --gd-semantic-primary-foreground: #062015 !important;
+  --gd-semantic-primary-foreground: #040810 !important;
   --gd-content-selection: var(--gd-accent) !important;
   --primary: 160 84% 39% !important;
   --primary-foreground: 160 42% 7% !important;
@@ -14768,7 +14768,7 @@ html[data-accent="metallic-gold"] {
 .brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]) {
   background: var(--gd-accent) !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 .brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]):hover {
   background: var(--gd-accent-bright) !important;
@@ -14786,7 +14786,7 @@ html[data-accent="metallic-gold"] {
   background: var(--gd-accent) !important;
   background-image: none !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 8px 22px -14px rgba(16, 185, 129, .95) !important;
 }
 .brand-shell button.gd-highlight-action:hover:not(:disabled),
@@ -14796,7 +14796,7 @@ html[data-accent="metallic-gold"] {
   background: var(--gd-accent-bright) !important;
   background-image: none !important;
   border-color: var(--gd-accent-bright) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 
 /* Final compatibility sweep for older page components that still expose the
@@ -14812,7 +14812,7 @@ html[data-accent="metallic-gold"] {
   background: var(--gd-accent) !important;
   background-image: none !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 .brand-shell :is(
   button, a, [role="button"], [role="tab"]
@@ -14829,11 +14829,11 @@ html[data-accent="metallic-gold"] {
   background: var(--gd-accent-bright) !important;
   background-image: none !important;
   border-color: var(--gd-accent-bright) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 .brand-shell :is(
-  [class*="bg-[#10b981"], [class*="bg-[#10B981"],
-  [class*="text-[#10b981"], [class*="text-[#10B981"],
+  [class*="bg-[#00a8ff"], [class*="bg-[#10B981"],
+  [class*="text-[#00a8ff"], [class*="text-[#10B981"],
   [style*="b7ff00"], [style*="B7FF00"], [style*="183, 255, 0"]
 ) {
   color: var(--gd-accent-bright) !important;
@@ -14894,7 +14894,7 @@ html[data-accent="metallic-gold"] {
 ) {
   background: var(--gd-accent) !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 
 /* Canonical Expert dashboard composition. This is the single final authority
@@ -15208,7 +15208,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   background: var(--gd-accent) !important;
   background-image: none !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
 }
 
@@ -15242,7 +15242,7 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .commercial-ranking-shell .commercial-ranking-filter:focus-visible,
 .commercial-ranking-shell .commercial-ranking-control:focus-visible {
   border-color: var(--gd-accent-bright) !important;
-  box-shadow: 0 0 0 3px rgba(52,211,153,.2) !important;
+  box-shadow: 0 0 0 3px rgba(56,189,248,.25) !important;
 }
 .commercial-ranking-shell .commercial-ranking-filter option,
 .commercial-ranking-shell .commercial-ranking-control option { background: var(--gd-surface-card) !important; color: var(--gd-content) !important; }
@@ -15251,13 +15251,13 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .commercial-ranking-shell .commercial-ranking-expand {
   border: 1px solid var(--gd-accent-bright) !important;
   background: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
 }
 .commercial-ranking-shell .commercial-ranking-expand:hover,
-.commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-accent-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(52,211,153,.22), 0 10px 26px rgba(16,185,129,.34) !important; }
+.commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-accent-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(56,189,248,.25), 0 10px 26px rgba(0,168,255,.35) !important; }
 .commercial-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--gd-emerald-deep) 22%, var(--gd-surface-control)); }
-.commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #047857, #10b981 58%, #6ee7b7); transition: width .55s ease; }
+.commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #047857, #00a8ff 58%, #6ee7b7); transition: width .55s ease; }
 .commercial-goal-fill::after { content: ""; position: absolute; inset: 0 auto 0 -35%; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); animation: commercial-goal-shimmer 2.8s ease-in-out infinite; }
 @keyframes commercial-goal-shimmer { from { transform: translateX(0); } to { transform: translateX(390%); } }
 @media (prefers-reduced-motion: reduce) { .commercial-goal-fill, .commercial-goal-fill::after { animation: none !important; transition: none !important; } }
@@ -15285,7 +15285,7 @@ html body section[role="dialog"].isolate .commercial-ranking-expand {
   background-color: var(--gd-accent) !important;
   background-image: none !important;
   border-color: var(--gd-accent-bright) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
 }
 html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand:hover,
@@ -15312,7 +15312,7 @@ html body section[role="dialog"].isolate .commercial-ranking-expand:focus-visibl
   background: var(--gd-accent) !important;
   background-image: none !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
   box-shadow: 0 8px 20px -12px rgba(16, 185, 129, .9) !important;
 }
 .dark .brand-shell .commercial-ranking-shell .commercial-ranking-tabs button:not(.is-active):not([aria-selected="true"]) {
@@ -15334,7 +15334,7 @@ html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-rank
   background: var(--gd-accent) !important;
   background-color: var(--gd-accent) !important;
   border-color: var(--gd-accent) !important;
-  color: #062015 !important;
+  color: #040810 !important;
 }
 html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button:not(.is-active):not([aria-selected="true"]) {
   color: #fff !important;
@@ -15510,8 +15510,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 }
 
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
-  background: #10b981 !important;
-  background-color: #10b981 !important;
+  background: #00a8ff !important;
+  background-color: #00a8ff !important;
   border-color: var(--gd-accent-bright) !important;
   color: #fff !important;
 }
@@ -15533,8 +15533,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 }
 
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top .campaign-account-pill .gd-account-count {
-  background: #10b981 !important;
-  background-color: #10b981 !important;
+  background: #00a8ff !important;
+  background-color: #00a8ff !important;
   color: #fff !important;
 }
 
@@ -15575,8 +15575,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 
 .campaigns-workspace .campaign-account-pill .gd-account-count,
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
-  background: #10b981 !important;
-  background-color: #10b981 !important;
+  background: #00a8ff !important;
+  background-color: #00a8ff !important;
   border-color: #34d399 !important;
   color: #fff !important;
 }
@@ -15586,8 +15586,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
   .campaign-hierarchy-tab[data-state="active"]
 ) {
   border-color: var(--gd-accent-bright) !important;
-  background: #10b981 !important;
-  background-color: #10b981 !important;
+  background: #00a8ff !important;
+  background-color: #00a8ff !important;
   background-image: none !important;
   color: #fff !important;
   box-shadow:
@@ -15611,8 +15611,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 }
 
 html.dark body .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active {
-  background: #10b981 !important;
-  background-color: #10b981 !important;
+  background: #00a8ff !important;
+  background-color: #00a8ff !important;
   border-color: var(--gd-accent-bright) !important;
   color: #fff !important;
   box-shadow: inset 0 -3px 0 var(--gd-emerald-deep), 0 4px 12px rgba(16, 185, 129, .22) !important;
@@ -15746,4 +15746,23 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 .campaign-tabs-list {
   max-width: 100% !important;
   overflow-x: hidden !important;
+}
+
+/* Modo Terra: 100% livre de verde. Azul cósmico (#00a8ff / #38bdf8), prata (#e2e8f0), preto (#050811) e branco */
+.brand-shell[data-space-phase="terra"] :is(.dashboard-page, .expert-dashboard, .crm-page) :is(.gd-metric-card, .gd-panel, .rounded-2xl.border, .rounded-xl.border, [class*="rounded-"].border) {
+  border-color: rgba(0, 168, 255, 0.35) !important;
+  background: linear-gradient(145deg, rgba(7, 16, 34, 0.94), rgba(3, 8, 18, 0.98)) !important;
+  box-shadow: 0 4px 20px -4px rgba(0, 168, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.brand-shell[data-space-phase="terra"] :is(.text-emerald-400, .text-emerald-500, .text-emerald-600) {
+  color: #38bdf8 !important;
+}
+
+.brand-shell[data-space-phase="terra"] :is(.bg-emerald-400, .bg-emerald-500, .bg-emerald-600) {
+  background-color: #00a8ff !important;
+}
+
+.brand-shell[data-space-phase="terra"] :is(.border-emerald-400, .border-emerald-500, .border-emerald-600) {
+  border-color: rgba(0, 168, 255, 0.4) !important;
 }
