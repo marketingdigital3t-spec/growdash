@@ -15766,3 +15766,19 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 .brand-shell[data-space-phase="terra"] :is(.border-emerald-400, .border-emerald-500, .border-emerald-600) {
   border-color: rgba(0, 168, 255, 0.4) !important;
 }
+
+@keyframes fuel-shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(250%) skewX(-20deg); }
+}
+
+@keyframes fuel-pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px var(--gd-accent)); opacity: 0.9; }
+  50% { filter: drop-shadow(0 0 16px var(--gd-accent-bright)); opacity: 1; }
+}
+
+.gd-fuel-fill {
+  background: linear-gradient(90deg, var(--gd-accent), var(--gd-accent-bright)) !important;
+  box-shadow: 0 0 16px -2px var(--gd-accent), inset 0 1px 2px rgba(255,255,255,0.4) !important;
+  animation: fuel-pulse-glow 2.5s ease-in-out infinite !important;
+}

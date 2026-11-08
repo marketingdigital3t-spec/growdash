@@ -55,12 +55,16 @@ export function FuelBar({
               {formatCurrency(current)} de {formatCurrency(target)} | <b className="font-bold text-text-primary">{formatPercent(percent, 0)}</b>
             </span>
           </div>
-          <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full border border-card-border bg-bg-elevated/80 shadow-inner">
+          <div className="relative mt-1.5 h-3 w-full overflow-hidden rounded-full border border-card-border/80 bg-black/60 shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] p-0.5">
+            {/* Fundo com rastro de plasma de combustível */}
             <div
-              className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${percent}%` }}
+              className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out overflow-hidden"
+              style={{ width: `${Math.max(percent, 2)}%` }}
             >
-              <span className="absolute right-0 top-0 h-full w-2 bg-white/70 shadow-[0_0_8px_1px_#ffffff]" />
+              {/* Feixe de luz correndo pelo tubo de combustível */}
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[fuel-shimmer_1.6s_ease-in-out_infinite] opacity-75" />
+              {/* Ponta brilhante de propulsão cósmica */}
+              <span className="absolute right-0 top-0 h-full w-2.5 bg-white shadow-[0_0_12px_2px_#ffffff] rounded-full" />
             </div>
           </div>
         </div>
@@ -134,7 +138,7 @@ export function FuelBar({
         {/* Trilho e preenchimento da barra */}
         <div className="relative h-3 w-full overflow-hidden rounded-full border border-card-border bg-bg-elevated/80 shadow-inner">
           <div
-            className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out"
+            className="gd-fuel-fill relative h-full rounded-full transition-all duration-700 ease-out before:absolute before:inset-0 before:rounded-full before:animate-[plasma_2s_linear_infinite] before:bg-[conic-gradient(from_90deg_at_center,rgba(0,168,255,0.3),rgba(255,255,255,0.9),rgba(0,168,255,0.3))]"
             style={{ width: `${percent}%` }}
           >
             {/* Brilho neon na ponta de avanco da barra */}
