@@ -17,6 +17,9 @@ interface MissionDashboardProps {
     sales?: number;
     revenue?: number;
     roas?: number;
+    impressions?: number;
+    clicks?: number;
+    opportunities?: number;
     spendChange?: number;
     leadsChange?: number;
     cplChange?: number;
@@ -96,7 +99,7 @@ export function MissionDashboard({
   };
 
   const active = metrics ?? defaultMetricsByPhase ?? fallback;
-  const safeMetrics = {
+const safeMetrics = {
     spend: Number.isFinite(active.spend) ? Number(active.spend) : fallback.spend,
     leads: Number.isFinite(active.leads) ? Number(active.leads) : fallback.leads,
     cpl: Number.isFinite(active.cpl) ? Number(active.cpl) : fallback.cpl,
@@ -107,6 +110,22 @@ export function MissionDashboard({
     cplChange: Number.isFinite(active.cplChange) ? active.cplChange : undefined,
     revenueChange: Number.isFinite(active.revenueChange) ? active.revenueChange : undefined,
   };
+
+  const visitors = Number.isFinite(metrics?.impressions) ? Number(metrics?.impressions) : 0;
+  const clicks = Number.isFinite(metrics?.clicks) ? Number(metrics?.clicks) : 0;
+  const leads = safeMetrics.leads;
+  const opportunities = Number.isFinite(metrics?.opportunities) ? Number(metrics?.opportunities) : 0;
+  const clients = safeMetrics.sales;
+
+  const realFunnelSteps = [
+    { label: "VISITANTES", value: visitors },
+    { label: "CLIQUES", value: clicks, conversionRate: visitors > 0 ? (clicks / visitors) * 100 : 0 },
+    { label: "LEADS", value: leads, conversionRate: clicks > 0 ? (leads / clicks) * 100 : 0 },
+    { label: "OPORTUNIDADES", value: opportunities, conversionRate: leads > 0 ? (opportunities / leads) * 100 : 0 },
+    { label: "CLIENTES", value: clients, conversionRate: opportunities > 0 ? (clients / opportunities) * 100 : 0 },
+  ];
+
+  const totalConversionRate = visitors > 0 ? (clients / visitors) * 100 : 0;
 
   return (
     <div className={`space-y-5 sm:space-y-6 ${className}`}>
@@ -158,7 +177,7 @@ export function MissionDashboard({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 sm:gap-6">
         {/* Funil Orbital da Missao em 2/3 da largura (8 colunas) */}
         <div className="lg:col-span-8">
-          <OrbitalFunnel monthlyRevenue={Number.isFinite(currentRevenue) ? currentRevenue : safeMetrics.revenue} />
+          <OrbitalFunnel steps={realFunnelSteps} totalConversionRate={totalConversionRate} monthlyRevenue={Number.isFinite(currentRevenue) ? currentRevenue : safeMetrics.revenue} />
         </div>
 
         {/* Radar de Anomalias em 1/3 da largura (4 colunas) */}

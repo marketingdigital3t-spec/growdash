@@ -363,6 +363,9 @@ const Index = () => {
           sales: glassSales.totalQuantity,
           revenue: glassSales.totalGross,
           roas: glassRoas,
+          impressions: dashboardInsights.reduce((sum, r) => sum + Number(r.impressions || 0), 0),
+          clicks: dashboardInsights.reduce((sum, r) => sum + Number(r.clicks || 0), 0),
+          opportunities: dashboardDeals.length,
         }}
       />
 
