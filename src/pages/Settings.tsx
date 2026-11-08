@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Database, Link2, Palette, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { Bell, ChevronRight, Database, Link2, Palette, ShieldCheck, Sparkles, UserRound, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Switch } from "@/components/ui/switch";
-import { PlatformThemePicker } from "@/components/settings/PlatformThemePicker";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
 import { SmartAlertSettingsCard } from "@/components/settings/SmartAlertSettingsCard";
 
@@ -55,8 +54,12 @@ export default function SettingsPage() {
 
       <MotionItem className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-black">Tema da plataforma</h2><p className="text-xs text-muted-foreground">Esmeralda e Obsidian, aplicados em toda a plataforma.</p></div></div>
-          <div className="mt-5"><PlatformThemePicker /></div>
+          <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-black">Evolução da Missão por Faturamento</h2><p className="text-xs text-muted-foreground">A cor da plataforma muda automaticamente pelo faturamento mensal: Terra (Prata), Órbita (Dourado) e Galáxia (Roxo).</p></div></div>
+          <div className="mt-5">
+            <Link to="/jornada" className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs font-bold text-primary transition hover:bg-primary/20">
+              <Sparkles className="h-4 w-4" /> Ver Jornada da Nave e Fases
+            </Link>
+          </div>
         </section>
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-3"><Bell className="h-5 w-5 text-primary" /><div><h2 className="font-black">Notificações</h2><p className="text-xs text-muted-foreground">Alertas críticos e resumos da operação.</p></div></div>

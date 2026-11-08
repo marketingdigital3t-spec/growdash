@@ -82,7 +82,7 @@ describe("Resiliencia do shell contra fase corrompida (AppErrorBoundary)", () =>
   it("integra a FuelBar dentro da barra superior sem duplicar no cockpit nem criar faixa solta", () => {
     // A barra COMBUSTIVEL DA MISSAO fica integrada dentro do proprio header sticky
     // no topo, entre o titulo e a pill de fase, sem criar bloco solto embaixo.
-    expect(growdashLayout).toContain('<FuelBar topbar className="w-full" />');
+    expect(growdashLayout).toContain('<FuelBar topbar');
     expect(growdashLayout).not.toContain(
       '{(pathname === "/" || pathname === "/painel-expert") && <FuelBar className="mb-4" />}',
     );

@@ -44,12 +44,19 @@ function readAccent(): AccentTheme {
   return "emerald";
 }
 
-export function applyAccent(_value?: AccentTheme) {
-  const palette = ACCENT.emerald;
+export function applyAccent(phase?: string) {
   const root = document.documentElement;
-  root.dataset.accent = "emerald";
-  root.dataset.platformTheme = "emerald";
-  // `gd-premium` anchors the premium layer above the legacy theme rules.
+  const activePhase = phase || root.dataset.phase || "terra";
+  const isGalaxia = activePhase === "galaxia";
+  const isOrbita = activePhase === "orbita";
+
+  const themeName = isGalaxia ? "obsidian" : isOrbita ? "metallic-gold" : "silver";
+  const themeColorHex = isGalaxia ? "#A855F7" : isOrbita ? "#FFC107" : "#E2E8F0";
+
+  root.dataset.accent = themeName;
+  root.dataset.platformTheme = themeName;
+  root.dataset.spacePhase = activePhase;
+  root.dataset.phase = activePhase;
   root.classList.add("gd-premium");
 
   let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
@@ -58,10 +65,11 @@ export function applyAccent(_value?: AccentTheme) {
     themeColor.name = "theme-color";
     document.head.appendChild(themeColor);
   }
-  themeColor.content = palette.color;
+  themeColor.content = themeColorHex;
 
-  // Favicon 100% Esmeralda Neon
-  const gradient = `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#D1FAE5"/><stop offset=".45" stop-color="#00FF88"/><stop offset="1" stop-color="#047857"/></linearGradient>`;
+  // Favicon dinamico na cor da fase ativa
+  const stopColor = isGalaxia ? "#A855F7" : isOrbita ? "#FFC107" : "#E2E8F0";
+  const gradient = `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".55" stop-color="${stopColor}"/><stop offset="1" stop-color="#050505"/></linearGradient>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>${gradient}</defs><path fill="url(#s)" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="url(#s)" d="m32 31 12 12-12 12-12-12z"/></svg>`;
   let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!favicon) {

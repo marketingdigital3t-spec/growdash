@@ -30,12 +30,7 @@
     <script>
       (function() {
         try {
-          // Plataforma 100% Esmeralda Neon pura. Sem roxo, sem obsidian.
-          var platform = 'emerald';
-          try { localStorage.setItem('growdash:accent-theme', 'emerald'); } catch(e) {}
-          // Purga preventiva: localStorage cheio estoura QuotaExceededError e
-          // derruba o React inteiro no primeiro setItem. Libera espaco antes
-          // de qualquer modulo escrever no storage.
+          // Purga preventiva contra QuotaExceededError
           try {
             var bytes = 0;
             for (var k in localStorage) {
@@ -52,11 +47,25 @@
               }
             }
           } catch (e) {}
+
+          // A cor deriva 100% da Fase pelo faturamento (Terra: prata, Orbita: dourado, Galaxia: roxo)
+          var phase = 'terra';
+          try {
+            var phaseRaw = localStorage.getItem('growdash:phase');
+            if (phaseRaw) {
+              var parsed = JSON.parse(phaseRaw);
+              var current = parsed && (parsed.state ? parsed.state.currentPhase : parsed.currentPhase);
+              if (current === 'orbita' || current === 'galaxia') phase = current;
+            }
+          } catch (e) {}
+
           var storedMode = localStorage.getItem('theme');
           var mode = storedMode === 'light' ? 'light' : 'dark';
           var root = document.documentElement;
-          root.dataset.accent = 'emerald';
-          root.dataset.platformTheme = 'emerald';
+          root.dataset.phase = phase;
+          root.dataset.spacePhase = phase;
+          root.dataset.platformTheme = phase === 'galaxia' ? 'obsidian' : phase === 'orbita' ? 'metallic-gold' : 'silver';
+          root.dataset.accent = phase === 'galaxia' ? 'obsidian' : phase === 'orbita' ? 'metallic-gold' : 'silver';
           root.classList.add('gd-premium');
           if (mode === 'dark') root.classList.add('dark');
           else root.classList.remove('dark');

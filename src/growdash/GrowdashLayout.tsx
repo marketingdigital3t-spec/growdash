@@ -318,7 +318,7 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="brand-shell growdash-app-shell gd-nebula-bg relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+    <div className="brand-shell growdash-app-shell gd-nebula-bg relative min-h-screen max-w-full overflow-x-hidden text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
       {/* Textura de ruido organico fixo com 3.5% de opacidade (ETAPA 4) */}
       <div className="gd-noise-overlay pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
       {/* Fundo estrelado em Canvas 2D a 60fps com parallax suave */}
@@ -327,7 +327,7 @@ export default function GrowdashLayout() {
       <CosmicObject />
       <aside
         className={cn(
-          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300 overflow-x-hidden",
           showSidebarLabels ? "w-[220px]" : "w-16",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
@@ -378,7 +378,7 @@ export default function GrowdashLayout() {
             </div>
           </div>
         ) : <><TooltipProvider delayDuration={180}>
-        <nav className="gd-sidebar-nav-list growdash-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Navegação principal">
+        <nav className="gd-sidebar-nav-list growdash-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4" aria-label="Navegação principal">
           {visibleSections.map((section) => {
             const isOpen = openSections[section.label] ?? true;
             const sectionContentId = `sidebar-section-${section.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
@@ -522,7 +522,7 @@ export default function GrowdashLayout() {
       )}
 
       <div className={cn(
-        "growdash-content-shell min-h-screen min-w-0 max-w-full transition-[padding] duration-300",
+        "growdash-content-shell min-h-screen min-w-0 max-w-full overflow-x-hidden transition-[padding] duration-300",
         // Keep a visible 16px breathing room between the expanded sidebar and
         // the content canvas. The collapsed state keeps its existing offset.
         effectiveCollapsed ? "lg:pl-16" : "lg:pl-[236px]",
@@ -548,13 +548,8 @@ export default function GrowdashLayout() {
             >
               <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
             </button>
-            {/* Cabecalho cosmico da fase com icone da missao */}
-            <HeaderCosmicBrand pageTitle={pathname === "/" ? "Dashboard" : pathname.replace(/^\//, "").replace(/-/g, " ")} />
-          </div>
-
-          {/* Combustivel da Missao integrado no centro da barra superior (sidebar superior) */}
-          <div className="hidden md:flex flex-1 min-w-[280px] max-w-xl mx-2 lg:mx-4">
-            <FuelBar topbar className="w-full" />
+            {/* Combustivel da Missao substituindo o titulo na barra superior */}
+            <FuelBar topbar className="w-full max-w-xl min-w-[260px] sm:min-w-[360px]" />
           </div>
 
           <div className="flex items-center gap-3 shrink-0">

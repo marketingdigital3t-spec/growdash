@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
-import { PlatformThemePicker } from "@/components/settings/PlatformThemePicker";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { AuthenticatorMfaCard } from "@/components/auth/AuthenticatorMfaCard";
 
@@ -174,12 +173,11 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="appearance" className="gd-panel p-5 sm:p-7">
-          <h2 className="font-black">Cor da plataforma</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Escolha a cor de destaque. A preferência fica salva na sua conta e vale para todos os dispositivos.</p>
-          <div className="mt-4"><PlatformThemePicker /></div>
+          <h2 className="font-black">Cor da plataforma (Fases da Missão)</h2>
+          <p className="mt-1 text-xs text-muted-foreground">A cor da Growdash é automática pelo faturamento mensal: <b className="text-foreground">Terra (Prata)</b> até R$ 50 mil, <b className="text-foreground">Órbita (Dourado)</b> até R$ 100 mil e <b className="text-foreground">Galáxia (Roxo Neon)</b> acima de R$ 100 mil.</p>
           <div className="mt-7 border-t border-border pt-6">
             <h2 className="font-black">Modo de leitura</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Claro ou escuro, independente da cor escolhida acima.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Claro ou escuro para maior conforto visual.</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <AppearanceCard active={mode === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setMode("dark")} />
               <AppearanceCard active={mode === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setMode("light")} />

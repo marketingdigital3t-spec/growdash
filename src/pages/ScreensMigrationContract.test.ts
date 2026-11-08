@@ -32,8 +32,9 @@ describe("ETAPA 5 — Migração Tela por Tela", () => {
     expect(alertsPageSource).toContain("severityFilter");
   });
 
-  it("5.4 Configurações: integra o seletor visual de temas PlatformThemePicker", () => {
-    expect(settingsPageSource).toContain("PlatformThemePicker");
+  it("5.4 Configurações: exibe a Evolução da Missão por Faturamento com link para a Jornada", () => {
+    expect(settingsPageSource).toContain("Evolução da Missão por Faturamento");
+    expect(settingsPageSource).toContain('/jornada');
   });
 
   it("5.5 Tráfego Pago: apresenta tabela consolidada de campanhas e métricas de ROAS", () => {

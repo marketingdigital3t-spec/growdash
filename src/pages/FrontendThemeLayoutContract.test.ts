@@ -89,7 +89,7 @@ describe("frontend theme and responsive contracts", () => {
     expect(whatsappPage).toContain('aria-label="Enviar mensagem"');
     expect(modulePage).toContain("aria-label={`Excluir automação ${automation.name}`}");
     expect(financePage).toContain('aria-label="Incluir imposto Meta no cálculo"');
-    expect(settingsPage).toContain("PlatformThemePicker");
+    expect(settingsPage).toContain("Evolução da Missão por Faturamento");
     expect(themePicker).toContain('aria-label="Cor da plataforma"');
     expect(themePicker).toContain('aria-pressed={active}');
     expect(platformRules).toContain('aria-label="Ativar regra"');
@@ -145,10 +145,9 @@ describe("frontend theme and responsive contracts", () => {
       fileURLToPath(new URL("../hooks/useAccentTheme.ts", import.meta.url)),
       "utf8",
     );
-    expect(themeHook).toContain('root.dataset.platformTheme = "emerald"');
+    expect(themeHook).toContain('root.dataset.platformTheme = themeName');
     expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
     expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
-    expect(themeHook).not.toContain("metallic-gold");
   });
 
   it("renders dark cards with translucent black glass over green cosmic nebula (Image 2 aesthetic)", () => {
@@ -237,8 +236,8 @@ describe("frontend theme and responsive contracts", () => {
     expect(hook).toContain("setMode");
     expect(hook).toContain("applyReadingMode");
 
-    // Profile shows palette picker and reading-mode cards as two separate controls.
-    expect(profile).toContain("PlatformThemePicker");
+    // Profile shows mission phases and reading-mode cards as two separate controls.
+    expect(profile).toContain("Cor da plataforma (Fases da Missão)");
     expect(profile).toContain("Modo de leitura");
     expect(profile).toContain("setMode(\"dark\")");
     expect(profile).toContain("setMode(\"light\")");

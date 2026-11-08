@@ -336,8 +336,11 @@
     overflow-x: clip;
   }
 
+  html,
   body {
     @apply m-0 bg-background text-foreground;
+    overflow-x: hidden;
+    max-width: 100vw;
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
@@ -11726,15 +11729,17 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
    continua independente e mantém seu comportamento próprio. */
 @media (min-width: 1024px) {
   .brand-shell[data-dashboard-scene="true"] {
-    height: 100dvh !important;
     min-height: 100dvh !important;
-    overflow: hidden !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
   }
 
   .brand-shell[data-dashboard-scene="true"] .growdash-content-shell {
-    height: calc(100dvh - 42px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
+    min-height: 100dvh !important;
+    height: auto !important;
+    overflow-y: visible !important;
+    overflow-x: hidden !important;
   }
 
   .brand-shell[data-dashboard-scene="true"] .growdash-main,
@@ -11742,26 +11747,9 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
   .brand-shell[data-dashboard-scene="true"] .dashboard-page {
     min-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .brand-shell[data-dashboard-scene="true"] .growdash-content-frame {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .brand-shell[data-dashboard-scene="true"] .growdash-main {
-    height: 100% !important;
-  }
-
-  .brand-shell[data-dashboard-scene="true"] .gd-page-transition {
     height: auto !important;
-    flex: 1 1 auto !important;
-  }
-
-  .brand-shell[data-dashboard-scene="true"] .dashboard-page {
-    height: 100% !important;
+    overflow-y: visible !important;
+    overflow-x: hidden !important;
   }
 }
 

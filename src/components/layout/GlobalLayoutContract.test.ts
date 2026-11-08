@@ -87,7 +87,7 @@ describe("ETAPA 2 — Contrato do Layout Global e Componentes Cósmicos", () => 
   it("integra o Starfield, CosmicObject, FuelBar e Footer no layout da aplicação", () => {
     expect(layout).toContain("<Starfield />");
     expect(layout).toContain("<CosmicObject />");
-    expect(layout).toContain("<HeaderCosmicBrand");
+    expect(layout).toContain("<FuelBar topbar");
     expect(layout).toContain("<PhasePill />");
     expect(layout).toContain("<ShipLevelCard");
     expect(layout).toContain("<FuelBar");
