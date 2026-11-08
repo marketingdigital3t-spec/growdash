@@ -2406,8 +2406,8 @@ html:not(.dark) .commercial-ranking-shell option {
   --primary: 160 84% 39% !important;
   --primary-foreground: 160 42% 7% !important;
   --ring: 158 64% 52% !important;
-  --gd-semantic-primary: var(--gd-emerald) !important;
-  --gd-content-selection: var(--gd-emerald) !important;
+  --gd-semantic-primary: var(--gd-accent) !important;
+  --gd-content-selection: var(--gd-accent) !important;
 }
 
 html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
@@ -2423,7 +2423,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
       .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
       .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 
 html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
@@ -2449,23 +2449,23 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"],
   [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]
 ) {
-  color: var(--gd-emerald) !important;
-  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-accent) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(
   [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]
-) { background-color: var(--gd-emerald-soft) !important; }
+) { background-color: var(--gd-accent-soft) !important; }
 
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) {
-  background: var(--gd-emerald) !important;
-  border-color: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) {
-  color: var(--gd-emerald-bright) !important;
+  color: var(--gd-accent-bright) !important;
 }
 
 /* Commercial ranking had a self-contained blue/gold palette. Keep its
@@ -2474,11 +2474,11 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   background: #0c1b12 !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) {
-  color: var(--gd-emerald-bright) !important;
-  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-accent-bright) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) {
-  background-color: var(--gd-emerald) !important;
+  background-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="border-white"], [class*="bg-white"], [class*="text-slate-"]) {
@@ -11673,14 +11673,14 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   box-shadow: none !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"][data-state="active"] {
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   background: var(--gd-content-surface) !important;
   color: var(--gd-content-text) !important;
-  box-shadow: inset 0 -2px var(--gd-emerald) !important;
+  box-shadow: inset 0 -2px var(--gd-accent) !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]) {
   background: var(--gd-content-surface) !important;
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 button,
 .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 > div {
@@ -13997,7 +13997,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .meta-
   .campaigns-workspace .campaign-scope-toolbar { flex: 1 1 100% !important; order: 1 !important; }
   .campaigns-workspace .campaign-search-wrap { width: min(100%, 360px) !important; max-width: none !important; margin-left: 0 !important; order: 2 !important; }
   .campaigns-workspace .campaign-date-filter { order: 3 !important; margin-left: auto !important; }
-  .campaigns-workspace .campaign-tabs-header { overflow-x: auto !important; }
+  .campaigns-workspace .campaign-tabs-header { overflow-x: hidden !important; }
   .campaigns-workspace .campaign-tabs-list { min-width: 560px !important; }
 }
 
@@ -14452,17 +14452,17 @@ html:not(.dark) .brand-shell {
   transition-duration: 80ms;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] {
-  background-color: var(--gd-emerald-soft) !important;
-  color: var(--gd-emerald-bright) !important;
-  box-shadow: inset 3px 0 0 var(--gd-emerald) !important;
+  background-color: var(--gd-accent-soft) !important;
+  color: var(--gd-accent-bright) !important;
+  box-shadow: inset 3px 0 0 var(--gd-accent) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip {
   background-color: rgba(16, 185, 129, .2) !important;
-  color: var(--gd-emerald-bright) !important;
+  color: var(--gd-accent-bright) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] svg {
-  color: var(--gd-emerald-bright) !important;
-  stroke: var(--gd-emerald-bright) !important;
+  color: var(--gd-accent-bright) !important;
+  stroke: var(--gd-accent-bright) !important;
 }
 @media (prefers-reduced-motion: reduce) {
   .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link {
@@ -14476,51 +14476,87 @@ html:not(.dark) .brand-shell {
   }
 }
 
-/* Final emerald content contract. Keep this block last so legacy phase and
-   monochrome layers cannot repaint dashboard, expert, CRM or commercial. */
-:root {
-  --gd-emerald: #10b981;
-  --gd-emerald-bright: #34d399;
-  --gd-emerald-deep: #047857;
-  --gd-emerald-soft: rgba(16, 185, 129, .14);
-  --gd-emerald-border: rgba(16, 185, 129, .28);
+/* Paletas dinâmicas por fase de faturamento (Faturamento mensal autoritativo)
+   TERRA: R$ 0 a R$ 50k (Prata / Azul Cósmico: #00a8ff / #38bdf8)
+   ÓRBITA: R$ 50k a R$ 100k (Dourado Solar / Âmbar Estelar: #ffc107 / #ffe082)
+   GALÁXIA: > R$ 100k (Púrpura Neon / Violeta Cósmico: #a855f7 / #d8b4fe) */
+
+html[data-space-phase="terra"],
+.brand-shell[data-space-phase="terra"] {
+  --brand-accent-rgb: 0, 168, 255 !important;
+  --brand-gold: #00a8ff !important;
+  --brand-gold-light: #38bdf8 !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --ring: 199 89% 58% !important;
+  --gd-accent: #00a8ff !important;
+  --gd-accent-bright: #38bdf8 !important;
+  --gd-accent-soft: rgba(0, 168, 255, 0.14) !important;
+  --gd-accent-border: rgba(0, 168, 255, 0.35) !important;
+  --gd-semantic-primary: #00a8ff !important;
+  --gd-content-border: rgba(0, 168, 255, 0.3) !important;
 }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
-  --primary: 160 84% 39% !important;
-  --primary-foreground: 160 42% 7% !important;
-  --ring: 158 64% 52% !important;
-  --gd-semantic-primary: var(--gd-emerald) !important;
-  --gd-content-selection: var(--gd-emerald) !important;
+
+html[data-space-phase="orbita"],
+.brand-shell[data-space-phase="orbita"] {
+  --brand-accent-rgb: 255, 193, 7 !important;
+  --brand-gold: #ffc107 !important;
+  --brand-gold-light: #ffe082 !important;
+  --primary: 45 100% 50% !important;
+  --primary-foreground: 45 40% 8% !important;
+  --ring: 45 100% 58% !important;
+  --gd-accent: #ffc107 !important;
+  --gd-accent-bright: #ffe082 !important;
+  --gd-accent-soft: rgba(255, 193, 7, 0.14) !important;
+  --gd-accent-border: rgba(255, 193, 7, 0.35) !important;
+  --gd-semantic-primary: #ffc107 !important;
+  --gd-content-border: rgba(255, 193, 7, 0.3) !important;
+}
+
+html[data-space-phase="galaxia"],
+.brand-shell[data-space-phase="galaxia"] {
+  --brand-accent-rgb: 168, 85, 247 !important;
+  --brand-gold: #a855f7 !important;
+  --brand-gold-light: #d8b4fe !important;
+  --primary: 271 91% 65% !important;
+  --primary-foreground: 271 40% 8% !important;
+  --ring: 271 91% 68% !important;
+  --gd-accent: #a855f7 !important;
+  --gd-accent-bright: #d8b4fe !important;
+  --gd-accent-soft: rgba(168, 85, 247, 0.14) !important;
+  --gd-accent-border: rgba(168, 85, 247, 0.35) !important;
+  --gd-semantic-primary: #a855f7 !important;
+  --gd-content-border: rgba(168, 85, 247, 0.3) !important;
 }
 html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #07120b 0%, #08130d 52%, #0a1711 100%) !important; color: #f5f7f6 !important; }
 html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #f5fbf7 0%, #fff 55%, #edf8f0 100%) !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { border-color: var(--gd-emerald-border) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { border-color: var(--gd-accent-border) !important; }
 html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important; box-shadow: inset 0 1px rgba(52,211,153,.08), 0 14px 32px rgba(0,0,0,.24) !important; }
 html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: rgba(255,255,255,.94) !important; box-shadow: 0 12px 28px rgba(16,80,40,.08) !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="text-blue"], [class*="text-sky"], [class*="text-cyan"], [class*="text-violet"], [class*="text-indigo"], [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"], [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { color: var(--gd-emerald) !important; border-color: var(--gd-emerald-border) !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { background-color: var(--gd-emerald-soft) !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) { background: var(--gd-emerald) !important; border-color: var(--gd-emerald) !important; color: #062015 !important; }
-.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) { color: var(--gd-emerald-bright) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="text-blue"], [class*="text-sky"], [class*="text-cyan"], [class*="text-violet"], [class*="text-indigo"], [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"], [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { color: var(--gd-accent) !important; border-color: var(--gd-accent-border) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { background-color: var(--gd-accent-soft) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) { background: var(--gd-accent) !important; border-color: var(--gd-accent) !important; color: #062015 !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) { color: var(--gd-accent-bright) !important; }
 .brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) { background: #0c1b12 !important; }
-.brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) { color: var(--gd-emerald-bright) !important; border-color: var(--gd-emerald-border) !important; }
-.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) { background-color: var(--gd-emerald) !important; color: #062015 !important; }
+.brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) { color: var(--gd-accent-bright) !important; border-color: var(--gd-accent-border) !important; }
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) { background-color: var(--gd-accent) !important; color: #062015 !important; }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .dashboard-summary-strip-surface,
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric {
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important;
 }
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric-icon,
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-metric-icon {
-  background: var(--gd-emerald-soft) !important;
-  color: var(--gd-emerald-bright) !important;
-  border-color: var(--gd-emerald-border) !important;
+  background: var(--gd-accent-soft) !important;
+  color: var(--gd-accent-bright) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 .brand-shell .expert-dashboard-tabs button[aria-selected="true"],
 .brand-shell .commercial-ranking-tabs button.is-active,
 .brand-shell .crm-page [role="tab"][aria-selected="true"] {
-  background: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
   color: #062015 !important;
-  border-color: var(--gd-emerald) !important;
+  border-color: var(--gd-accent) !important;
   box-shadow: 0 0 0 1px rgba(52,211,153,.2), 0 8px 18px rgba(16,185,129,.18) !important;
 }
 .gd-expert-tab-active,
@@ -14712,9 +14748,9 @@ html[data-accent="metallic-gold"] {
 .brand-shell .traffic-page-shell,
 .brand-shell .commercial-page,
 .brand-shell .integrations-page {
-  --gd-semantic-primary: var(--gd-emerald) !important;
+  --gd-semantic-primary: var(--gd-accent) !important;
   --gd-semantic-primary-foreground: #062015 !important;
-  --gd-content-selection: var(--gd-emerald) !important;
+  --gd-content-selection: var(--gd-accent) !important;
   --primary: 160 84% 39% !important;
   --primary-foreground: 160 42% 7% !important;
   --ring: 158 64% 52% !important;
@@ -14722,21 +14758,21 @@ html[data-accent="metallic-gold"] {
 .brand-shell :is(
   [class*="text-lime"], [class*="text-green-400"], [class*="text-green-500"], [class*="text-green-600"],
   [class*="text-emerald-400"], [class*="text-emerald-500"], [class*="text-emerald-600"]
-) { color: var(--gd-emerald-bright) !important; }
+) { color: var(--gd-accent-bright) !important; }
 .brand-shell :is(
   [class*="border-lime"], [class*="border-green"], [class*="border-emerald"]
-) { border-color: var(--gd-emerald-border) !important; }
+) { border-color: var(--gd-accent-border) !important; }
 .brand-shell :is(
   [class*="bg-lime"], [class*="bg-green"], [class*="bg-emerald"]
-) { background-color: var(--gd-emerald-soft) !important; }
+) { background-color: var(--gd-accent-soft) !important; }
 .brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]) {
-  background: var(--gd-emerald) !important;
-  border-color: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 .brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]):hover {
-  background: var(--gd-emerald-bright) !important;
-  border-color: var(--gd-emerald-bright) !important;
+  background: var(--gd-accent-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
 }
 
 /* The default shadcn Button carries the legacy `gd-highlight-action` class.
@@ -14747,9 +14783,9 @@ html[data-accent="metallic-gold"] {
 .brand-shell button.gd-highlight-action,
 .brand-shell button.premium-button.gd-highlight-action,
 .growdash-main button.gd-highlight-action {
-  background: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
   box-shadow: 0 8px 22px -14px rgba(16, 185, 129, .95) !important;
 }
@@ -14757,9 +14793,9 @@ html[data-accent="metallic-gold"] {
 .brand-shell button.gd-highlight-action:focus-visible:not(:disabled),
 .growdash-main button.gd-highlight-action:hover:not(:disabled),
 .growdash-main button.gd-highlight-action:focus-visible:not(:disabled) {
-  background: var(--gd-emerald-bright) !important;
+  background: var(--gd-accent-bright) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   color: #062015 !important;
 }
 
@@ -14773,9 +14809,9 @@ html[data-accent="metallic-gold"] {
   [class*="b7ff00"], [class*="B7FF00"], [class*="lime"], [class*="gold-action"],
   [class*="gd-highlight-action"], [class*="premium-button"]
 ) {
-  background: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 .brand-shell :is(
@@ -14790,9 +14826,9 @@ html[data-accent="metallic-gold"] {
   [class*="b7ff00"], [class*="B7FF00"], [class*="lime"], [class*="gold-action"],
   [class*="gd-highlight-action"], [class*="premium-button"]
 ):focus-visible:not(:disabled) {
-  background: var(--gd-emerald-bright) !important;
+  background: var(--gd-accent-bright) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   color: #062015 !important;
 }
 .brand-shell :is(
@@ -14800,9 +14836,9 @@ html[data-accent="metallic-gold"] {
   [class*="text-[#10b981"], [class*="text-[#10B981"],
   [style*="b7ff00"], [style*="B7FF00"], [style*="183, 255, 0"]
 ) {
-  color: var(--gd-emerald-bright) !important;
-  background-color: var(--gd-emerald-soft) !important;
-  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-accent-bright) !important;
+  background-color: var(--gd-accent-soft) !important;
+  border-color: var(--gd-accent-border) !important;
 }
 
 /* Agenda & Turmas contextual actions intentionally use the neutral white
@@ -14856,8 +14892,8 @@ html[data-accent="metallic-gold"] {
   .office-life-speed button.is-active,
   .office-life-autonomy.is-active
 ) {
-  background: var(--gd-emerald) !important;
-  border-color: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 
@@ -14897,10 +14933,10 @@ html[data-accent="metallic-gold"] {
   padding: 8px 14px !important;
 }
 .brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   background: #fff !important;
   color: #0b0b0b !important;
-  box-shadow: inset 0 -2px var(--gd-emerald), 0 2px 8px rgba(0, 0, 0, .16) !important;
+  box-shadow: inset 0 -2px var(--gd-accent), 0 2px 8px rgba(0, 0, 0, .16) !important;
 }
 .brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="false"] {
   color: var(--gd-content-muted) !important;
@@ -14920,14 +14956,14 @@ html.dark body .brand-shell .platform-distribution-card .expert-chart-card-conte
 }
 html.dark body .brand-shell .platform-distribution-card .gd-platform-tabs [role="tab"][data-state="active"] {
   background: #252525 !important;
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   color: var(--gd-content-text-dark) !important;
-  box-shadow: inset 0 -2px var(--gd-emerald) !important;
+  box-shadow: inset 0 -2px var(--gd-accent) !important;
 }
 html.dark body .brand-shell .platform-distribution-card .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]),
 html.dark body .brand-shell .platform-distribution-card .expert-chart-card-content > .flex > .flex-1 button:hover:not(:disabled) {
   background: #252525 !important;
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   color: var(--gd-content-text-dark) !important;
 }
 .brand-shell .expert-dashboard .gd-module-section {
@@ -15023,7 +15059,7 @@ html.dark body .brand-shell .platform-distribution-card .expert-chart-card-conte
   box-shadow: var(--gd-shadow-card) !important;
 }
 .brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card):hover {
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   box-shadow: 0 12px 28px rgba(0, 0, 0, .18) !important;
 }
 @media (min-width: 768px) {
@@ -15193,7 +15229,7 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 /* Commercial final authority: keep controls readable after every legacy theme layer. */
 .commercial-ranking-shell .commercial-ranking-filter,
 .commercial-ranking-shell .commercial-ranking-control {
-  border: 1px solid var(--gd-emerald-border) !important;
+  border: 1px solid var(--gd-accent-border) !important;
   border-radius: 12px !important;
   background: var(--gd-surface-control) !important;
   color: var(--gd-content) !important;
@@ -15205,7 +15241,7 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .dark .commercial-ranking-shell .commercial-ranking-control { color: #fff !important; }
 .commercial-ranking-shell .commercial-ranking-filter:focus-visible,
 .commercial-ranking-shell .commercial-ranking-control:focus-visible {
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   box-shadow: 0 0 0 3px rgba(52,211,153,.2) !important;
 }
 .commercial-ranking-shell .commercial-ranking-filter option,
@@ -15213,25 +15249,25 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .dark .commercial-ranking-shell .commercial-ranking-filter option,
 .dark .commercial-ranking-shell .commercial-ranking-control option { background: #0b1b12 !important; color: #fff !important; }
 .commercial-ranking-shell .commercial-ranking-expand {
-  border: 1px solid var(--gd-emerald-bright) !important;
-  background: var(--gd-emerald) !important;
+  border: 1px solid var(--gd-accent-bright) !important;
+  background: var(--gd-accent) !important;
   color: #062015 !important;
   box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
 }
 .commercial-ranking-shell .commercial-ranking-expand:hover,
-.commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-emerald-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(52,211,153,.22), 0 10px 26px rgba(16,185,129,.34) !important; }
+.commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-accent-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(52,211,153,.22), 0 10px 26px rgba(16,185,129,.34) !important; }
 .commercial-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--gd-emerald-deep) 22%, var(--gd-surface-control)); }
 .commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #047857, #10b981 58%, #6ee7b7); transition: width .55s ease; }
 .commercial-goal-fill::after { content: ""; position: absolute; inset: 0 auto 0 -35%; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); animation: commercial-goal-shimmer 2.8s ease-in-out infinite; }
 @keyframes commercial-goal-shimmer { from { transform: translateX(0); } to { transform: translateX(390%); } }
 @media (prefers-reduced-motion: reduce) { .commercial-goal-fill, .commercial-goal-fill::after { animation: none !important; transition: none !important; } }
-.commercial-ranking-shell :is(section[role="dialog"], section.isolate) { background: var(--gd-surface-card) !important; border-color: var(--gd-emerald-border) !important; }
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) { background: var(--gd-surface-card) !important; border-color: var(--gd-accent-border) !important; }
 
 /* The fullscreen portal is mounted under document.body, outside the page
    shell, so its controls need a portal-local authority as well. */
 :is(section[role="dialog"], section.isolate) .commercial-ranking-filter,
 :is(section[role="dialog"], section.isolate) .commercial-ranking-control {
-  border: 1px solid var(--gd-emerald-border) !important;
+  border: 1px solid var(--gd-accent-border) !important;
   background: var(--gd-surface-control) !important;
   color: var(--gd-content) !important;
 }
@@ -15245,10 +15281,10 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
    locations and themes instead of falling back to the platform button layer. */
 html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand,
 html body section[role="dialog"].isolate .commercial-ranking-expand {
-  background: var(--gd-emerald) !important;
-  background-color: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
+  background-color: var(--gd-accent) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   color: #062015 !important;
   box-shadow: 0 8px 22px rgba(16,185,129,.28) !important;
 }
@@ -15256,8 +15292,8 @@ html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-ex
 html body .brand-shell .commercial-ranking-shell .isolate .commercial-ranking-expand:focus-visible,
 html body section[role="dialog"].isolate .commercial-ranking-expand:hover,
 html body section[role="dialog"].isolate .commercial-ranking-expand:focus-visible {
-  background: var(--gd-emerald-bright) !important;
-  background-color: var(--gd-emerald-bright) !important;
+  background: var(--gd-accent-bright) !important;
+  background-color: var(--gd-accent-bright) !important;
   color: #03140c !important;
 }
 
@@ -15267,15 +15303,15 @@ html body section[role="dialog"].isolate .commercial-ranking-expand:focus-visibl
 .brand-shell .commercial-ranking-shell .commercial-ranking-tabs button {
   background: var(--gd-surface-control) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   color: var(--gd-content-muted) !important;
   box-shadow: none !important;
 }
 .brand-shell .commercial-ranking-shell .commercial-ranking-tabs button.is-active,
 .brand-shell .commercial-ranking-shell .commercial-ranking-tabs button[aria-selected="true"] {
-  background: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
   box-shadow: 0 8px 20px -12px rgba(16, 185, 129, .9) !important;
 }
@@ -15295,9 +15331,9 @@ html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-rank
 }
 html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button.is-active,
 html body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button[aria-selected="true"] {
-  background: var(--gd-emerald) !important;
-  background-color: var(--gd-emerald) !important;
-  border-color: var(--gd-emerald) !important;
+  background: var(--gd-accent) !important;
+  background-color: var(--gd-accent) !important;
+  border-color: var(--gd-accent) !important;
   color: #062015 !important;
 }
 html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial-ranking-tabs button:not(.is-active):not([aria-selected="true"]) {
@@ -15314,19 +15350,19 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
 .brand-shell .brand-topbar .topbar-goal-progress-fill {
   position: relative;
   isolation: isolate;
-  background: var(--gd-emerald) !important;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--gd-emerald-bright) 28%, transparent);
+  background: var(--gd-accent) !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--gd-accent-bright) 28%, transparent);
 }
 .brand-shell .brand-topbar .topbar-goal-progress-track[data-goal-animation="pulse"] .topbar-goal-progress-fill {
   animation: topbar-goal-progress-pulse 2.6s ease-in-out infinite;
 }
 @keyframes topbar-goal-progress-pulse {
   0%, 100% {
-    box-shadow: 0 0 7px color-mix(in srgb, var(--gd-emerald-bright) 28%, transparent), 0 0 0 0 color-mix(in srgb, var(--gd-emerald-bright) 0%, transparent);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gd-accent-bright) 28%, transparent), 0 0 0 0 color-mix(in srgb, var(--gd-accent-bright) 0%, transparent);
     filter: saturate(1);
   }
   50% {
-    box-shadow: 0 0 14px color-mix(in srgb, var(--gd-emerald-bright) 72%, transparent), 0 0 0 2px color-mix(in srgb, var(--gd-emerald-bright) 16%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--gd-accent-bright) 72%, transparent), 0 0 0 2px color-mix(in srgb, var(--gd-accent-bright) 16%, transparent);
     filter: saturate(1.12);
   }
 }
@@ -15347,7 +15383,7 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
 :is(section[role="dialog"], section.isolate) .commercial-ranking-filter {
   background: var(--gd-surface-control) !important;
   background-image: none !important;
-  border-color: var(--gd-emerald-border) !important;
+  border-color: var(--gd-accent-border) !important;
   color: var(--gd-content) !important;
   box-shadow: none !important;
 }
@@ -15476,7 +15512,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
   background: #10b981 !important;
   background-color: #10b981 !important;
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   color: #fff !important;
 }
 
@@ -15549,7 +15585,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
   .meta-toolbar-button-active,
   .campaign-hierarchy-tab[data-state="active"]
 ) {
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   background: #10b981 !important;
   background-color: #10b981 !important;
   background-image: none !important;
@@ -15577,7 +15613,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active {
   background: #10b981 !important;
   background-color: #10b981 !important;
-  border-color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-accent-bright) !important;
   color: #fff !important;
   box-shadow: inset 0 -3px 0 var(--gd-emerald-deep), 0 4px 12px rgba(16, 185, 129, .22) !important;
 }
@@ -15647,7 +15683,7 @@ html:not(.dark) .brand-shell .growdash-main .gd-crm-metric-card > p.text-primary
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
-  color: var(--gd-emerald-bright) !important;
+  color: var(--gd-accent-bright) !important;
 }
 .campaigns-workspace .campaign-result-cell .campaign-result-value,
 .campaigns-workspace .campaign-result-cell .campaign-result-label {
@@ -15661,7 +15697,7 @@ html:not(.dark) .campaigns-workspace .campaign-result-cell {
    emerald action color instead of inheriting the neutral text token. */
 .campaigns-workspace .campaign-date-pill > svg,
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-date-pill > svg {
-  color: var(--gd-emerald-bright) !important;
+  color: var(--gd-accent-bright) !important;
   stroke: currentColor !important;
 }
 
@@ -15694,3 +15730,20 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: var(--gd-content-text) !important;
 }
 
+
+/* Regra autoritativa: Scroll estritamente vertical na sidebar e bloqueio de scroll horizontal em abas */
+.brand-sidebar,
+.brand-sidebar nav,
+.brand-sidebar nav.gd-sidebar-nav-list {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  max-width: 100% !important;
+}
+
+.traffic-page-shell,
+.campaigns-workspace,
+.campaign-tabs-header,
+.campaign-tabs-list {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}

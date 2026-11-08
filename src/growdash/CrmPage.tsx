@@ -1398,16 +1398,35 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
     setSelectedFunnelId(deal.rd_funnel_id || "");
     setSelectedStageId(deal.rd_stage_id || "");
     const source = attribution || automaticAttribution;
-    setTrackingDraft(source ? {
-      source: source.source,
-      campaign: source.campaignName,
-      adset: source.adsetName,
-      creative: source.adName,
-      form: source.formName || source.formId,
-      platform: source.platform,
-      placement: source.placement,
-      isOrganic: source.isOrganic,
-    } : {});
+    const cf = (deal.custom_fields || {}) as Record<string, unknown>;
+    const findCustom = (patterns: string[]) => {
+      for (const [k, v] of Object.entries(cf)) {
+        const lower = k.toLowerCase();
+        if (patterns.some((p) => lower.includes(p)) && v != null && String(v).trim()) {
+          return String(v).trim();
+        }
+      }
+      return "";
+    };
+
+    const resolvedSource = source?.source || deal.utm_source || deal.source || findCustom(["origem", "source"]) || "";
+    const resolvedCampaign = source?.campaignName || deal.meta_campaign_name || deal.utm_campaign || deal.campaign || findCustom(["campanha", "campaign"]) || "";
+    const resolvedAdset = source?.adsetName || deal.meta_adset_name || deal.utm_term || findCustom(["conjunto", "adset", "ad set", "ad_set"]) || "";
+    const resolvedCreative = source?.adName || deal.meta_ad_name || deal.utm_content || findCustom(["criativo", "anúncio", "anuncio", "ad name", "ad_name"]) || "";
+    const resolvedForm = source?.formName || source?.formId || deal.meta_form_name || deal.meta_form_id || findCustom(["formulário", "formulario", "form"]) || "";
+    const resolvedPlatform = source?.platform || deal.meta_platform || (deal.meta_lead_id ? "Meta Ads" : findCustom(["plataforma", "platform"])) || (resolvedCampaign ? "Meta Ads" : "");
+    const resolvedPlacement = source?.placement || deal.meta_placement || findCustom(["posicionamento", "placement"]) || "";
+
+    setTrackingDraft({
+      source: resolvedSource,
+      campaign: resolvedCampaign,
+      adset: resolvedAdset,
+      creative: resolvedCreative,
+      form: resolvedForm,
+      platform: resolvedPlatform,
+      placement: resolvedPlacement,
+      isOrganic: source?.isOrganic ?? deal.meta_is_organic ?? null,
+    });
   }, [attribution, automaticAttribution, deal]);
 
   if (!deal) return null;

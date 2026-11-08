@@ -1638,7 +1638,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAdsets.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "adset" })}>
+                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "adset", campaignId: a.campaignId || "", campaignName: a.campaignName || "Campanha", spend: Number(a.spend || 0), impressions: Number(a.impressions || 0), reach: Number(a.reach || 0), clicks: Number(a.clicks || 0), leads: Number(a.leads || 0) })}>
                         <TableCell style={adsetCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             <StatusDot status={a.status} />
@@ -1700,7 +1700,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAds.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "ad" })}>
+                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "ad", campaignId: a.campaignId || "", campaignName: a.campaignName || "Campanha", adsetName: a.adsetName || "Conjunto", spend: Number(a.spend || 0), impressions: Number(a.impressions || 0), reach: Number(a.reach || 0), clicks: Number(a.clicks || 0), leads: Number(a.leads || 0) })}>
                         <TableCell style={adCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             {a.thumbnail_url ? (

@@ -13,45 +13,32 @@ import { useCallback, useEffect, useState } from "react";
  * Obsidian can be read in light or dark. The `.dark` class is kept in sync
  * because ~100 legacy rules in `index.css` still depend on it.
  */
-export type AccentTheme = "obsidian" | "emerald";
+export type AccentTheme = "terra" | "orbita" | "galaxia";
 export type ReadingMode = "light" | "dark";
-export const PLATFORM_THEME_STORAGE_KEY = "growdash:accent-theme";
-
-const ACCENT: Record<AccentTheme, { html: string; color: string }> = {
-  obsidian: { html: "obsidian", color: "#07090E" },
-  emerald: { html: "emerald", color: "#F4F8F6" },
-};
+export const PLATFORM_THEME_STORAGE_KEY = "growdash:phase-theme";
 
 export const PLATFORM_THEMES: { value: AccentTheme; label: string; description: string }[] = [
-  { value: "obsidian", label: "Obsidian", description: "Paleta violeta neon sobre preto cósmico." },
-  { value: "emerald", label: "Esmeralda", description: "Paleta verde sobre superfícies translúcidas." },
+  { value: "terra", label: "Terra", description: "Fase inicial: azul cósmico e prata até R$ 50 mil." },
+  { value: "orbita", label: "Órbita", description: "Fase de aceleração: dourado solar de R$ 50 mil a R$ 100 mil." },
+  { value: "galaxia", label: "Galáxia", description: "Fase de escala máxima: púrpura e violeta neon acima de R$ 100 mil." },
 ];
 
-/**
- * Resolves the platform palette. This MUST mirror the inline bootstrap in
- * `index.html` exactly: when the bootstrap writes `obsidian` because the
- * browser prefers dark, the hook has to agree, otherwise next-themes
- * re-applies the `.dark` class right after and the two layers fight.
- */
 function readAccent(): AccentTheme {
   try {
-    // Force migrate any legacy obsidian preference to emerald
     const saved = window.localStorage.getItem(PLATFORM_THEME_STORAGE_KEY);
-    if (saved === "obsidian") {
-      window.localStorage.setItem(PLATFORM_THEME_STORAGE_KEY, "emerald");
-    }
+    if (saved === "orbita" || saved === "galaxia" || saved === "terra") return saved;
   } catch {}
-  return "emerald";
+  return "terra";
 }
 
 export function applyAccent(phase?: string) {
   const root = document.documentElement;
-  const activePhase = phase || root.dataset.phase || "terra";
+  const activePhase = (phase === "orbita" || phase === "galaxia") ? phase : (root.dataset.phase || root.dataset.spacePhase || "terra");
   const isGalaxia = activePhase === "galaxia";
   const isOrbita = activePhase === "orbita";
 
-  const themeName = isGalaxia ? "obsidian" : isOrbita ? "metallic-gold" : "silver";
-  const themeColorHex = isGalaxia ? "#A855F7" : isOrbita ? "#FFC107" : "#E2E8F0";
+  const themeName = isGalaxia ? "galaxia" : isOrbita ? "orbita" : "terra";
+  const themeColorHex = isGalaxia ? "#A855F7" : isOrbita ? "#FFC107" : "#00A8FF";
 
   root.dataset.accent = themeName;
   root.dataset.platformTheme = themeName;

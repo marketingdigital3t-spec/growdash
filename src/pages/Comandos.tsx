@@ -48,7 +48,8 @@ export default function ComandosPage() {
 
   // Metricas reais calculadas exclusivamente a partir das acoes executadas pelo usuario
   const totalActions = logs.length;
-  const totalHoursSaved = logs.reduce((sum, l) => sum + 0.35, 0);
+  // Horas economizadas: calculadas apenas se o usuário tiver executado comandos reais
+  const totalHoursSaved = logs.length > 0 ? (logs.length * 0.25) : 0;
 
   const handleExecute = async (rec: AiRecommendation) => {
     setExecutingId(rec.id);
