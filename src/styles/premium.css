@@ -1302,20 +1302,50 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
    purple, exactly as the phase means.
    -------------------------------------------------------------------------- */
 
+html[data-space-phase="terra"],
 .brand-shell[data-space-phase="terra"] {
   --phase-accent: 226, 232, 240;
-  --phase-accent-bright: #f8fafc;
+  --phase-accent-bright: #ffffff;
   --phase-accent-dim: #94a3b8;
+  --palette-accent: #E2E8F0 !important;
+  --palette-accent-bright: #ffffff !important;
+  --palette-accent-rgb: 226, 232, 240 !important;
+  --primary: 210 20% 94% !important;
+  --primary-foreground: 210 40% 6% !important;
+  --primary-neon: #ffffff !important;
+  --ring: 210 20% 82% !important;
+  --sidebar-primary: 210 20% 94% !important;
+  --card-glow-color: 226, 232, 240 !important;
 }
+html[data-space-phase="orbita"],
 .brand-shell[data-space-phase="orbita"] {
   --phase-accent: 255, 193, 7;
   --phase-accent-bright: #ffe082;
   --phase-accent-dim: #a66b00;
+  --palette-accent: #FFC107 !important;
+  --palette-accent-bright: #ffe082 !important;
+  --palette-accent-rgb: 255, 193, 7 !important;
+  --primary: 45 100% 50% !important;
+  --primary-foreground: 45 40% 8% !important;
+  --primary-neon: #ffe082 !important;
+  --ring: 45 100% 58% !important;
+  --sidebar-primary: 45 100% 50% !important;
+  --card-glow-color: 255, 193, 7 !important;
 }
+html[data-space-phase="galaxia"],
 .brand-shell[data-space-phase="galaxia"] {
   --phase-accent: 168, 85, 247;
   --phase-accent-bright: #d8b4fe;
   --phase-accent-dim: #6c3483;
+  --palette-accent: #A855F7 !important;
+  --palette-accent-bright: #d8b4fe !important;
+  --palette-accent-rgb: 168, 85, 247 !important;
+  --primary: 271 91% 65% !important;
+  --primary-foreground: 271 40% 8% !important;
+  --primary-neon: #d8b4fe !important;
+  --ring: 271 91% 68% !important;
+  --sidebar-primary: 271 91% 65% !important;
+  --card-glow-color: 168, 85, 247 !important;
 }
 
 /* Cards follow the phase instead of the fixed emerald. */
