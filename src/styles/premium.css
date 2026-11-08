@@ -43,8 +43,8 @@ html[data-platform-theme="emerald"] {
   --ring: 199 89% 58% !important;
   --sidebar-primary: 199 89% 48% !important;
   --sidebar-ring: 199 89% 58% !important;
-  --gd-emerald: #10B981 !important;
-  --gd-emerald-bright: #00FF88 !important;
+  --gd-emerald: #00a8ff !important;
+  --gd-emerald-bright: #38bdf8 !important;
   --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
   --gd-emerald-border: rgba(0, 168, 255, .35) !important;
 
@@ -52,8 +52,8 @@ html[data-platform-theme="emerald"] {
   --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
   --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
   --palette-favicon-start: #D1FAE5;
-  --palette-favicon-mid: #00FF88;
-  --palette-favicon-end: #10B981;
+  --palette-favicon-mid: #38bdf8;
+  --palette-favicon-end: #00a8ff;
 }
 
 /* --- Palette: Fallback esmeralda neon (zero roxo em producao) -------------- */
@@ -71,15 +71,15 @@ html[data-platform-theme="obsidian"] {
   --ring: 199 89% 58% !important;
   --sidebar-primary: 199 89% 48% !important;
   --sidebar-ring: 199 89% 58% !important;
-  --gd-emerald: #10B981 !important;
-  --gd-emerald-bright: #00FF88 !important;
+  --gd-emerald: #00a8ff !important;
+  --gd-emerald-bright: #38bdf8 !important;
   --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
   --gd-emerald-border: rgba(0, 168, 255, .35) !important;
   --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65) !important;
   --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45) !important;
   --palette-favicon-start: #D1FAE5;
-  --palette-favicon-mid: #00FF88;
-  --palette-favicon-end: #10B981;
+  --palette-favicon-mid: #38bdf8;
+  --palette-favicon-end: #00a8ff;
 }
 
 /* --- Mode: light surfaces -------------------------------------------------- */
@@ -131,8 +131,8 @@ html:not(.dark) {
   --bg-canvas: #F4F8F6;
   --surface-card: rgba(255, 255, 255, 0.82);
   --surface-raised: #FFFFFF;
-  --border-subtle: rgba(6, 78, 59, 0.10);
-  --border-strong: rgba(6, 78, 59, 0.20);
+  --border-subtle: rgba(56, 189, 248, 0.15);
+  --border-strong: rgba(0, 168, 255, 0.25);
   --text-primary: #0B1A15;
   --text-secondary: #2D4A3E;
   --text-muted: #4D6B5F;
@@ -158,14 +158,14 @@ html:not(.dark) {
   --gd-content-bg: var(--bg-canvas);
   --gd-content-surface: var(--surface-card);
   --gd-content-panel: var(--surface-raised);
-  --gd-shadow-card: 0 10px 30px -18px rgba(6, 78, 59, 0.28), 0 2px 6px -3px rgba(6, 78, 59, 0.12);
+  --gd-shadow-card: 0 10px 30px -18px rgba(0, 168, 255, 0.28), 0 2px 6px -3px rgba(56, 189, 248, 0.18);
   --gd-control-active-thumb: #FFFFFF;
 
   --gd-status-critical: #DC2626;
   --gd-status-attention: #D97706;
   --gd-status-observation: #CA8A04;
   --gd-status-initial: #2563EB;
-  --gd-status-healthy: #047857;
+  --gd-status-healthy: #0284c7;
   --gd-status-inactive: #64748B;
 
   --gd-glow-emerald: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
@@ -384,15 +384,15 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
   justify-content: center !important;
   border: 1px solid rgba(0, 168, 255, 0.35) !important;
   background: rgba(0, 168, 255, 0.12) !important;
-  color: #00FF88 !important;
+  color: #38bdf8 !important;
   border-radius: 8px !important;
   box-shadow: 0 0 14px -3px rgba(0, 168, 255, 0.35) !important;
 }
 
 .brand-shell .gd-metric-card .gd-metric-icon svg,
 .brand-shell .dashboard-terra-card .gd-metric-icon svg {
-  color: #00FF88 !important;
-  stroke: #00FF88 !important;
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
   filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.65)) !important;
 }
 
@@ -883,7 +883,7 @@ html.gd-premium .brand-shell {
 }
 
 html.gd-premium:not(.dark) .brand-shell {
-  --gd-shadow-card: 0 10px 30px -18px rgba(6, 78, 59, 0.28), 0 2px 6px -3px rgba(6, 78, 59, 0.12) !important;
+  --gd-shadow-card: 0 10px 30px -18px rgba(0, 168, 255, 0.28), 0 2px 6px -3px rgba(56, 189, 248, 0.18) !important;
   --gd-control-active-thumb: #FFFFFF !important;
 }
 
@@ -955,8 +955,8 @@ html.gd-premium:not(.dark) .brand-shell[data-space-phase] .dashboard-page
   background: rgba(255, 255, 255, 0.88) !important;
   background-color: rgba(255, 255, 255, 0.88) !important;
   background-image: none !important;
-  border: 1px solid rgba(6, 78, 59, 0.12) !important;
-  box-shadow: 0 10px 30px -18px rgba(6, 78, 59, 0.22), 0 2px 6px -3px rgba(6, 78, 59, 0.08) !important;
+  border: 1px solid rgba(56, 189, 248, 0.18) !important;
+  box-shadow: 0 10px 30px -18px rgba(0, 168, 255, 0.22), 0 2px 6px -3px rgba(56, 189, 248, 0.10) !important;
 }
 
 /* Ícone de status dos cards de KPI com o quadradinho verde esmeralda idêntico à Imagem 2 */
@@ -973,14 +973,14 @@ html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon {
 
 html.gd-premium .brand-shell .gd-metric-icon svg,
 html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon svg {
-  color: #00FF88 !important;
-  stroke: #00FF88 !important;
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
   filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.70)) !important;
 }
 
 /* Donut de distribuição por plataforma: harmônico em verde esmeralda */
 html.gd-premium .brand-shell .platform-distribution-card .recharts-pie-sector:first-child path {
-  fill: #10B981 !important;
+  fill: #00a8ff !important;
 }
 
 /* Legacy: `.brand-shell[data-dashboard-scene="true"] … blur(10px) !important` —
@@ -1026,7 +1026,7 @@ html.gd-premium .brand-shell .space-mission-track {
 
 html.gd-premium .brand-shell[data-space-phase] .space-mission-track > span,
 html.gd-premium .brand-shell .space-mission-track > span {
-  background: linear-gradient(90deg, #059669 0%, #10B981 55%, #00FF88 100%) !important;
+  background: linear-gradient(90deg, #059669 0%, #00a8ff 55%, #38bdf8 100%) !important;
   box-shadow:
     0 0 26px 3px rgba(0, 168, 255, 0.85),
     0 0 12px 2px rgba(56, 189, 248, 0.95),
@@ -1034,7 +1034,7 @@ html.gd-premium .brand-shell .space-mission-track > span {
 }
 
 html.gd-premium.dark .brand-shell .space-mission-track > span {
-  background: linear-gradient(90deg, #047857 0%, #10B981 50%, #00FF88 100%) !important;
+  background: linear-gradient(90deg, #0284c7 0%, #00a8ff 50%, #38bdf8 100%) !important;
   box-shadow:
     0 0 28px 4px rgba(0, 168, 255, 0.90),
     0 0 14px 2px rgba(56, 189, 248, 1),

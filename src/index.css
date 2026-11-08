@@ -86,7 +86,7 @@
     --color-accent: #C56508;
     --color-accent-hover: #9C4606;
     --color-accent-soft: #FFF0D6;
-    --color-success: #07845A;
+    --color-success: #0369a1;
     --color-warning: #B45B00;
     --color-error: #C62C36;
     --color-info: #1670D2;
@@ -203,8 +203,8 @@
     --sidebar-icon-active: 158 64% 52%;
     --sidebar-ring: 158 64% 52%;
     --brand-gold: #00a8ff;
-    --brand-gold-light: #6ee7b7;
-    --brand-bronze: #047857;
+    --brand-gold-light: #7dd3fc;
+    --brand-bronze: #0284c7;
     --brand-accent-rgb: 16, 185, 129;
   }
 
@@ -1806,7 +1806,7 @@ html:not(.dark) {
     animation-delay: calc(var(--confetti-index) * -.28s);
   }
 
-  .goal-confetti i:nth-child(3n) { --confetti-color: #34d399; width: 5px; height: 8px; }
+  .goal-confetti i:nth-child(3n) { --confetti-color: #38bdf8; width: 5px; height: 8px; }
   .goal-confetti i:nth-child(4n) { --confetti-color: #fb7185; border-radius: 50%; }
 
   @keyframes goal-confetti-fall {
@@ -2396,10 +2396,10 @@ html:not(.dark) .commercial-ranking-shell option {
    Terra/blue and monochrome declarations without changing data behavior. */
 :root {
   --gd-emerald: #00a8ff;
-  --gd-emerald-bright: #34d399;
-  --gd-emerald-deep: #047857;
-  --gd-emerald-soft: rgba(16, 185, 129, .14);
-  --gd-emerald-border: rgba(16, 185, 129, .28);
+  --gd-emerald-bright: #38bdf8;
+  --gd-emerald-deep: #0284c7;
+  --gd-emerald-soft: rgba(56, 189, 248, .18);
+  --gd-emerald-border: rgba(0, 168, 255, .32);
 }
 
 .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
@@ -2438,7 +2438,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
       .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
       .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
   background: rgba(255, 255, 255, .94) !important;
-  box-shadow: 0 12px 28px rgba(16, 80, 40, .08) !important;
+  box-shadow: 0 12px 28px rgba(0, 168, 255, .08) !important;
 }
 
 /* Blue/cyan/violet utilities in content are legacy brand colors. Semantic
@@ -3794,8 +3794,8 @@ html[data-accent="monochrome"] {
   --sidebar-icon-active: 158 64% 52% !important;
   --sidebar-ring: 158 64% 52% !important;
   --brand-gold: #00a8ff !important;
-  --brand-gold-light: #6ee7b7 !important;
-  --brand-bronze: #047857 !important;
+  --brand-gold-light: #7dd3fc !important;
+  --brand-bronze: #0284c7 !important;
   --brand-accent-rgb: 16, 185, 129 !important;
 }
 
@@ -14280,7 +14280,7 @@ html.dark .brand-shell:has(.traffic-page-shell) {
 
 .brand-shell :is(button, a)[data-state="active"],
 .brand-shell [role="tab"][aria-selected="true"] {
-  border-color: rgba(16, 185, 129, .5) !important;
+  border-color: rgba(0, 168, 255, .45) !important;
 }
 
 /* The legacy visual layer contains !important monochrome/blue fallbacks.
@@ -14314,7 +14314,7 @@ html[data-accent] {
 .brand-shell :is(.bg-primary, [class~="bg-primary"], .gold-action, .premium-button, .meta-toolbar-primary) {
   color: #0B1304 !important;
   background-color: #10B981 !important;
-  border-color: rgba(16, 185, 129, .65) !important;
+  border-color: rgba(0, 168, 255, .55) !important;
 }
 
 .brand-shell :is(.text-primary, [class*="text-primary"]) {
@@ -14369,7 +14369,7 @@ html.dark .brand-shell {
   --gd-content-bg: #071007 !important;
   --gd-content-surface: #0e190f !important;
   --gd-content-panel: #142116 !important;
-  --gd-content-border: rgba(16, 185, 129, .17) !important;
+  --gd-content-border: rgba(56, 189, 248, .22) !important;
   --gd-content-muted: #9eafa2 !important;
 }
 
@@ -14456,7 +14456,7 @@ html:not(.dark) .brand-shell {
   box-shadow: inset 3px 0 0 var(--gd-accent) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip {
-  background-color: rgba(16, 185, 129, .2) !important;
+  background-color: rgba(56, 189, 248, .25) !important;
   color: var(--gd-accent-bright) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] svg {
@@ -14572,15 +14572,15 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
    layers above cannot repaint KPI/content surfaces green. */
 :root {
   --gd-accent: #00a8ff;
-  --gd-accent-bright: #34d399;
-  --gd-accent-soft: rgba(16, 185, 129, .12);
-  --gd-accent-border: rgba(16, 185, 129, .26);
+  --gd-accent-bright: #38bdf8;
+  --gd-accent-soft: rgba(56, 189, 248, .18);
+  --gd-accent-border: rgba(0, 168, 255, .30);
 }
 
 html[data-accent] {
   --brand-accent-rgb: 16, 185, 129 !important;
   --brand-gold: #00a8ff !important;
-  --brand-gold-light: #34d399 !important;
+  --brand-gold-light: #38bdf8 !important;
   --primary: 160 84% 39% !important;
   --primary-foreground: 160 42% 7% !important;
   --ring: 158 64% 52% !important;
@@ -14727,7 +14727,7 @@ html[data-accent="metallic-gold"] {
   --brand-accent-rgb: 16, 185, 129 !important;
   --brand-gold: #10B981 !important;
   --brand-gold-light: #34D399 !important;
-  --brand-bronze: #047857 !important;
+  --brand-bronze: #0284c7 !important;
   --color-accent: #10B981 !important;
   --color-accent-hover: #34D399 !important;
   --color-focus: #10B981 !important;
@@ -15256,7 +15256,7 @@ html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-sta
 .commercial-ranking-shell .commercial-ranking-expand:hover,
 .commercial-ranking-shell .commercial-ranking-expand:focus-visible { background: var(--gd-accent-bright) !important; color: #03140c !important; box-shadow: 0 0 0 3px rgba(56,189,248,.25), 0 10px 26px rgba(0,168,255,.35) !important; }
 .commercial-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--gd-emerald-deep) 22%, var(--gd-surface-control)); }
-.commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #047857, #00a8ff 58%, #6ee7b7); transition: width .55s ease; }
+.commercial-goal-fill { position: relative; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0284c7, #00a8ff 58%, #7dd3fc); transition: width .55s ease; }
 .commercial-goal-fill::after { content: ""; position: absolute; inset: 0 auto 0 -35%; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); animation: commercial-goal-shimmer 2.8s ease-in-out infinite; }
 @keyframes commercial-goal-shimmer { from { transform: translateX(0); } to { transform: translateX(390%); } }
 @media (prefers-reduced-motion: reduce) { .commercial-goal-fill, .commercial-goal-fill::after { animation: none !important; transition: none !important; } }
@@ -15343,7 +15343,7 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
    changes only light and shadow, so the measured width never jumps and a
    loading/unavailable state cannot look like a confirmed value. */
 .brand-shell .brand-topbar .topbar-goal-progress-track {
-  background: rgba(16, 185, 129, .14) !important;
+  background: rgba(56, 189, 248, .18) !important;
   border-color: rgba(0, 168, 255, .35) !important;
 }
 .brand-shell .brand-topbar .topbar-goal-progress-fill {
@@ -15505,7 +15505,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   background: #17241e !important;
   background-color: #17241e !important;
   border-color: rgba(0, 168, 255, .55) !important;
-  box-shadow: inset 0 -2px 0 rgba(4, 120, 87, .72), 0 4px 14px rgba(16, 185, 129, .12) !important;
+  box-shadow: inset 0 -2px 0 rgba(4, 120, 87, .72), 0 4px 14px rgba(56, 189, 248, .18) !important;
 }
 
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
@@ -15576,7 +15576,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
   background: #00a8ff !important;
   background-color: #00a8ff !important;
-  border-color: #34d399 !important;
+  border-color: #38bdf8 !important;
   color: #fff !important;
 }
 
@@ -15780,4 +15780,66 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   background: linear-gradient(90deg, var(--gd-accent), var(--gd-accent-bright)) !important;
   box-shadow: 0 0 16px -2px var(--gd-accent), inset 0 1px 2px rgba(255,255,255,0.4) !important;
   animation: fuel-pulse-glow 2.5s ease-in-out infinite !important;
+}
+
+/* ==========================================================================
+   AUTORITATIVO: MODO TERRA 100% AZUL CÓSMICO, PRETO E PRATA (ZERO VERDE)
+   ========================================================================== */
+:root[data-phase="terra"],
+:root[data-space-phase="terra"],
+html[data-space-phase="terra"],
+.brand-shell[data-space-phase="terra"],
+.brand-shell {
+  --card-border: rgba(0, 168, 255, 0.35) !important;
+  --card-border-active: rgba(56, 189, 248, 0.75) !important;
+  --card-bg: rgba(6, 12, 24, 0.85) !important;
+  --primary: 199 89% 48% !important;
+  --primary-neon: #38bdf8 !important;
+  --primary-soft: #00a8ff !important;
+  --accent: #00a8ff !important;
+  --border: 215 25% 16% !important;
+}
+
+/* Barra lateral esquerda: aba ativa em azul neon sobre preto */
+.brand-shell[data-space-phase="terra"] .brand-sidebar nav a[aria-current="page"],
+.brand-shell[data-space-phase="terra"] .brand-sidebar nav a[data-state="active"],
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(0, 168, 255, 0.28) 0%, rgba(0, 168, 255, 0.06) 100%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 0 16px -2px rgba(0, 168, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.brand-shell[data-space-phase="terra"] .brand-sidebar nav a[aria-current="page"]::before,
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"]::before {
+  background: #38bdf8 !important;
+  box-shadow: 0 0 12px 2px #38bdf8 !important;
+}
+
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip {
+  background-color: rgba(0, 168, 255, 0.25) !important;
+  color: #38bdf8 !important;
+}
+
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] svg {
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
+}
+
+/* Cards de KPI, Funil e Radar: bordas em azul elétrico */
+.brand-shell[data-space-phase="terra"] :is(.dashboard-page, .expert-dashboard, .crm-page) article,
+.brand-shell[data-space-phase="terra"] :is(.dashboard-page, .expert-dashboard, .crm-page) .border-card-border,
+.brand-shell[data-space-phase="terra"] :is(.dashboard-page, .expert-dashboard, .crm-page) .rounded-2xl.border,
+.brand-shell[data-space-phase="terra"] :is(.dashboard-page, .expert-dashboard, .crm-page) .rounded-xl.border {
+  border-color: rgba(0, 168, 255, 0.38) !important;
+  box-shadow: 0 0 16px -4px rgba(0, 168, 255, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.brand-shell[data-space-phase="terra"] .border-card-border-active {
+  border-color: rgba(56, 189, 248, 0.75) !important;
+}
+
+/* Barra de filtros superior */
+.brand-shell[data-space-phase="terra"] .dashboard-page :is(.border-border, [class*="border-border"]) {
+  border-color: rgba(0, 168, 255, 0.28) !important;
 }
