@@ -6,6 +6,7 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
+import rocketLogo from "@/assets/rocket-logo.jpg";
 
 type Mode = "login" | "register";
 
@@ -116,16 +117,23 @@ export default function Auth() {
     <section className="auth-hero-panel" aria-label="Growdash">
       <div className="auth-neural-field" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
       <div className="auth-hero-smoke auth-hero-smoke-a" aria-hidden="true" /><div className="auth-hero-smoke auth-hero-smoke-b" aria-hidden="true" />
-      <div className="auth-hero-symbol" aria-hidden="true"><BrandMark /></div>
-      <div className="auth-hero-copy">
-        <p className="auth-hero-tagline">Quem enxerga o negócio inteiro, escala mais rápido.</p>
-        <p className="auth-hero-kicker">Growdash Intelligence System</p>
+      <div className="auth-hero-symbol mb-4" aria-hidden="true">
+        <div className="relative h-44 w-44 overflow-hidden rounded-3xl border border-sky-400/30 shadow-[0_0_40px_-5px_rgba(0,168,255,0.6)]">
+          <img src={rocketLogo} alt="Growdash Mission Control" className="h-full w-full object-cover" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        </div>
       </div>
-      <p className="auth-hero-description"><BarChart3 />Leads, vendas, funil e faturamento — tudo em um só lugar. A Growdash mostra o que está gerando lucro na sua empresa.</p>
-      <p className="auth-hero-foot">Transforme dados em decisões. Decisões em crescimento.</p>
+      <div className="auth-hero-copy">
+        <p className="auth-hero-tagline">Da Terra à Galáxia: lance, acelere e escale seu negócio.</p>
+        <p className="auth-hero-kicker text-sky-400 font-bold uppercase tracking-[0.2em]">Growdash Mission Control</p>
+      </div>
+      <p className="auth-hero-description"><BarChart3 className="text-sky-400" />Tráfego, leads, funil e faturamento alimentando o combustível da sua missão. Suba de fase em tempo real.</p>
+      <p className="auth-hero-foot text-slate-400">Sua jornada começa na Terra, ganha órbita e conquista a Galáxia.</p>
     </section>
     <motion.section initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .5, ease: "easeOut" }} className="auth-card-premium">
-      <div className="auth-card-symbol" aria-hidden="true"><BrandMark /></div>
+      <div className="auth-card-symbol" aria-hidden="true">
+        <img src={rocketLogo} alt="Growdash" className="h-12 w-12 rounded-xl object-cover border border-sky-400/40 shadow-[0_0_15px_rgba(0,168,255,0.4)]" />
+      </div>
       <div className="auth-card-top"><div><h1>{mode === "login" && <span className="sr-only">Entrar na Growdash. </span>}{mode === "login" ? "Seja Bem-Vindo(a)" : "Criar conta"}</h1><p aria-hidden="true">{mode === "login" ? "Acesse sua operação Growdash." : "Crie o acesso da sua operação."}</p></div></div>
       {mode === "register" && <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={false} onClick={() => setMode("login")}>Entrar</button><button type="button" role="tab" aria-selected className="is-active">Cadastrar</button></div>}
       <form onSubmit={handleSubmit} className="auth-form-premium">
