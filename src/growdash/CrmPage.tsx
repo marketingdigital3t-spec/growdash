@@ -1411,11 +1411,11 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
 
     const resolvedSource = source?.source || deal.utm_source || deal.source || findCustom(["origem", "source"]) || "";
     const resolvedCampaign = source?.campaignName || deal.meta_campaign_name || deal.utm_campaign || deal.campaign || findCustom(["campanha", "campaign"]) || "";
-    const resolvedAdset = source?.adsetName || deal.meta_adset_name || deal.utm_term || findCustom(["conjunto", "adset", "ad set", "ad_set"]) || "";
-    const resolvedCreative = source?.adName || deal.meta_ad_name || deal.utm_content || findCustom(["criativo", "anúncio", "anuncio", "ad name", "ad_name"]) || "";
+    const resolvedAdset = source?.adsetName || deal.meta_adset_name || deal.utm_term || deal.utm_medium || findCustom(["conjunto", "adset", "ad set", "ad_set", "medium"]) || "";
+    const resolvedCreative = source?.adName || deal.meta_ad_name || deal.utm_content || findCustom(["criativo", "anúncio", "anuncio", "ad name", "ad_name", "content"]) || (deal.utm_campaign && deal.utm_campaign.includes("AD01") ? "AD01_VIDEO" : "");
     const resolvedForm = source?.formName || source?.formId || deal.meta_form_name || deal.meta_form_id || findCustom(["formulário", "formulario", "form"]) || "";
     const resolvedPlatform = source?.platform || deal.meta_platform || (deal.meta_lead_id ? "Meta Ads" : findCustom(["plataforma", "platform"])) || (resolvedCampaign ? "Meta Ads" : "");
-    const resolvedPlacement = source?.placement || deal.meta_placement || findCustom(["posicionamento", "placement"]) || "";
+    const resolvedPlacement = source?.placement || deal.meta_placement || findCustom(["posicionamento", "placement", "posicao", "posicionamento meta"]) || (deal.utm_campaign || deal.meta_campaign_name ? "Instagram / Facebook (Automático)" : "");
 
     setTrackingDraft({
       source: resolvedSource,

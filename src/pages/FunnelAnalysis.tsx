@@ -837,21 +837,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           {/* Funil Orbital interativo: comparativo por etapa e destaque do gargalo */}
-          <MotionItem>
-            <FunnelOrbitalInteractive
-              stages={[
-                { key: "leads", label: "LEADS", current: periodAnalytics.totalLeads ?? 0 },
-                { key: "qualified", label: "QUALIFICADOS", current: periodAnalytics.qualifiedLeads ?? 0 },
-                { key: "opportunities", label: "NEGOCIAÇÕES", current: periodAnalytics.conversions ?? 0 },
-                { key: "won", label: "CLIENTES", current: periodAnalytics.stages.find((s) => s.is_won)?.count ?? 0 },
-              ]}
-              conversionRates={[
-                periodAnalytics.qualificationRate ?? 0,
-                periodAnalytics.conversionRate ?? 0,
-                periodAnalytics.avgTicket > 0 ? periodAnalytics.revenue / Math.max(periodAnalytics.avgTicket, 1) : 0,
-              ]}
-            />
-          </MotionItem>
+          
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

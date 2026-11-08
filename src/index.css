@@ -2134,7 +2134,7 @@ html:not(.dark) .commercial-ranking-shell option {
 .campaigns-workspace .campaign-action-button,
 .campaigns-workspace .campaign-action-select,
 .campaigns-workspace .campaign-columns-control > button { height: 36px !important; min-height: 36px !important; border-radius: 6px !important; font-size: 14px !important; }
-.campaigns-workspace .campaign-primary-actions > .campaign-action-button:first-child { background: #00a400 !important; border-color: #00a400 !important; color: #fff !important; }
+.campaigns-workspace .campaign-primary-actions > .campaign-action-button:first-child { background: #00a8ff !important; border-color: #00a8ff !important; color: #fff !important; }
 .campaigns-workspace .campaign-primary-actions .meta-toolbar-button { border-radius: 6px !important; }
 .campaigns-workspace .campaign-secondary-actions .meta-toolbar-button,
 .campaigns-workspace .campaign-secondary-actions .campaign-columns-control > button { border-radius: 6px !important; background: #fff !important; color: #1c1e21 !important; }
@@ -15842,4 +15842,33 @@ html[data-space-phase="terra"],
 /* Barra de filtros superior */
 .brand-shell[data-space-phase="terra"] .dashboard-page :is(.border-border, [class*="border-border"]) {
   border-color: rgba(0, 168, 255, 0.28) !important;
+}
+
+/* Harmonização da tela de Campanhas com o Modo Terra (Azul Cósmico / Preto) */
+.campaigns-workspace .campaign-scope-action.meta-toolbar-button-active,
+.campaigns-workspace .meta-toolbar-button-active {
+  background: rgba(0, 168, 255, 0.2) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 0 12px -2px rgba(0, 168, 255, 0.5) !important;
+}
+
+.campaigns-workspace :is(.campaign-scope-action, .meta-toolbar-button):hover {
+  border-color: rgba(0, 168, 255, 0.5) !important;
+  color: #ffffff !important;
+}
+
+.campaigns-workspace [data-state="checked"] {
+  background-color: #00a8ff !important;
+}
+
+/* Anti-verde autoritativo: fundo dos cards 100% preto espacial + borda azul neon em todas as abas */
+.brand-shell[data-space-phase="terra"] :is(article, .gd-metric-card, .gd-panel, .rounded-2xl.border, .rounded-xl.border, .dashboard-glass-card, .dashboard-video-glass) {
+  background: linear-gradient(145deg, #070e1c 0%, #030712 100%) !important;
+  border-color: rgba(0, 168, 255, 0.35) !important;
+  box-shadow: 0 4px 20px -4px rgba(0, 168, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.brand-shell[data-space-phase="terra"] :is(.bg-card, .bg-card-bg, [class*="bg-card-bg"]) {
+  background: linear-gradient(145deg, #070e1c 0%, #030712 100%) !important;
 }
