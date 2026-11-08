@@ -64,7 +64,7 @@ export function AchievementModal({ phase, revenue, date, onClose }: AchievementM
             {/* Poligono hexagonal */}
             <polygon
               points="50 3, 90 25, 90 75, 50 97, 10 75, 10 25"
-              fill="rgba(7, 18, 12, 0.85)"
+              fill="rgba(4, 9, 20, 0.92)"
               stroke={neonColor}
               strokeWidth="2.5"
             />

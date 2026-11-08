@@ -99,7 +99,7 @@ export function FunnelOrbitalInteractive({
                       : isSelected
                       ? "var(--primary-neon)"
                       : "var(--card-border-active)",
-                    backgroundColor: "rgba(7, 18, 12, 0.55)",
+                    backgroundColor: "rgba(5, 12, 24, 0.75)",
                     boxShadow: isBottleneck
                       ? "0 0 18px -4px var(--danger)"
                       : isSelected

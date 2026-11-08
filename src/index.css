@@ -2430,8 +2430,7 @@ html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .comme
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
       .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
       .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
-  background: linear-gradient(145deg, rgba(18, 37, 25, .96), rgba(10, 24, 16, .96)) !important;
-  box-shadow: inset 0 1px rgba(52, 211, 153, .08), 0 14px 32px rgba(0, 0, 0, .24) !important;
+  background: linear-gradient(145deg, rgba(7, 16, 34, .95), rgba(3, 8, 18, .98)) !important; box-shadow: inset 0 1px rgba(56, 189, 248, .12), 0 14px 32px rgba(0, 0, 0, .45) !important;
 }
 
 html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
@@ -2482,7 +2481,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   color: #040810 !important;
 }
 .brand-shell .commercial-ranking-shell :is([class*="border-white"], [class*="bg-white"], [class*="text-slate-"]) {
-  border-color: rgba(52, 211, 153, .18) !important;
+  border-color: rgba(56, 189, 248, .25) !important;
 }
 
 /* Spatial phase shell: decorative only, keeping all content and controls above it. */
@@ -14651,7 +14650,7 @@ html:not(.dark) .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-ca
 
 .brand-shell :is(.gd-metric-card, .gd-funnel-kpi, .gd-funnel-media-kpi,
   .dashboard-primary-kpis > *):hover {
-  border-color: rgba(52, 211, 153, .5) !important;
+  border-color: rgba(0, 168, 255, .45) !important;
   box-shadow: inset 0 1px rgba(255,255,255,.1), 0 20px 44px -36px rgba(16,185,129,.36) !important;
 }
 
@@ -15345,7 +15344,7 @@ html.dark body .brand-shell .growdash-main .commercial-ranking-shell .commercial
    loading/unavailable state cannot look like a confirmed value. */
 .brand-shell .brand-topbar .topbar-goal-progress-track {
   background: rgba(16, 185, 129, .14) !important;
-  border-color: rgba(52, 211, 153, .28) !important;
+  border-color: rgba(0, 168, 255, .35) !important;
 }
 .brand-shell .brand-topbar .topbar-goal-progress-fill {
   position: relative;
@@ -15505,7 +15504,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill {
   background: #17241e !important;
   background-color: #17241e !important;
-  border-color: rgba(52, 211, 153, .62) !important;
+  border-color: rgba(0, 168, 255, .55) !important;
   box-shadow: inset 0 -2px 0 rgba(4, 120, 87, .72), 0 4px 14px rgba(16, 185, 129, .12) !important;
 }
 
@@ -15522,7 +15521,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top .campaign-account-pill {
   background: #17241e !important;
   background-color: #17241e !important;
-  border-color: rgba(52, 211, 153, .62) !important;
+  border-color: rgba(0, 168, 255, .55) !important;
   color: #f2f4f7 !important;
 }
 
@@ -15541,7 +15540,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar .campaign-action-select {
   background: #252728 !important;
   background-color: #252728 !important;
-  border-color: rgba(52, 211, 153, .42) !important;
+  border-color: rgba(0, 168, 255, .40) !important;
   color: #f2f4f7 !important;
 }
 

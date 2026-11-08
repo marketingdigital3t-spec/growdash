@@ -113,7 +113,7 @@ export function OrbitalFunnel({
                   style={{
                     width: `${widthPercent}%`,
                     borderColor: ringColor,
-                    backgroundColor: "rgba(7, 18, 12, 0.55)",
+                    backgroundColor: "rgba(5, 12, 24, 0.75)",
                     boxShadow: `0 0 16px -4px ${ringColor}, inset 0 0 14px rgba(0, 0, 0, 0.6)`,
                   }}
                 >
