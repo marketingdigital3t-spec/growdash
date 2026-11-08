@@ -39,7 +39,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
+import { SpacePhaseBackground, SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
 import { Starfield } from "@/components/cosmic/Starfield";
 import { CosmicObject } from "@/components/cosmic/CosmicObject";
@@ -323,6 +323,8 @@ export default function GrowdashLayout() {
       <div className="gd-noise-overlay pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
       {/* Fundo estrelado em Canvas 2D a 60fps com parallax suave */}
       <Starfield />
+      {/* Fundo espacial oficial da Fase com Planeta Terra 8K, atmosfera e estrelas em movimento */}
+      <SpacePhaseBackground phase={spacePhase} dashboardScene={pathname === "/"} />
       {/* Elemento cosmico exclusivo da fase ativa (Terra, Orbita, Galaxia) */}
       <CosmicObject />
       <aside
@@ -527,8 +529,9 @@ export default function GrowdashLayout() {
         // the content canvas. The collapsed state keeps its existing offset.
         effectiveCollapsed ? "lg:pl-16" : "lg:pl-[236px]",
       )}>
-        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-3 border-b px-3 py-2.5 text-foreground shadow-sm sm:px-6">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 items-center justify-between gap-3 border-b px-3 py-2 text-foreground shadow-sm sm:px-6">
+          {/* Controles de navegacao a esquerda */}
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
@@ -548,12 +551,15 @@ export default function GrowdashLayout() {
             >
               <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
             </button>
-            {/* Combustivel da Missao substituindo o titulo na barra superior */}
-            <FuelBar topbar className="w-full max-w-xl min-w-[260px] sm:min-w-[360px]" />
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Pill FASE: TERRA / ORBITA / GALAXIA */}
+          {/* Combustivel da Missao DE UMA PONTA A OUTRA (100% da largura central) */}
+          <div className="flex-1 min-w-0 mx-1 sm:mx-3">
+            <FuelBar topbar className="w-full" />
+          </div>
+
+          {/* Pill FASE: TERRA / ORBITA / GALAXIA a direita */}
+          <div className="flex items-center gap-2 shrink-0">
             <PhasePill />
           </div>
         </header>

@@ -1304,18 +1304,21 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
 
 html[data-space-phase="terra"],
 .brand-shell[data-space-phase="terra"] {
-  --phase-accent: 226, 232, 240;
-  --phase-accent-bright: #ffffff;
-  --phase-accent-dim: #94a3b8;
-  --palette-accent: #E2E8F0 !important;
-  --palette-accent-bright: #ffffff !important;
-  --palette-accent-rgb: 226, 232, 240 !important;
-  --primary: 210 20% 94% !important;
-  --primary-foreground: 210 40% 6% !important;
-  --primary-neon: #ffffff !important;
-  --ring: 210 20% 82% !important;
-  --sidebar-primary: 210 20% 94% !important;
-  --card-glow-color: 226, 232, 240 !important;
+  /* FASE TERRA: AZUL CELESTE / CYAN ELETRICO + PRETO + FONTE BRANCA */
+  --phase-accent: 0, 168, 255;
+  --phase-accent-bright: #00d2ff;
+  --phase-accent-dim: #0284c7;
+  --palette-accent: #00a8ff !important;
+  --palette-accent-bright: #00d2ff !important;
+  --palette-accent-rgb: 0, 168, 255 !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --primary-neon: #00d2ff !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --card-glow-color: 0, 168, 255 !important;
+  --foreground: 0 0% 100% !important;
+  --text-primary: #ffffff !important;
 }
 html[data-space-phase="orbita"],
 .brand-shell[data-space-phase="orbita"] {
