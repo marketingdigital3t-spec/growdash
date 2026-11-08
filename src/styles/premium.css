@@ -29,28 +29,28 @@
 /* --- Palette: Esmeralda Neon Elétrico (100% pure green — ZERO purple) ---- */
 :root,
 html[data-platform-theme="emerald"] {
-  --palette-accent: #10B981;
-  --palette-accent-bright: #00FF88;
-  --palette-accent-soft: rgba(16, 185, 129, .16);
-  --palette-accent-rgb: 16, 185, 129;
-  --palette-secondary: #059669;
+  --palette-accent: #00A8FF;
+  --palette-accent-bright: #38BDF8;
+  --palette-accent-soft: rgba(0, 168, 255, .16);
+  --palette-accent-rgb: 0, 168, 255;
+  --palette-secondary: #0284C7;
   --palette-secondary-rgb: 5, 150, 105;
   --card-glow-color: 16, 185, 129;
   --purple-glow-color: 16, 185, 129; /* Anula qualquer roxo em Esmeralda */
   --emerald-glow-color: 16, 185, 129;
 
-  --primary: 160 84% 39% !important;
-  --ring: 158 64% 52% !important;
-  --sidebar-primary: 160 84% 39% !important;
-  --sidebar-ring: 158 64% 52% !important;
+  --primary: 199 89% 48% !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-ring: 199 89% 58% !important;
   --gd-emerald: #10B981 !important;
   --gd-emerald-bright: #00FF88 !important;
-  --gd-emerald-soft: rgba(16, 185, 129, .16) !important;
-  --gd-emerald-border: rgba(16, 185, 129, .35) !important;
+  --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
+  --gd-emerald-border: rgba(0, 168, 255, .35) !important;
 
   /* Glow neon intenso verde elétrico */
-  --palette-glow-accent: 0 0 28px -2px rgba(16, 185, 129, 0.55), 0 0 10px 1px rgba(0, 255, 136, 0.65);
-  --palette-glow-secondary: 0 0 24px -4px rgba(16, 185, 129, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
+  --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
+  --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
   --palette-favicon-start: #D1FAE5;
   --palette-favicon-mid: #00FF88;
   --palette-favicon-end: #10B981;
@@ -58,25 +58,25 @@ html[data-platform-theme="emerald"] {
 
 /* --- Palette: Fallback esmeralda neon (zero roxo em producao) -------------- */
 html[data-platform-theme="obsidian"] {
-  --palette-accent: #10B981 !important;
-  --palette-accent-bright: #00FF88 !important;
-  --palette-accent-soft: rgba(16, 185, 129, .16) !important;
-  --palette-accent-rgb: 16, 185, 129 !important;
-  --palette-secondary: #059669 !important;
+  --palette-accent: #00A8FF !important;
+  --palette-accent-bright: #38BDF8 !important;
+  --palette-accent-soft: rgba(0, 168, 255, .16) !important;
+  --palette-accent-rgb: 0, 168, 255 !important;
+  --palette-secondary: #0284C7 !important;
   --palette-secondary-rgb: 5, 150, 105 !important;
   --card-glow-color: 16, 185, 129 !important;
   --purple-glow-color: 16, 185, 129 !important;
   --emerald-glow-color: 16, 185, 129 !important;
-  --primary: 160 84% 39% !important;
-  --ring: 158 64% 52% !important;
-  --sidebar-primary: 160 84% 39% !important;
-  --sidebar-ring: 158 64% 52% !important;
+  --primary: 199 89% 48% !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-ring: 199 89% 58% !important;
   --gd-emerald: #10B981 !important;
   --gd-emerald-bright: #00FF88 !important;
-  --gd-emerald-soft: rgba(16, 185, 129, .16) !important;
-  --gd-emerald-border: rgba(16, 185, 129, .35) !important;
-  --palette-glow-accent: 0 0 28px -2px rgba(16, 185, 129, 0.55), 0 0 10px 1px rgba(0, 255, 136, 0.65) !important;
-  --palette-glow-secondary: 0 0 24px -4px rgba(16, 185, 129, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45) !important;
+  --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
+  --gd-emerald-border: rgba(0, 168, 255, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45) !important;
   --palette-favicon-start: #D1FAE5;
   --palette-favicon-mid: #00FF88;
   --palette-favicon-end: #10B981;
@@ -169,64 +169,64 @@ html:not(.dark) {
   --gd-status-inactive: #64748B;
 
   --gd-glow-emerald: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
-  --gd-glow-purple: 0 0 24px -4px rgba(16, 185, 129, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
+  --gd-glow-purple: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
 }
 
 /* --- Mode: dark surfaces (Esmeralda Puro — idêntico à Imagem 2 aprovada) ---- */
 html.dark {
   color-scheme: dark;
 
-  --background: 160 30% 3.5%;
-  --foreground: 150 40% 98%;
-  --card: 156 30% 8.5%;
-  --card-foreground: 150 40% 98%;
-  --popover: 156 30% 8.5%;
-  --popover-foreground: 150 40% 98%;
-  --primary: 158 64% 52%;
-  --primary-foreground: 163 90% 7%;
-  --secondary: 158 24% 13%;
-  --secondary-foreground: 150 40% 98%;
-  --muted: 158 24% 13%;
-  --muted-foreground: 156 16% 65%;
-  --accent: 158 26% 14%;
-  --accent-foreground: 152 76% 80%;
+  --background: 220 40% 3.5%;
+  --foreground: 210 40% 98%;
+  --card: 222 35% 6%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 35% 6%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 12%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 215 25% 12%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 199 80% 14%;
+  --accent-foreground: 199 89% 94%;
   --destructive: 358 75% 59%;
   --destructive-foreground: 0 0% 100%;
-  --success: 158 64% 52%;
-  --success-foreground: 163 90% 7%;
+  --success: 199 89% 48%;
+  --success-foreground: 0 0% 100%;
   --warning: 38 92% 50%;
   --warning-foreground: 38 90% 8%;
-  --border: 158 25% 18%;
-  --input: 158 24% 16%;
-  --ring: 158 64% 52%;
+  --border: 215 25% 16%;
+  --input: 215 25% 14%;
+  --ring: 199 89% 58%;
   --radius: 0.875rem;
 
-  --sidebar-background: 160 35% 4%;
-  --sidebar-foreground: 150 25% 85%;
-  --sidebar-primary: 158 64% 52%;
-  --sidebar-primary-foreground: 163 90% 7%;
-  --sidebar-accent: 158 30% 12%;
-  --sidebar-accent-foreground: 152 76% 80%;
-  --sidebar-border: 158 25% 16%;
-  --sidebar-ring: 158 64% 52%;
+  --sidebar-background: 222 40% 4%;
+  --sidebar-foreground: 215 20% 85%;
+  --sidebar-primary: 199 89% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 25% 12%;
+  --sidebar-accent-foreground: 199 89% 94%;
+  --sidebar-border: 215 25% 14%;
+  --sidebar-ring: 199 89% 58%;
 
   --brand-gold: var(--palette-accent-bright);
   --brand-gold-light: var(--palette-accent-bright);
   --brand-bronze: var(--palette-accent);
   --brand-accent-rgb: var(--palette-accent-rgb);
 
-  --bg-canvas: #020403;
-  --surface-card: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82));
-  --surface-card-color: rgba(4, 9, 6, 0.78);
-  --surface-raised: rgba(8, 16, 12, 0.88);
-  --border-subtle: rgba(0, 255, 136, 0.22);
-  --border-strong: rgba(0, 255, 136, 0.42);
+  --bg-canvas: #030712;
+  --surface-card: linear-gradient(145deg, rgba(8, 15, 30, 0.85), rgba(4, 8, 18, 0.95));
+  --surface-card-color: rgba(6, 12, 24, 0.88);
+  --surface-raised: rgba(10, 18, 36, 0.88);
+  --border-subtle: rgba(56, 189, 248, 0.22);
+  --border-strong: rgba(0, 168, 255, 0.42);
   --text-primary: #FFFFFF;
   --text-secondary: #D1FAE5;
   --text-muted: #94A3B8;
-  --accent-primary: #00FF88;
-  --accent-secondary: #10B981;
-  --purple-accent: #10B981;
+  --accent-primary: #38BDF8;
+  --accent-secondary: #00A8FF;
+  --purple-accent: #38BDF8;
   --purple-glow-color: 16, 185, 129;
   --emerald-glow-color: 16, 185, 129;
 
@@ -257,7 +257,7 @@ html.dark {
   --gd-status-inactive: #94A3B8;
 
   --gd-glow-emerald: 0 0 24px -4px rgba(52, 211, 153, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.50);
-  --gd-glow-purple: 0 0 28px -2px rgba(16, 185, 129, 0.55), 0 0 10px 1px rgba(0, 255, 136, 0.65);
+  --gd-glow-purple: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
 }
 
 /* --------------------------------------------------------------------------
@@ -279,26 +279,26 @@ html body .brand-shell.growdash-app-shell {
   background-color: var(--bg-canvas) !important;
   background-image:
     /* Feixe diagonal de fumaça verde — o núcleo brilhante da galáxia */
-    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(0, 255, 136, 0.22) 0%, rgba(16, 185, 129, 0.12) 34%, transparent 68%),
-    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(16, 185, 129, 0.16) 0%, transparent 62%),
+    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(56, 189, 248, 0.22) 0%, rgba(0, 168, 255, 0.12) 34%, transparent 68%),
+    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(0, 168, 255, 0.16) 0%, transparent 62%),
     /* Halos esmeralda difusos que difumam a fumaça no vazio */
-    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(0, 255, 136, 0.14) 0%, transparent 58%),
+    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(56, 189, 248, 0.14) 0%, transparent 58%),
     radial-gradient(ellipse 34% 20% at 18% 74%, rgba(5, 150, 105, 0.16) 0%, transparent 60%),
     /* Núcleo luminoso da galáxia */
-    radial-gradient(circle 320px at 68% 78%, rgba(0, 255, 136, 0.20) 0%, transparent 70%),
-    linear-gradient(158deg, rgba(16, 185, 129, 0.06) 0%, transparent 46%) !important;
+    radial-gradient(circle 320px at 68% 78%, rgba(56, 189, 248, 0.20) 0%, transparent 70%),
+    linear-gradient(158deg, rgba(0, 168, 255, 0.06) 0%, transparent 46%) !important;
   background-attachment: fixed;
 }
 
 /* Tema Claro: mesma galáxia, respirando sobre um vazio quase branco */
 html:not(.dark) .brand-shell.growdash-app-shell {
   background-image:
-    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(16, 185, 129, 0.10) 0%, rgba(5, 150, 105, 0.06) 34%, transparent 68%),
-    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(16, 185, 129, 0.08) 0%, transparent 62%),
-    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(0, 255, 136, 0.07) 0%, transparent 58%),
+    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(0, 168, 255, 0.10) 0%, rgba(5, 150, 105, 0.06) 34%, transparent 68%),
+    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(0, 168, 255, 0.08) 0%, transparent 62%),
+    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(56, 189, 248, 0.07) 0%, transparent 58%),
     radial-gradient(ellipse 34% 20% at 18% 74%, rgba(5, 150, 105, 0.08) 0%, transparent 60%),
-    radial-gradient(circle 320px at 68% 78%, rgba(16, 185, 129, 0.08) 0%, transparent 70%),
-    linear-gradient(158deg, rgba(16, 185, 129, 0.05) 0%, transparent 46%) !important;
+    radial-gradient(circle 320px at 68% 78%, rgba(0, 168, 255, 0.08) 0%, transparent 70%),
+    linear-gradient(158deg, rgba(0, 168, 255, 0.05) 0%, transparent 46%) !important;
 }
 
 /* Textura — ruído orgânico + poeira estelar fina sobre o vazio */
@@ -370,9 +370,9 @@ html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashbo
 html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
   background: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
-  border-color: rgba(0, 255, 136, 0.22) !important;
+  border-color: rgba(56, 189, 248, 0.22) !important;
   box-shadow:
-    inset 0 1px 0 rgba(0, 255, 136, 0.14),
+    inset 0 1px 0 rgba(56, 189, 248, 0.14),
     0 18px 40px -20px rgba(0, 0, 0, 0.75) !important;
 }
 
@@ -382,18 +382,18 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border: 1px solid rgba(16, 185, 129, 0.35) !important;
-  background: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(0, 168, 255, 0.35) !important;
+  background: rgba(0, 168, 255, 0.12) !important;
   color: #00FF88 !important;
   border-radius: 8px !important;
-  box-shadow: 0 0 14px -3px rgba(16, 185, 129, 0.35) !important;
+  box-shadow: 0 0 14px -3px rgba(0, 168, 255, 0.35) !important;
 }
 
 .brand-shell .gd-metric-card .gd-metric-icon svg,
 .brand-shell .dashboard-terra-card .gd-metric-icon svg {
   color: #00FF88 !important;
   stroke: #00FF88 !important;
-  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.65)) !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.65)) !important;
 }
 
 /* Luminous top edge — 100% pure to the active theme palette */
@@ -404,7 +404,7 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
   inset: 0 10% auto 10%;
   height: 1px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.75), rgba(0, 255, 136, 0.65), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 168, 255, 0.75), rgba(56, 189, 248, 0.65), transparent);
   content: "";
   opacity: 0.70;
   pointer-events: none;
@@ -417,24 +417,24 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
 
 /* Level 2 — hover elevation with Esmeralda Neon electric glow */
 .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
-  border-color: rgba(0, 255, 136, 0.65) !important;
+  border-color: rgba(56, 189, 248, 0.65) !important;
   box-shadow:
-    0 20px 48px -20px rgba(16, 185, 129, 0.70),
-    0 0 32px -4px rgba(0, 255, 136, 0.55),
+    0 20px 48px -20px rgba(0, 168, 255, 0.70),
+    0 0 32px -4px rgba(56, 189, 248, 0.55),
     0 0 10px 1px rgba(110, 231, 183, 0.80),
     inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
   transform: translateY(-3px);
 }
 
 html.dark .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card) {
-  border-color: rgba(16, 185, 129, 0.28) !important;
+  border-color: rgba(0, 168, 255, 0.28) !important;
 }
 
 html.dark .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
-  border-color: rgba(0, 255, 136, 0.85) !important;
+  border-color: rgba(56, 189, 248, 0.85) !important;
   box-shadow:
-    0 20px 50px -20px rgba(16, 185, 129, 0.80),
-    0 0 34px -4px rgba(0, 255, 136, 0.65),
+    0 20px 50px -20px rgba(0, 168, 255, 0.80),
+    0 0 34px -4px rgba(56, 189, 248, 0.65),
     0 0 12px 2px rgba(110, 231, 183, 0.90),
     inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
   transform: translateY(-3px);
@@ -442,9 +442,9 @@ html.dark .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-te
 
 html:not(.dark) .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
   box-shadow:
-    0 22px 48px -26px rgba(16, 185, 129, 0.40),
-    0 0 0 1px rgba(16, 185, 129, 0.35),
-    0 0 24px -6px rgba(0, 255, 136, 0.45),
+    0 22px 48px -26px rgba(0, 168, 255, 0.40),
+    0 0 0 1px rgba(0, 168, 255, 0.35),
+    0 0 24px -6px rgba(56, 189, 248, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
 }
 
@@ -794,7 +794,7 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
 /* Preview: Modo Escuro — preto cósmico com nebulosa e neon esmeralda */
 .gd-theme-swatch-preview-dark {
   background:
-    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(16, 185, 129, 0.38) 0%, transparent 66%),
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(0, 168, 255, 0.38) 0%, transparent 66%),
     radial-gradient(ellipse 60% 50% at 10% 90%, rgba(5, 150, 105, 0.30) 0%, transparent 62%),
     linear-gradient(135deg, #0A120F 0%, #050A08 52%, #040907 100%);
 }
@@ -802,8 +802,8 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
 /* Preview: Modo Claro — superfícies translúcidas com o mesmo neon esmeralda */
 .gd-theme-swatch-preview-light {
   background:
-    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(0, 255, 136, 0.20) 0%, transparent 66%),
-    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(16, 185, 129, 0.26) 0%, transparent 62%),
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(56, 189, 248, 0.20) 0%, transparent 66%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(0, 168, 255, 0.26) 0%, transparent 62%),
     linear-gradient(135deg, #FFFFFF 0%, #F4F8F6 52%, #E8F5EE 100%);
 }
 
@@ -819,7 +819,7 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
   left: 13px;
   width: 46%;
   background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.55);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.55);
 }
 
 .gd-theme-swatch-preview i:nth-child(2) {
@@ -833,8 +833,8 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
   top: 39px;
   left: 13px;
   width: 20%;
-  background: rgba(0, 255, 136, 0.55);
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.70);
+  background: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.70);
 }
 
 .gd-theme-swatch-preview-light i:nth-child(1) {
@@ -848,7 +848,7 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
 
 .gd-theme-swatch-preview-light i:nth-child(3) {
   background: rgba(0, 170, 110, 0.62);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
 }
 /* --------------------------------------------------------------------------
    12. Neutralizing legacy gradients — the nebula is the atmosphere
@@ -934,9 +934,9 @@ html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
   background: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
   background-color: rgba(4, 9, 6, 0.78) !important;
   background-image: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
-  border: 1px solid rgba(0, 255, 136, 0.22) !important;
+  border: 1px solid rgba(56, 189, 248, 0.22) !important;
   box-shadow:
-    inset 0 1px 0 rgba(0, 255, 136, 0.14),
+    inset 0 1px 0 rgba(56, 189, 248, 0.14),
     0 18px 40px -20px rgba(0, 0, 0, 0.75) !important;
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
@@ -965,17 +965,17 @@ html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border: 1px solid rgba(16, 185, 129, 0.35) !important;
-  background: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(0, 168, 255, 0.35) !important;
+  background: rgba(0, 168, 255, 0.12) !important;
   border-radius: 8px !important;
-  box-shadow: 0 0 12px -2px rgba(16, 185, 129, 0.30) !important;
+  box-shadow: 0 0 12px -2px rgba(0, 168, 255, 0.30) !important;
 }
 
 html.gd-premium .brand-shell .gd-metric-icon svg,
 html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon svg {
   color: #00FF88 !important;
   stroke: #00FF88 !important;
-  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.70)) !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.70)) !important;
 }
 
 /* Donut de distribuição por plataforma: harmônico em verde esmeralda */
@@ -1028,16 +1028,16 @@ html.gd-premium .brand-shell[data-space-phase] .space-mission-track > span,
 html.gd-premium .brand-shell .space-mission-track > span {
   background: linear-gradient(90deg, #059669 0%, #10B981 55%, #00FF88 100%) !important;
   box-shadow:
-    0 0 26px 3px rgba(16, 185, 129, 0.85),
-    0 0 12px 2px rgba(0, 255, 136, 0.95),
+    0 0 26px 3px rgba(0, 168, 255, 0.85),
+    0 0 12px 2px rgba(56, 189, 248, 0.95),
     inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
 }
 
 html.gd-premium.dark .brand-shell .space-mission-track > span {
   background: linear-gradient(90deg, #047857 0%, #10B981 50%, #00FF88 100%) !important;
   box-shadow:
-    0 0 28px 4px rgba(16, 185, 129, 0.90),
-    0 0 14px 2px rgba(0, 255, 136, 1),
+    0 0 28px 4px rgba(0, 168, 255, 0.90),
+    0 0 14px 2px rgba(56, 189, 248, 1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
@@ -1141,7 +1141,7 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
 
 .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::before {
-  background-image: linear-gradient(90deg, transparent 0%, rgba(0, 255, 136, 0.85) 45%, rgba(255, 255, 255, 0.95) 50%, rgba(0, 255, 136, 0.85) 55%, transparent 100%) !important;
+  background-image: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.85) 45%, rgba(255, 255, 255, 0.95) 50%, rgba(56, 189, 248, 0.85) 55%, transparent 100%) !important;
   background-size: 220% 100% !important;
   background-repeat: no-repeat !important;
   animation: gd-neon-flash 7s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
@@ -1156,14 +1156,14 @@ html.gd-premium.dark .brand-shell .space-mission-track > span {
 
 .brand-shell .gd-highlight-action::after,
 .brand-shell button.gd-highlight-action::after {
-  background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.55) 48%, rgba(0, 255, 136, 0.85) 54%, transparent 72%) !important;
+  background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.55) 48%, rgba(56, 189, 248, 0.85) 54%, transparent 72%) !important;
   background-size: 240% 100% !important;
   animation: gd-neon-flash 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
 }
 
 /* The sidebar rail breathes with the same neon filament */
 .brand-shell .brand-sidebar::after {
-  background-image: linear-gradient(180deg, transparent 0%, rgba(0, 255, 136, 0.9) 22%, rgba(16, 185, 129, 0.35) 48%, transparent 78%) !important;
+  background-image: linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.9) 22%, rgba(0, 168, 255, 0.35) 48%, transparent 78%) !important;
   background-size: 100% 260% !important;
   animation: gd-neon-flash 9s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
 }

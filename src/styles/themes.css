@@ -37,7 +37,7 @@
    FASE 1 — TERRA (azul neon)
    -------------------------------------------------------------------------- */
 
-[data-phase="terra"] {
+[data-phase="terra"], [data-space-phase="terra"], .brand-shell[data-space-phase="terra"] {
   --bg-base: #030814;
   --bg-elevated: #071226;
   --card-bg: rgba(10, 22, 46, 0.62);
@@ -61,7 +61,7 @@
    FASE 2 — ÓRBITA (dourado / ambar neon)
    -------------------------------------------------------------------------- */
 
-[data-phase="orbita"] {
+[data-phase="orbita"], [data-space-phase="orbita"], .brand-shell[data-space-phase="orbita"] {
   --bg-base: #060503;
   --bg-elevated: #110D06;
   --card-bg: rgba(24, 18, 8, 0.62);
@@ -92,7 +92,7 @@
    FASE 3 — GALÁXIA (roxo / violeta neon)
    -------------------------------------------------------------------------- */
 
-[data-phase="galaxia"] {
+[data-phase="galaxia"], [data-space-phase="galaxia"], .brand-shell[data-space-phase="galaxia"] {
   --bg-base: #05020C;
   --bg-elevated: #0E0819;
   --card-bg: rgba(20, 11, 38, 0.62);
