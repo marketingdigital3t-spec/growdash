@@ -364,7 +364,14 @@ const Index = () => {
           revenue: glassSales.totalGross,
           roas: glassRoas,
           impressions: dashboardInsights.reduce((sum, r) => sum + Number(r.impressions || 0), 0),
-          opportunities: dashboardDeals.filter((d) => Boolean(d.deal_stage || d.rd_stage_id || d.hold || (d.amount && d.amount > 0) || d.rating > 0)).length || Math.min(dashboardDeals.length, Math.round(dashboardDeals.length * 0.7)),
+          // Contagem estrita de Oportunidades reais no RD Station (etapas qualificadas, avançadas ou ganhas)
+          opportunities: dashboardDeals.filter((d) => {
+            if (d.win) return true;
+            if (["opportunity", "sql", "client"].includes(d.stage_bucket)) return true;
+            if (typeof d.rd_stage_order === "number" && d.rd_stage_order > 1 && d.stage_bucket !== "lost") return true;
+            const name = String(d.rd_stage_name || "").toLowerCase();
+            return /oportunidade|proposta|negocia|reuni|qualifica|apresenta/.test(name);
+          }).length,
         }}
       />
 
