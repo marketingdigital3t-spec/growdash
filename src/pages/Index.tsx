@@ -364,13 +364,13 @@ const Index = () => {
           revenue: glassSales.totalGross,
           roas: glassRoas,
           impressions: dashboardInsights.reduce((sum, r) => sum + Number(r.impressions || 0), 0),
-          // Contagem estrita de Oportunidades reais no RD Station (etapas qualificadas, avançadas ou ganhas)
+          // Puxa APENAS a negociação que está na etapa de Oportunidade no funil do RD Station (sem somar conversa iniciada/contato)
           opportunities: dashboardDeals.filter((d) => {
-            if (d.win) return true;
-            if (["opportunity", "sql", "client"].includes(d.stage_bucket)) return true;
-            if (typeof d.rd_stage_order === "number" && d.rd_stage_order > 1 && d.stage_bucket !== "lost") return true;
-            const name = String(d.rd_stage_name || "").toLowerCase();
-            return /oportunidade|proposta|negocia|reuni|qualifica|apresenta/.test(name);
+            const name = String(d.rd_stage_name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            // Ignora conversas iniciadas, contatos ou novas entradas
+            if (/conversa|iniciad|contat|whatsapp|mensagem|msg|novo|lead/.test(name)) return false;
+            // Conta estritamente quem está na etapa de Oportunidade do RD
+            return name.includes("oportunidade") || d.stage_bucket === "opportunity";
           }).length,
         }}
       />
