@@ -13,7 +13,7 @@ export interface CrmMetricAvailabilityInput {
  * Derives the display state from the RD deals query itself. Funnel metadata or
  * cached timestamps are not sufficient evidence for a CRM metric snapshot.
  */
-export function buildCrmMetricAvailability({ loading, failed, hasSnapshot, hasRows, reason }: CrmMetricAvailabilityInput): MetricAvailability {
+export function buildCrmMetricAvailability({ loading, failed, hasSnapshot, hasRows, reason, noSnapshotReason }: CrmMetricAvailabilityInput): MetricAvailability {
   if (loading) {
     return hasSnapshot
       ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." }

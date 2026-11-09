@@ -10,6 +10,12 @@ import {
   shouldSkipRDDealEnrichment,
 } from "../_shared/rdSyncCursor.ts";
 import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
+import {
+  RD_REQUEST_ATTEMPTS,
+  RD_REQUEST_BACKOFFS_MS,
+  RD_SYNC_RUNTIME_BUDGET_MS,
+  safeRDRequestTimeoutMs,
+} from "../../../src/lib/rdSyncRuntimeBudget.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
 
@@ -408,12 +414,18 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let rdRequestTail: Promise<void> = Promise.resolve();
 let rdNextRequestAt = 0;
 const RD_MIN_REQUEST_INTERVAL_MS = 300;
-const RD_REQUEST_TIMEOUT_MS = 30_000;
 // Leave enough margin for the Edge runtime to finish the current batch and
 // close sync_runs cleanly instead of being killed by the gateway (HTTP 520).
 // Historical runs are intentionally resumable: a later invocation reuses
 // stored profiles and continues walking the remaining RD pages.
-const RD_SYNC_RUNTIME_BUDGET_MS = 90_000;
+// The per-request timeout is derived from the invocation budget so that one
+// logical provider request — every attempt plus every backoff — can never
+// outlive the budget. A request that could reach 110s (30s timeout x 3
+// attempts plus 5s and 15s backoffs) was killed by the gateway before the
+// function could return its resumable payload, so the client saw a non-2xx
+// status instead of the checkpointed partial result and the mirrored
+// snapshot stayed stale.
+const RD_REQUEST_TIMEOUT_MS = safeRDRequestTimeoutMs();
 
 /** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
  *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
@@ -427,8 +439,8 @@ function toBrtDateString(iso: string): string {
 // Métricas globais por execução
 const metrics = { retries: 0, errors: 0, details: 0, contacts: 0 };
 
-async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
-  const backoffs = [5_000, 15_000, 30_000, 60_000];
+async function fetchWithRetry(url: string, attempts = RD_REQUEST_ATTEMPTS, deadline?: number): Promise<Response> {
+  const backoffs = RD_REQUEST_BACKOFFS_MS;
   let lastErr: any = null;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -440,8 +452,15 @@ async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
       if (spacing > 0) await sleep(spacing);
       rdNextRequestAt = Date.now() + RD_MIN_REQUEST_INTERVAL_MS;
       release();
+      // Never start an attempt that cannot finish inside the remaining budget.
+      // A request that overruns the gateway deadline is killed before the
+      // function can persist its cursor, which surfaces as a non-2xx status
+      // and leaves the mirrored snapshot stale.
+      const remaining = deadline == null ? RD_REQUEST_TIMEOUT_MS : deadline - Date.now();
+      if (remaining <= 0) throw new Error("RD sync runtime budget exhausted before the provider request");
+      const attemptTimeoutMs = Math.min(RD_REQUEST_TIMEOUT_MS, remaining);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), RD_REQUEST_TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), attemptTimeoutMs);
       let r: Response;
       try {
         r = await fetch(url, { signal: controller.signal });
@@ -1905,7 +1924,7 @@ Deno.serve(async (req) => {
           // calculadas separadamente pela reconciliação de métricas.
           const segmentPeriodParams = periodParams;
           const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${segmentPeriodParams}${segment.params}`;
-          const r = await fetchWithRetry(url);
+          const r = await fetchWithRetry(url, RD_REQUEST_ATTEMPTS, runtimeDeadline);
           if (!r.ok) {
             const txt = await r.text();
             // Keep the exact page that failed so a transient RD/429 response

@@ -1,23 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { buildCrmMetricAvailability, crmBoardSummaryLabel } from "./crmAvailability";
+import { buildCrmMetricAvailability } from "./crmAvailability";
 
-describe("crmBoardSummaryLabel", () => {
-  it("does not expose a zero count while the first CRM snapshot is loading", () => {
-    expect(crmBoardSummaryLabel("loading", 0)).toBe("Carregando negociações…");
-  });
-
-  it("keeps a real count available for a fresh snapshot", () => {
-    expect(crmBoardSummaryLabel("fresh", 3)).toBe("3 negociação(ões) no quadro");
-  });
-
-  it("does not turn an unavailable query into a zero count", () => {
-    expect(crmBoardSummaryLabel("unavailable", 0)).toBe("Negociações indisponíveis");
-  });
-
-  it("marks the metrics unavailable when the RD query timed out without a snapshot", () => {
-    expect(buildCrmMetricAvailability({ loading: false, failed: true, hasSnapshot: false, hasRows: false })).toEqual({
-      state: "unavailable",
-      reason: "Não foi possível confirmar os dados do RD Station.",
+describe("buildCrmMetricAvailability", () => {
+  it("usa noSnapshotReason quando nao ha snapshot confirmado", () => {
+    const availability = buildCrmMetricAvailability({
+      loading: false,
+      failed: false,
+      hasSnapshot: false,
+      hasRows: false,
+      reason: "Falha ao consultar o webhook.",
+      noSnapshotReason: "Aguardando a primeira leitura confirmada dos leads recebidos pelo webhook.",
     });
+
+    expect(availability).toEqual({
+      state: "unavailable",
+      reason: "Aguardando a primeira leitura confirmada dos leads recebidos pelo webhook.",
+    });
+  });
+
+  it("usa o fallback padrao quando nao ha snapshot e nenhuma razao especifica", () => {
+    const availability = buildCrmMetricAvailability({
+      loading: false,
+      failed: false,
+      hasSnapshot: false,
+      hasRows: false,
+    });
+
+    expect(availability.state).toBe("unavailable");
+    expect(availability.reason).toBe("Aguardando a primeira sincronização confirmada do RD Station.");
   });
 });
