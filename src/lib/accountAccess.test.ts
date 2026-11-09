@@ -39,4 +39,9 @@ describe("Meta account authorization contract", () => {
     expect(filterAuthorizedAdAccounts([legacy], context({ accountAccess: new Set(["delegated-1:account-1:null"]) }))).toHaveLength(1);
     expect(filterAuthorizedAdAccounts([legacy], context({ accountAccess: new Set(["delegated-1:other:null"]) }))).toEqual([]);
   });
+
+  it("allows delegated access when account has workspace but grant was recorded with null workspace", () => {
+    const acct = account({ workspace_id: "workspace-1" });
+    expect(filterAuthorizedAdAccounts([acct], context({ accountAccess: new Set(["delegated-1:account-1:null"]) }))).toHaveLength(1);
+  });
 });

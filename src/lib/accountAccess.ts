@@ -28,7 +28,9 @@ export function isAdAccountAuthorized(account: AdAccountRecord, context: AdAccou
   if (account.metadata?.profile_disconnected === true) return false;
   if (context.master || account.user_id === context.userId) return true;
   if (account.workspace_id && context.managerWorkspaceIds.has(account.workspace_id)) return true;
-  return context.accountAccess.has(adAccountAccessKey(context.userId, account.id, account.workspace_id));
+  // Permite acesso explícito concedido para a conta no workspace atual ou legado
+  return context.accountAccess.has(adAccountAccessKey(context.userId, account.id, account.workspace_id))
+    || context.accountAccess.has(adAccountAccessKey(context.userId, account.id, null));
 }
 
 export function filterAuthorizedAdAccounts<T extends AdAccountRecord>(accounts: T[], context: AdAccountAccessContext) {

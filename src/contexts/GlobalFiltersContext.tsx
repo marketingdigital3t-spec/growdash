@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { normalizeCustomDateRange, resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
 import { businessDateKey } from "@/lib/businessDate";
+import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID, resolveLinkedRDFunnelIds } from "@/lib/rdAccountScope";
+import { sanitizeSelectedAdAccountIds, getUserFiltersStorageKey } from "./GlobalFiltersScope.test";
 
 export type BusinessSegment = "infoproduto" | "saas";
 
@@ -53,6 +55,7 @@ function readStored() {
 }
 
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const { data: workspace, isLoading: loadingWorkspace } = useWorkspace();
   // Resolve the workspace first. Starting the owner-wide RD query before the
   // workspace RPC returns caused a duplicate request on every cold session
@@ -63,8 +66,19 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections({ enabled: !loadingWorkspace });
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const accountScopeReady = !loadingWorkspace && !!workspace?.id && !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
+  const activeStorageKey = getUserFiltersStorageKey(STORAGE_KEY, user?.id);
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountIds, setAdAccountIds] = useState<string[]>(() => stored?.adAccountIds?.length ? stored.adAccountIds : stored?.adAccountId && stored.adAccountId !== "all" ? [stored.adAccountId] : []);
+
+  // Sanitiza a seleção de contas assim que a lista autorizada carrega,
+  // evitando que contas não autorizadas herdadas de outra sessão travem a tela.
+  useEffect(() => {
+    if (loadingAdAccounts) return;
+    setAdAccountIds((current) => {
+      const sanitized = sanitizeSelectedAdAccountIds(current, adAccounts);
+      return sanitized.length === current.length && sanitized.every((id, idx) => id === current[idx]) ? current : sanitized;
+    });
+  }, [adAccounts, loadingAdAccounts]);
   const [storedFunnelIds, setStoredFunnelIds] = useState<string[]>(() => stored?.funnelIds ?? []);
   const resolvedFunnelIds = useMemo(
     () => accountScopeReady
@@ -96,6 +110,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
+      localStorage.setItem(activeStorageKey, JSON.stringify({ adAccountId, adAccountIds, funnelIds, preset, customRange, segment }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ adAccountId, adAccountIds, funnelIds, preset, customRange, segment }));
       // Mantém compatibilidade com telas antigas durante a migração.
       localStorage.setItem("dash:account", adAccountId);

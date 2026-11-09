@@ -48,11 +48,20 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(accountId)) return json({ error: "Conta inválida." }, 400);
 
     const admin = createClient(url, service);
+
+    // Valida se o chamador tem acesso à conta: pode ser o proprietário original
+    // ou um membro delegado do workspace explicitamente autorizado.
+    const { data: canView, error: accessError } = await admin.rpc("user_can_view_ad_account", {
+      _user_id: user.id,
+      _ad_account_id: accountId,
+    });
+    if (accessError) throw accessError;
+    if (!canView) return json({ error: "Conta não encontrada ou sem acesso." }, 404);
+
     const { data: account, error: accountError } = await admin
       .from("ad_accounts")
       .select("id, account_id, name, access_token, token_expires_at")
       .eq("id", accountId)
-      .eq("user_id", user.id)
       .maybeSingle();
     if (accountError) throw accountError;
     if (!account) return json({ error: "Conta não encontrada ou sem acesso." }, 404);
@@ -74,7 +83,7 @@ Deno.serve(async (req) => {
         last_sync_error_code: code,
         last_sync_attempt_at: now,
         updated_at: now,
-      }).eq("id", account.id).eq("user_id", user.id);
+      }).eq("id", account.id);
       return json({ ok: false, account: { id: account.id, name: account.name }, code, error: safeMetaMessage(code) }, 409);
     }
 
@@ -95,7 +104,7 @@ Deno.serve(async (req) => {
         last_sync_error_code: inspection.errorCode,
         last_sync_attempt_at: now,
         updated_at: now,
-      }).eq("id", account.id).eq("user_id", user.id);
+      }).eq("id", account.id);
       return json({ ok: false, account: { id: account.id, name: account.name }, error: errorMessage }, 409);
     }
 
@@ -120,7 +129,7 @@ Deno.serve(async (req) => {
       last_sync_attempt_at: now,
       last_sync_success_at: now,
       updated_at: now,
-    }).eq("id", account.id).eq("user_id", user.id);
+    }).eq("id", account.id);
     if (updateError) throw updateError;
 
     return json({ ok: true, account: { id: account.id, name: meta.name ?? account.name }, token_expires_at: inspection.expiresAt });
