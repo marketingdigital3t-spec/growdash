@@ -16292,3 +16292,58 @@ html:not(.dark) .brand-shell .growdash-main input {
   color: #0f172a !important;
   border-color: #94a3b8 !important;
 }
+
+/* ==========================================================================
+   MODO CLARO: HIERARQUIA DE TEXTO E CONTRASTE ABSOLUTO NO CONTEÚDO
+   Nenhum número de KPI, valor financeiro ou etapa de funil fica branco no claro.
+   ========================================================================== */
+html:not(.dark) .brand-shell .growdash-main :is(
+  strong,
+  .font-display,
+  .text-text-primary,
+  [class*="text-text-primary"],
+  .text-foreground,
+  [class*="text-foreground"],
+  .gd-metric-value,
+  .dashboard-terra-metric-value
+) {
+  color: #090d16 !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(
+  .text-text-secondary,
+  [class*="text-text-secondary"],
+  .text-text-muted,
+  [class*="text-text-muted"]
+) {
+  color: #475569 !important;
+}
+
+/* Etapas do Funil em Modo Claro */
+html:not(.dark) .brand-shell .growdash-main :is(
+  .orbital-funnel-step,
+  [aria-labelledby="orbital-funnel-title"] .group
+) {
+  background: #ffffff !important;
+  border-color: #94a3b8 !important;
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.1) !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main [aria-labelledby="orbital-funnel-title"] .group strong {
+  color: #0f172a !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main [aria-labelledby="orbital-funnel-title"] .group span {
+  color: #475569 !important;
+}
+
+/* Radar em Modo Claro */
+html:not(.dark) .brand-shell .growdash-main section:has(#radar-title) {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main section:has(#radar-title) :is(h2, h3, strong, b) {
+  color: #0f172a !important;
+}
