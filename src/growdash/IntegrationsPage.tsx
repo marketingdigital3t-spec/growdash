@@ -6,6 +6,7 @@ import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, Folde
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
+import { mapWithConcurrency, isProviderRateLimited } from "@/lib/concurrency";
 import { recordRuntimeDiagnostic, withRequestTimeout } from "@/lib/resilience";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
@@ -47,19 +48,6 @@ const tabs = [
   ["payments", "Pagamentos"], ["files", "Arquivos"], ["developers", "API & Webhooks"], ["health", "Saúde & Logs"],
 ] as const;
 
-async function mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  async function consume() {
-    while (true) {
-      const index = next++;
-      if (index >= items.length) return;
-      results[index] = await worker(items[index]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, consume));
-  return results;
-}
 
 function safeText(value: unknown, fallback = "") {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;

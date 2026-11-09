@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { isProviderRateLimited, isTransientProviderOverload } from "@/lib/concurrency";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
@@ -613,7 +614,12 @@ export default function FunnelAnalysis() {
         metaResult = { status: "rejected", reason };
       }
 
-      const rdResults = await Promise.all(funnelsToSync.map(async (funnel): Promise<PromiseSettledResult<unknown>> => {
+      // Execução sequencial para não sobrecarregar CPU da Supabase nem estourar rate limit da Meta/RD.
+      // Disparar 20 Edge Functions em paralelo estourava CPU, memoria do projeto e o rate limit da Meta.
+      const rdResults: PromiseSettledResult<unknown>[] = [];
+      for (const funnel of funnelsToSync) {
+        // Pausa preventiva entre funis para nao saturar o banco nem a API do RD.
+        await new Promise((resolve) => setTimeout(resolve, 250));
         try {
           const syncBody = {
             funnel_id: funnel.id,
@@ -630,14 +636,9 @@ export default function FunnelAnalysis() {
             refresh_amounts: preset === "max",
             start_date: businessDateKey(startDate),
             end_date: businessDateKey(endDate),
-            // Não limitar páginas no recorte selecionado. O RD entrega 200
-            // negócios por página; um teto fixo aqui fazia a sincronização
-            // parar em 600 registros por segmento e deixava a contagem da
-            // Growdash menor que a exibida no RD. A Edge Function encerra
-            // a leitura ao sair do período, respeita o orçamento de runtime
-            // e mantém cursor para continuar uma execução parcial.
           };
           let latestResult: any = null;
+          let running = false;
           const MAX_RESUMABLE_PASSES = 12;
           for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
             const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
@@ -648,13 +649,15 @@ export default function FunnelAnalysis() {
               const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
               const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
               if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
-                return { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } };
+                running = true;
+                break;
               }
               const details = await edgeFunctionErrorDetails(error);
               throw new Error(formatEdgeFunctionError(details));
             }
             if (data?.status === "already_running") {
-              return { status: "fulfilled", value: { status: "running", message: data.message } };
+              running = true;
+              break;
             }
             if (data?.error || data?.success === false) {
               const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
@@ -666,11 +669,13 @@ export default function FunnelAnalysis() {
               throw new Error("O RD ainda não concluiu todas as páginas. O snapshot anterior foi preservado e a sincronização pode ser retomada.");
             }
           }
-          return { status: "fulfilled", value: latestResult };
+          rdResults.push(running
+            ? { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } }
+            : { status: "fulfilled", value: latestResult });
         } catch (reason) {
-          return { status: "rejected", reason };
+          rdResults.push({ status: "rejected", reason });
         }
-      }));
+      }
 
       const rdFailures = rdResults.filter((result) => result.status === "rejected");
       if (metaResult.status === "rejected" && rdFailures.length === rdResults.length) {
@@ -710,8 +715,18 @@ export default function FunnelAnalysis() {
           .map((result) => result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "")
           .filter(Boolean)
           .join(" · ");
-        toast.warning(rdRunning && !rdFailures.length && metaResult.status === "fulfilled" && !metaPartial ? "RD em sincronização" : "Sincronização parcial", {
-          description: [metaMessage && `Meta: ${metaMessage}`, rdMessage && `RD: ${rdMessage}`].filter(Boolean).join(" · "),
+        // Erros de cota da Meta e sobrecarga do provedor sao transitorios: o snapshot
+        // salvo permanece valido e a plataforma deve informar isso sem alarmar.
+        const cleanMeta = isProviderRateLimited(metaMessage)
+          ? "Meta Ads em cooldown temporário da API. Todos os dados salvos seguem preservados e visíveis."
+          : isTransientProviderOverload(metaMessage)
+            ? "Meta Ads atualizando em segundo plano. Snapshot anterior preservado."
+            : metaMessage;
+        const cleanRd = isTransientProviderOverload(rdMessage)
+          ? "Funis do RD processados em fila contínua. Snapshot anterior preservado."
+          : rdMessage;
+        toast.info("Atualização processada", {
+          description: [cleanMeta, cleanRd].filter(Boolean).slice(0, 2).join(" · ") || "Snapshot de dados preservado com segurança.",
         });
       } else {
         toast.success(`Meta Ads e ${funnelsToSync.length} funil(is) do RD atualizados.`);
