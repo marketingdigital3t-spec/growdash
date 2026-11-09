@@ -7,7 +7,7 @@ import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID, resolveLinkedRDFunnelIds } from "@/lib/rdAccountScope";
-import { sanitizeSelectedAdAccountIds, getUserFiltersStorageKey } from "./GlobalFiltersScope.test";
+import { sanitizeSelectedAdAccountIds, getUserFiltersStorageKey } from "./GlobalFiltersScope";
 
 export type BusinessSegment = "infoproduto" | "saas";
 
