@@ -15895,141 +15895,140 @@ html[data-space-phase="terra"],
 }
 
 /* ==========================================================================
-   TELA DE LOGIN CÓSMICA — FOGUETE DE FUNDO + FOGO CONTÍNUO + ZOOM 3D
+   TELA DE LOGIN CÓSMICA — 2 COLUNAS (FOGUETE À ESQUERDA + LOGIN À DIREITA)
    ========================================================================== */
 .auth-cosmic-viewport {
   position: relative;
   width: 100vw;
   min-height: 100svh;
   overflow: hidden;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 520px);
   align-items: center;
-  justify-content: center;
   background: #02040a;
   perspective: 1200px;
 }
 
-.auth-cosmic-bg-scene {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+@media (max-width: 960px) {
+  .auth-cosmic-viewport {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    overflow-y: auto;
+  }
+}
+
+/* Coluna Esquerda: Cena do Foguete com Efeito de Fogo */
+.auth-cosmic-left-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100svh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(32px, 5vw, 64px);
+  overflow: hidden;
   transition: transform 1.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.8s ease;
 }
 
-.auth-cosmic-bg-scene.launching {
-  transform: translateZ(-1800px) scale(0.08);
-  opacity: 0.2;
+.auth-cosmic-left-panel.launching {
+  transform: translateZ(-1600px) scale(0.1);
+  opacity: 0.15;
 }
 
-.auth-cosmic-bg-scene img {
+.auth-cosmic-left-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.auth-cosmic-left-bg img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 30%;
-  filter: brightness(0.78) contrast(1.15);
+  object-position: center 35%;
+  filter: brightness(0.85) contrast(1.18);
 }
 
-.auth-cosmic-overlay {
+.auth-cosmic-left-overlay {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(3, 8, 20, 0.45) 0%, rgba(2, 5, 12, 0.88) 75%, #02040a 100%);
-  mix-blend-mode: multiply;
+  background: linear-gradient(180deg, rgba(2, 4, 10, 0.2) 0%, rgba(2, 4, 10, 0.7) 70%, #02040a 100%),
+              radial-gradient(circle at 50% 40%, transparent 40%, rgba(2, 4, 10, 0.6) 100%);
 }
 
-/* Jato de fogo azul/ciano permanente na base do foguete */
-.auth-rocket-thruster {
+/* Jato de fogo azul/ciano na base do foguete (lado esquerdo) */
+.auth-left-thruster {
   position: absolute;
-  top: 52%;
+  top: 55%;
   left: 50%;
   transform: translateX(-50%);
-  width: 80px;
-  height: 220px;
+  width: 90px;
+  height: 240px;
   pointer-events: none;
   z-index: 2;
 }
 
-.auth-rocket-flame-core {
+.auth-left-flame-core {
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 32px;
-  height: 120px;
+  width: 38px;
+  height: 140px;
   border-radius: 50% 50% 20% 20%;
   background: linear-gradient(180deg, #ffffff 0%, #38bdf8 30%, #00a8ff 70%, transparent 100%);
-  box-shadow: 0 0 45px 12px rgba(56, 189, 248, 0.9), 0 0 90px 25px rgba(0, 168, 255, 0.6);
+  box-shadow: 0 0 50px 14px rgba(56, 189, 248, 0.95), 0 0 100px 30px rgba(0, 168, 255, 0.7);
   animation: flame-pulse 0.12s ease-in-out infinite alternate;
   filter: blur(2px);
 }
 
-.auth-rocket-flame-plume {
+.auth-left-flame-plume {
   position: absolute;
   top: 15px;
   left: 50%;
   transform: translateX(-50%);
-  width: 70px;
-  height: 180px;
+  width: 80px;
+  height: 210px;
   border-radius: 50% 50% 30% 30%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(56, 189, 248, 0.6) 40%, rgba(0, 168, 255, 0.2) 75%, transparent 100%);
-  box-shadow: 0 0 60px 18px rgba(0, 168, 255, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(56, 189, 248, 0.65) 40%, rgba(0, 168, 255, 0.25) 75%, transparent 100%);
+  box-shadow: 0 0 70px 22px rgba(0, 168, 255, 0.8);
   animation: flame-wave 0.22s ease-in-out infinite alternate;
   filter: blur(6px);
 }
 
-@keyframes flame-pulse {
-  0% { transform: translateX(-50%) scaleY(0.92) scaleX(0.96); opacity: 0.92; }
-  100% { transform: translateX(-50%) scaleY(1.08) scaleX(1.04); opacity: 1; }
+/* Textos da narrativa cósmica no rodapé da coluna esquerda */
+.auth-cosmic-left-content {
+  position: relative;
+  z-index: 3;
+  max-width: 580px;
 }
 
-@keyframes flame-wave {
-  0% { transform: translateX(-50%) scaleY(0.95); }
-  100% { transform: translateX(-50%) scaleY(1.12); }
-}
-
-/* Faíscas subindo */
-.auth-spark {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 8px 1px #38bdf8;
-  animation: spark-rise 1.8s ease-out infinite;
-}
-
-@keyframes spark-rise {
-  0% {
-    transform: translate(0, 0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--spark-x, 15px), -120px) scale(0.2);
-    opacity: 0;
-  }
-}
-
-/* Card Centralizado Flutuante */
-.auth-card-centered {
+/* Coluna Direita: Card de Login */
+.auth-cosmic-right-panel {
   position: relative;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+.auth-card-docked {
   width: 100%;
   max-width: 440px;
-  margin: 20px;
-  padding: 36px 32px;
+  padding: clamp(28px, 3.5vw, 40px);
   border-radius: 24px;
-  background: rgba(4, 9, 22, 0.82);
+  background: rgba(5, 10, 24, 0.88);
   border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.9), 0 0 35px -5px rgba(0, 168, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.9), 0 0 35px -5px rgba(0, 168, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
-.auth-card-centered.launching {
+.auth-card-docked.launching {
   opacity: 0;
   transform: scale(0.9) translateY(20px);
   pointer-events: none;
