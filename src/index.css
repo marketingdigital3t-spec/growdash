@@ -16181,3 +16181,114 @@ html[data-space-phase="terra"],
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
+
+/* ==========================================================================
+   AUTORITATIVO: SIDEBAR E TOPBAR SEMPRE ESCURAS (MODO BLACK PERMANENTE)
+   Mesmo quando o usuário ativa o Modo Claro, o painel lateral e a barra do
+   Combustível da Missão permanecem no visual escuro cósmico, enquanto apenas
+   o conteúdo principal (growdash-main) se torna claro com alto contraste.
+   ========================================================================== */
+
+/* 1. Sidebar SEMPRE preta / escura em todos os modos e abas */
+html:not(.dark) .brand-shell .brand-sidebar,
+.brand-shell .brand-sidebar {
+  background: #03060f !important;
+  border-color: rgba(0, 168, 255, 0.22) !important;
+  color: #ffffff !important;
+  box-shadow: 16px 0 54px rgba(0, 0, 0, 0.5) !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar :is(span, p, h1, h2, h3, b, strong) {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav.gd-sidebar-nav-list a:not([aria-current="page"]) {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav.gd-sidebar-nav-list a:not([aria-current="page"]):hover {
+  background: rgba(0, 168, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav.gd-sidebar-nav-list a:not([aria-current="page"]) svg {
+  color: #38bdf8 !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(0, 168, 255, 0.3) 0%, rgba(0, 168, 255, 0.08) 100%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.7) !important;
+  box-shadow: 0 0 20px -3px rgba(0, 168, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+/* 2. Topbar e Combustível da Missão SEMPRE pretos / escuros em todos os modos e abas */
+html:not(.dark) .brand-shell .brand-topbar,
+html:not(.dark) .brand-shell .brand-topbar.growdash-global-header,
+.brand-shell .brand-topbar {
+  background: #040813 !important;
+  border-color: rgba(0, 168, 255, 0.25) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+html:not(.dark) .brand-shell .brand-topbar :is(span, b, strong, p, svg) {
+  color: #ffffff !important;
+}
+
+html:not(.dark) .brand-shell .brand-topbar .text-primary-neon,
+html:not(.dark) .brand-shell .brand-topbar [class*="text-primary"] {
+  color: #38bdf8 !important;
+}
+
+/* Container do tubo de combustível sempre no fundo escuro com neon */
+html:not(.dark) .brand-shell .brand-topbar :is(.border-card-border, [class*="border-card-border"]) {
+  border-color: rgba(0, 168, 255, 0.35) !important;
+  background-color: rgba(6, 12, 24, 0.85) !important;
+}
+
+/* 3. Apenas o CONTEÚDO (growdash-main) fica em Modo Claro com alto contraste */
+html:not(.dark) .brand-shell .growdash-main {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Cards em Modo Claro: fundo branco, sombra suave e texto escuro legível */
+html:not(.dark) .brand-shell .growdash-main :is(.gd-panel, .gd-metric-card, .rounded-2xl.border, .rounded-xl.border, [class*="rounded-"].border:not([role="tablist"])) {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(h1, h2, h3, h4, h5, p, span:not(.text-primary-neon):not([class*="text-sky"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-emerald"])) {
+  color: #0f172a !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main .text-muted-foreground,
+html:not(.dark) .brand-shell .growdash-main [class*="text-muted"] {
+  color: #64748b !important;
+}
+
+/* 4. Barra de Filtros no Modo Claro (contas Meta, datas): texto escuro e legível */
+html:not(.dark) .brand-shell .growdash-main :is(.gd-filter-strip, .gd-global-scope-toolbar) :is(button, .gd-filter-account, .gd-filter-control, [role="combobox"]) {
+  background: #ffffff !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(.gd-filter-strip, .gd-global-scope-toolbar) :is(button, .gd-filter-account, .gd-filter-control) :is(span, p, b, strong) {
+  color: #0f172a !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(.gd-filter-strip, .gd-global-scope-toolbar) svg {
+  color: #0284c7 !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main select,
+html:not(.dark) .brand-shell .growdash-main input {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
