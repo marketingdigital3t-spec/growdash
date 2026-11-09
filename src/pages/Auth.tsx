@@ -26,6 +26,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -67,7 +68,10 @@ export default function Auth() {
         });
         return;
       }
-      navigate("/", { replace: true });
+      setLaunching(true);
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 1600);
       return;
     }
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
@@ -75,7 +79,10 @@ export default function Auth() {
     if (error) { toast({ title: "Não foi possível criar a conta", description: authErrorMessage(error), variant: "destructive" }); return; }
     if (data.session) {
       await (supabase as any).rpc("record_legal_consent", { _terms_version: "1.0", _privacy_version: "1.0" });
-      navigate("/", { replace: true });
+      setLaunching(true);
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 1600);
     }
     else toast({ title: "Cadastro realizado", description: "Confirme seu email para acessar a Growdash." });
   }
