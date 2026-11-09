@@ -130,7 +130,7 @@ const safeMetrics = {
   return (
     <div className={`space-y-5 sm:space-y-6 ${className}`}>
       {/* Grade com os 4 KPIs solicitados: Investimento, Leads, CPL, Vendas e Faturamento */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+      <div className="dashboard-kpi-grid grid gap-3 sm:gap-4">
         {/* 1. Investimento */}
         <KpiCard
           label="Investimento"

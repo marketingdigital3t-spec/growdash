@@ -16163,3 +16163,21 @@ html[data-space-phase="terra"],
 .auth-left-thruster {
   animation: jet-glow-pulsar 0.18s ease-in-out infinite alternate !important;
 }
+
+/* Grade oficial dos 4 KPIs: 4 colunas estritas no desktop, 2x2 em tablets, 1 no mobile */
+.dashboard-kpi-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+}
+
+@media (min-width: 640px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1100px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
