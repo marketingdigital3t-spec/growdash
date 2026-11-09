@@ -123,28 +123,36 @@ export default function Auth() {
     <main className="auth-cosmic-viewport">
       {/* COLUNA ESQUERDA: Foguete, Jato de Fogo, Faíscas e Narrativa da Missão */}
       <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
+        {/* Fundo do Foguete com Overlay */}
         <div className="auth-cosmic-left-bg">
           <img src={rocketLogo} alt="Growdash Rocket Mission" />
           <div className="auth-cosmic-left-overlay" />
+        </div>
 
-          {/* Jato de fogo azul/ciano na base do foguete */}
-          <div className="auth-left-thruster">
-            <div className="auth-left-flame-plume" />
-            <div className="auth-left-flame-core" />
-            {/* Faíscas de energia subindo pela fuselagem */}
-            {[...Array(10)].map((_, i) => (
-              <span
-                key={i}
-                className="auth-spark"
-                style={{
-                  left: `${30 + (i * 4.5)}%`,
-                  top: `${15 + (i * 7.5)}%`,
-                  animationDelay: `${i * 0.18}s`,
-                  ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
-                }}
-              />
-            ))}
-          </div>
+        {/* Jato de fogo azul/ciano na base do foguete */}
+        <div className="auth-left-thruster">
+          <div className="auth-left-flame-plume" />
+          <div className="auth-left-flame-core" />
+          {/* Faíscas de energia subindo pela fuselagem */}
+          {[...Array(10)].map((_, i) => (
+            <span
+              key={i}
+              className="auth-spark"
+              style={{
+                left: `${30 + (i * 4.5)}%`,
+                top: `${15 + (i * 7.5)}%`,
+                animationDelay: `${i * 0.18}s`,
+                ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Fumaça volumétrica viva ondulando e se espalhando na base */}
+        <div className="auth-smoke-container">
+          <div className="auth-smoke-cloud auth-smoke-cloud-3" />
+          <div className="auth-smoke-cloud auth-smoke-cloud-2" />
+          <div className="auth-smoke-cloud auth-smoke-cloud-1" />
         </div>
 
         {/* Conteúdo textual da missão no rodapé da coluna esquerda */}
