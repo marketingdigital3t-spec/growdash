@@ -527,7 +527,7 @@ export default function GrowdashLayout() {
         "growdash-content-shell min-h-screen min-w-0 max-w-full overflow-x-hidden transition-[padding] duration-300",
         // Keep a visible 16px breathing room between the expanded sidebar and
         // the content canvas. The collapsed state keeps its existing offset.
-        effectiveCollapsed ? "lg:pl-16" : "lg:pl-[236px]",
+        effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]",
       )}>
         <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 items-center justify-between gap-3 border-b px-3 py-2 text-foreground shadow-sm sm:px-6">
           {/* Controles de navegacao a esquerda */}
