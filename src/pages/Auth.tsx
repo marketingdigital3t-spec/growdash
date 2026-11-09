@@ -121,134 +121,136 @@ export default function Auth() {
 
   return (
     <main className="auth-cosmic-viewport">
-      {/* COLUNA ESQUERDA: Foguete, Jato de Fogo, Faíscas e Narrativa da Missão */}
-      <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
-        {/* Fundo do Foguete com Overlay */}
-        <div className="auth-cosmic-left-bg">
-          <img src={rocketLogo} alt="Growdash Rocket Mission" />
-          <div className="auth-cosmic-left-overlay" />
-        </div>
-
-        {/* Jato de fogo azul/ciano na base do foguete */}
-        <div className="auth-left-thruster">
-          <div className="auth-left-flame-plume" />
-          <div className="auth-left-flame-core" />
-          {/* Faíscas de energia subindo pela fuselagem */}
-          {[...Array(10)].map((_, i) => (
-            <span
-              key={i}
-              className="auth-spark"
-              style={{
-                left: `${30 + (i * 4.5)}%`,
-                top: `${15 + (i * 7.5)}%`,
-                animationDelay: `${i * 0.18}s`,
-                ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Fumaça volumétrica viva ondulando e se espalhando na base */}
-        <div className="auth-smoke-container">
-          <div className="auth-smoke-cloud auth-smoke-cloud-3" />
-          <div className="auth-smoke-cloud auth-smoke-cloud-2" />
-          <div className="auth-smoke-cloud auth-smoke-cloud-1" />
-        </div>
-
-        {/* Conteúdo textual da missão no rodapé da coluna esquerda */}
-        <div className="auth-cosmic-left-content">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-400/40 bg-sky-950/60 text-sky-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3 shadow-[0_0_20px_rgba(0,168,255,0.4)] backdrop-blur-md">
-            <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
-            Growdash Mission Control
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight drop-shadow-[0_4px_25px_rgba(0,0,0,0.9)]">
-            Da Terra à Galáxia: lance, acelere e escale seu negócio.
-          </h2>
-          <p className="mt-3 text-sm text-slate-300 max-w-lg leading-relaxed drop-shadow-[0_2px_15px_rgba(0,0,0,0.9)]">
-            Tráfego, leads, funil e faturamento alimentando o combustível da sua missão. Suba de fase em tempo real.
-          </p>
-          <p className="mt-4 text-xs font-semibold text-sky-400/90 tracking-wide uppercase">
-            Sua jornada começa na Terra, ganha órbita e conquista a Galáxia.
-          </p>
-        </div>
-      </section>
-
-      {/* COLUNA DIREITA: Card de Autenticação */}
-      <section className="auth-cosmic-right-panel">
-        <div className={cn("auth-card-docked", launching && "launching")}>
-          <div className="text-center mb-6">
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              {mode === "login" ? "Seja Bem-Vindo(a)" : "Criar conta"}
-            </h1>
-            <p className="text-xs text-slate-400 mt-1.5">
-              {mode === "login" ? "Acesse sua operação Growdash." : "Crie o acesso da sua operação."}
-            </p>
+      <div className="auth-cosmic-container">
+        {/* COLUNA ESQUERDA: Foguete com Jato de Fogo e Copy Centralizada Abaixo da Chama */}
+        <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
+          {/* Fundo do Foguete */}
+          <div className="auth-cosmic-left-bg">
+            <img src={rocketLogo} alt="Growdash Rocket Mission" />
+            <div className="auth-cosmic-left-overlay" />
           </div>
 
-          {mode === "register" && (
-            <div className="auth-mode-switch mb-4" role="tablist" aria-label="Tipo de acesso">
-              <button type="button" role="tab" aria-selected={false} onClick={() => setMode("login")}>
-                Entrar
-              </button>
-              <button type="button" role="tab" aria-selected className="is-active">
-                Cadastrar
-              </button>
+          {/* Jato de fogo azul/ciano na base do foguete */}
+          <div className="auth-left-thruster">
+            <div className="auth-left-flame-plume" />
+            <div className="auth-left-flame-core" />
+            {/* Faíscas de energia subindo pela fuselagem */}
+            {[...Array(10)].map((_, i) => (
+              <span
+                key={i}
+                className="auth-spark"
+                style={{
+                  left: `${30 + (i * 4.5)}%`,
+                  top: `${15 + (i * 7.5)}%`,
+                  animationDelay: `${i * 0.18}s`,
+                  ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Fumaça volumétrica viva ondulando e se espalhando na base */}
+          <div className="auth-smoke-container">
+            <div className="auth-smoke-cloud auth-smoke-cloud-3" />
+            <div className="auth-smoke-cloud auth-smoke-cloud-2" />
+            <div className="auth-smoke-cloud auth-smoke-cloud-1" />
+          </div>
+
+          {/* Conteúdo textual da missão PERFEITAMENTE CENTRALIZADO ABAIXO DA CHAMA */}
+          <div className="auth-cosmic-left-content">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-400/40 bg-sky-950/70 text-sky-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3.5 shadow-[0_0_20px_rgba(0,168,255,0.45)] backdrop-blur-md">
+              <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
+              Growdash Mission Control
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {mode === "register" && (
-              <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />
-            )}
-            <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />
-            <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:text-white" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>} />
-            {mode === "register" && (
-              <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />
-            )}
-            {mode === "register" && (
-              <label className="flex items-start gap-2 text-[11px] text-slate-400">
-                <input type="checkbox" checked={legalAccepted} onChange={(e) => setLegalAccepted(e.target.checked)} required className="mt-0.5" />
-                <span>Li e aceito os <Link to="/termos" target="_blank" className="font-bold text-sky-400 hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="font-bold text-sky-400 hover:underline">Política de Privacidade</Link>.</span>
-              </label>
-            )}
-            {mode === "login" && (
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                <span>Acesso mantido neste dispositivo</span>
-                <button type="button" onClick={() => { setForgotOpen((v) => !v); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="font-semibold text-sky-400 hover:underline">
-                  Esqueceu a senha?
-                </button>
-              </div>
-            )}
-            {forgotOpen && (
-              <div className="rounded-xl border border-sky-400/30 bg-sky-950/30 p-3 text-xs text-slate-300 space-y-2">
-                <p>Recupere a senha ou receba um link de acesso por e-mail:</p>
-                <div className="flex gap-2">
-                  <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="seu@email.com" className="flex-1 bg-black/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-white" />
-                  <button type="button" onClick={recover} disabled={loading} className="bg-primary text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-primary/90">Enviar</button>
-                </div>
-                <button type="button" onClick={sendAccessLink} disabled={loading} className="text-sky-400 hover:underline text-[11px] block text-center w-full pt-1">
-                  Enviar link de acesso sem senha
-                </button>
-              </div>
-            )}
-            <button type="submit" disabled={loading || launching} className="auth-submit-button w-full mt-4">
-              {launching ? "Decolando missão..." : loading ? "Acessando..." : mode === "login" ? "Entrar na Plataforma" : "Criar conta"}
-            </button>
-          </form>
-
-          {mode === "login" && (
-            <p className="mt-4 text-center text-xs text-slate-400">
-              Ainda não tem acesso? <button type="button" className="text-sky-400 font-bold hover:underline" onClick={() => setMode("register")}>Criar conta</button>
+            <h2 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-[1.12] drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)]">
+              Da Terra à Galáxia: lance, acelere e escale seu negócio.
+            </h2>
+            <p className="mt-3.5 text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed drop-shadow-[0_2px_15px_rgba(0,0,0,0.95)]">
+              Tráfego, leads, funil e faturamento alimentando o combustível da sua missão. Suba de fase em tempo real.
             </p>
-          )}
-
-          <div className="auth-divider"><span />ou continue com<span /></div>
-          <div className="auth-social-grid">
-            <button type="button" onClick={() => social("Claude Opus 5")}><span className="auth-google-mark">G</span>Continuar com Claude Opus 5</button>
-            <button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span>Continuar com iCloud</button>
+            <p className="mt-4 text-xs font-bold text-sky-400 tracking-wider uppercase drop-shadow-[0_2px_10px_rgba(0,168,255,0.5)]">
+              Sua jornada começa na Terra, ganha órbita e conquista a Galáxia.
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* COLUNA DIREITA: Card de Autenticação Equilibrado no Grid */}
+        <section className="auth-cosmic-right-panel">
+          <div className={cn("auth-card-docked", launching && "launching")}>
+            <div className="text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {mode === "login" ? "Seja Bem-Vindo(a)" : "Criar conta"}
+              </h1>
+              <p className="text-xs text-slate-400 mt-1.5">
+                {mode === "login" ? "Acesse sua operação Growdash." : "Crie o acesso da sua operação."}
+              </p>
+            </div>
+
+            {mode === "register" && (
+              <div className="auth-mode-switch mb-4" role="tablist" aria-label="Tipo de acesso">
+                <button type="button" role="tab" aria-selected={false} onClick={() => setMode("login")}>
+                  Entrar
+                </button>
+                <button type="button" role="tab" aria-selected className="is-active">
+                  Cadastrar
+                </button>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              {mode === "register" && (
+                <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />
+              )}
+              <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />
+              <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:text-white" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>} />
+              {mode === "register" && (
+                <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />
+              )}
+              {mode === "register" && (
+                <label className="flex items-start gap-2 text-[11px] text-slate-400">
+                  <input type="checkbox" checked={legalAccepted} onChange={(e) => setLegalAccepted(e.target.checked)} required className="mt-0.5" />
+                  <span>Li e aceito os <Link to="/termos" target="_blank" className="font-bold text-sky-400 hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="font-bold text-sky-400 hover:underline">Política de Privacidade</Link>.</span>
+                </label>
+              )}
+              {mode === "login" && (
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Acesso mantido neste dispositivo</span>
+                  <button type="button" onClick={() => { setForgotOpen((v) => !v); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="font-semibold text-sky-400 hover:underline">
+                    Esqueceu a senha?
+                  </button>
+                </div>
+              )}
+              {forgotOpen && (
+                <div className="rounded-xl border border-sky-400/30 bg-sky-950/30 p-3 text-xs text-slate-300 space-y-2">
+                  <p>Recupere a senha ou receba um link de acesso por e-mail:</p>
+                  <div className="flex gap-2">
+                    <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="seu@email.com" className="flex-1 bg-black/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-white" />
+                    <button type="button" onClick={recover} disabled={loading} className="bg-primary text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-primary/90">Enviar</button>
+                  </div>
+                  <button type="button" onClick={sendAccessLink} disabled={loading} className="text-sky-400 hover:underline text-[11px] block text-center w-full pt-1">
+                    Enviar link de acesso sem senha
+                  </button>
+                </div>
+              )}
+              <button type="submit" disabled={loading || launching} className="auth-submit-button w-full mt-4">
+                {launching ? "Decolando missão..." : loading ? "Acessando..." : mode === "login" ? "Entrar na Plataforma" : "Criar conta"}
+              </button>
+            </form>
+
+            {mode === "login" && (
+              <p className="mt-4 text-center text-xs text-slate-400">
+                Ainda não tem acesso? <button type="button" className="text-sky-400 font-bold hover:underline" onClick={() => setMode("register")}>Criar conta</button>
+              </p>
+            )}
+
+            <div className="auth-divider"><span />ou continue com<span /></div>
+            <div className="auth-social-grid">
+              <button type="button" onClick={() => social("Claude Opus 5")}><span className="auth-google-mark">G</span>Continuar com Claude Opus 5</button>
+              <button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span>Continuar com iCloud</button>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
