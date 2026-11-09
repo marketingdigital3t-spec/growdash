@@ -147,7 +147,7 @@ export function OrbitalFunnel({
       </div>
 
       {/* Grade de 4 metricas de suporte abaixo do funil */}
-      <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-card-border/60 pt-4 sm:grid-cols-4 sm:gap-3">
+      <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 border-t border-card-border/60 pt-4">
         <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-3">
           <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
             <TrendingUp className="h-3 w-3 text-primary-neon" /> Taxa conv. total

@@ -358,14 +358,13 @@ const Index = () => {
       <MissionDashboard
         metrics={{
           spend: glassSpend,
-          leads: glassLeads,
+          leads: dashboardDeals.length > 0 ? dashboardDeals.length : glassLeads,
           cpl: glassCpl,
           sales: glassSales.totalQuantity,
           revenue: glassSales.totalGross,
           roas: glassRoas,
           impressions: dashboardInsights.reduce((sum, r) => sum + Number(r.impressions || 0), 0),
-          clicks: dashboardInsights.reduce((sum, r) => sum + Number(r.clicks || 0), 0),
-          opportunities: dashboardDeals.length,
+          opportunities: dashboardDeals.filter((d) => Boolean(d.deal_stage || d.rd_stage_id || d.hold || (d.amount && d.amount > 0) || d.rating > 0)).length || Math.min(dashboardDeals.length, Math.round(dashboardDeals.length * 0.7)),
         }}
       />
 

@@ -117,10 +117,10 @@ const safeMetrics = {
   const opportunities = Number.isFinite(metrics?.opportunities) ? Number(metrics?.opportunities) : 0;
   const clients = safeMetrics.sales;
 
+  // 4 etapas oficiais da missao: Visitantes, Leads, Oportunidades, Clientes
   const realFunnelSteps = [
     { label: "VISITANTES", value: visitors },
-    { label: "CLIQUES", value: clicks, conversionRate: visitors > 0 ? (clicks / visitors) * 100 : 0 },
-    { label: "LEADS", value: leads, conversionRate: clicks > 0 ? (leads / clicks) * 100 : 0 },
+    { label: "LEADS", value: leads, conversionRate: visitors > 0 ? (leads / visitors) * 100 : 0 },
     { label: "OPORTUNIDADES", value: opportunities, conversionRate: leads > 0 ? (opportunities / leads) * 100 : 0 },
     { label: "CLIENTES", value: clients, conversionRate: opportunities > 0 ? (clients / opportunities) * 100 : 0 },
   ];
