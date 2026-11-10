@@ -4,6 +4,7 @@ import { Users, Trophy, Percent, Clock, DollarSign, TrendingUp, Target } from "l
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 import { metricDescription } from "@/lib/metricPresentation";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+import { isMetricAvailable, type MetricAvailability } from "@/lib/metricAvailability";
 
 interface Props {
   a: FunnelAnalytics;
@@ -14,16 +15,17 @@ interface Props {
   metaLeads: number;
   metaLeadsAvailable?: boolean;
   metaLeadsLoading?: boolean;
-  trafficLoading?: boolean;
-  trafficUnavailable?: boolean;
   trafficReason?: string | null;
   cpl?: number | null;
   rdCpl?: number | null;
-  metaCplLoading?: boolean;
   cac?: number | null;
   roas?: number | null;
   salesConversionRate?: number | null;
   previousAvgDaysToConvert?: number | null;
+  /** Availability of the persisted Meta snapshot for the selected scope. */
+  metaAvailability?: MetricAvailability | null;
+  /** Availability of the persisted RD snapshot for the selected scope. */
+  rdAvailability?: MetricAvailability | null;
 }
 
 const fmtBRL = (v: number) =>
@@ -37,14 +39,20 @@ const toneClasses: Record<KpiTone, { text: string; border: string; icon: string 
   negative: { text: "text-red-600 dark:text-red-400", border: "border-l-red-500", icon: "text-red-600 dark:text-red-400" },
 };
 
-export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, metaLeads, metaLeadsAvailable = false, metaLeadsLoading = false, trafficLoading = false, trafficUnavailable = false, trafficReason, cpl, rdCpl, metaCplLoading = false, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
+export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, metaLeads, metaLeadsAvailable = false, metaLeadsLoading = false, trafficReason, cpl, rdCpl, cac, roas, salesConversionRate, previousAvgDaysToConvert, metaAvailability, rdAvailability }: Props) {
   // A tiny/empty comparison base produces misleading values such as
   // 2.213.930%. Only show a change when the previous period has a meaningful
   // measured average; otherwise keep the card honest and comparable.
   const timeChange = previousAvgDaysToConvert != null && previousAvgDaysToConvert >= 1
     ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100
     : null;
-  const rdLeadValue = rdLeadsError ? null : rdLeadsLoading ? null : rdLeads;
+  // A confirmed snapshot stays on screen while the provider refreshes. Only a
+  // scope that never produced a snapshot may show a pending/unavailable state.
+  const metaUsable = metaAvailability ? isMetricAvailable(metaAvailability) : true;
+  const rdUsable = rdAvailability ? isMetricAvailable(rdAvailability) : true;
+  const metaPending = metaAvailability?.state === "loading" || (!metaUsable && metaLeadsLoading);
+  const rdPending = rdAvailability?.state === "loading" || (!rdUsable && rdLeadsLoading);
+  const rdLeadValue = rdUsable ? rdLeads : null;
   const conversionTone: KpiTone = a.conversions > 0 ? "positive" : trafficSpend > 0 || rdLeads > 0 ? "negative" : "neutral";
   const salesRateTone: KpiTone = salesConversionRate == null ? (metaLeads > 0 ? "negative" : "neutral") : salesConversionRate > 0 ? "positive" : "negative";
   const timeTone: KpiTone = timeChange == null ? "neutral" : timeChange <= 0 ? "positive" : "negative";
@@ -52,11 +60,11 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
   const cacTone: KpiTone = cac == null ? "neutral" : a.avgTicket > 0 && cac > a.avgTicket ? "negative" : "positive";
   const roasTone: KpiTone = roas == null ? "neutral" : roas >= 1 ? "positive" : "negative";
   const cards = [
-    { label: "Investimento em anúncio", value: trafficSpend, icon: DollarSign, tone: "neutral" as KpiTone, format: "brl" as const, unavailable: trafficLoading || trafficUnavailable, detail: trafficReason || "Investimento atribuído pela Meta Ads no período selecionado." },
-    { label: "Leads Meta", value: metaLeads, icon: Users, tone: "neutral" as KpiTone, format: "int" as const, unavailable: metaLeadsLoading || !metaLeadsAvailable, detail: "Formulários + leads de site + conversas iniciadas · Meta Ads" },
-    { label: "Lead", value: rdLeadValue, icon: Users, tone: "neutral" as KpiTone, format: "int" as const, detail: rdLeadsError ? "Falha ao carregar negociações RD Station" : "Negociações criadas no RD Station · período e filtros selecionados" },
+    { label: "Investimento em anúncio", value: trafficSpend, icon: DollarSign, tone: "neutral" as KpiTone, format: "brl" as const, unavailable: !metaUsable, pending: metaPending, detail: trafficReason || "Investimento atribuído pela Meta Ads no período selecionado." },
+    { label: "Leads Meta", value: metaLeads, icon: Users, tone: "neutral" as KpiTone, format: "int" as const, unavailable: !metaUsable || !metaLeadsAvailable, pending: metaPending, detail: "Formulários + leads de site + conversas iniciadas · Meta Ads" },
+    { label: "Lead", value: rdLeadValue, icon: Users, tone: "neutral" as KpiTone, format: "int" as const, unavailable: !rdUsable, pending: rdPending, detail: rdUsable ? "Negociações criadas no RD Station · período e filtros selecionados" : rdLeadsError ? "Falha ao carregar negociações RD Station" : "Negociações do RD Station · aguardando a primeira sincronização" },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, tone: conversionTone, format: "int" as const },
-    { label: "Conversão Meta → venda", value: salesConversionRate, icon: Percent, tone: salesRateTone, format: "pct" as const, decimals: 2, unavailable: !metaLeadsAvailable },
+    { label: "Conversão Meta → venda", value: salesConversionRate, icon: Percent, tone: salesRateTone, format: "pct" as const, decimals: 2, unavailable: !metaUsable || !metaLeadsAvailable, pending: metaPending },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, tone: timeTone, format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
     { label: "Ticket médio", value: a.avgTicket, icon: Target, tone: a.avgTicket > 0 ? "positive" as KpiTone : "neutral" as KpiTone, format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, tone: revenueTone, format: "brl" as const },
@@ -66,7 +74,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
       icon: TrendingUp,
       tone: "neutral" as KpiTone,
       format: "custom" as const,
-      custom: metaCplLoading ? "Sincronizando…" : cpl == null ? "—" : fmtBRL(cpl),
+      custom: cpl == null ? (metaPending ? "Sincronizando…" : "—") : fmtBRL(cpl),
       detail: "Investimento Meta ÷ leads Meta.",
     },
     {
@@ -112,12 +120,12 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
                   <Icon className={`gd-funnel-kpi-icon shrink-0 ${tone.icon}`} />
                 </div>
                 <div className={`gd-funnel-kpi-value ${tone.text}`}>
-                  {c.format === "int" && c.label === "Leads Meta" && (("unavailable" in c && c.unavailable) ? (metaLeadsLoading ? "Sincronizando…" : "Indisponível") : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
-                  {c.format === "int" && c.label === "Lead" && (rdLeadsLoading ? "Carregando…" : rdLeadsError ? "Indisponível" : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
+                  {c.format === "int" && c.label === "Leads Meta" && (("unavailable" in c && c.unavailable) ? (("pending" in c && c.pending) ? "Sincronizando…" : "Indisponível") : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
+                  {c.format === "int" && c.label === "Lead" && (("unavailable" in c && c.unavailable) ? (("pending" in c && c.pending) ? "Carregando…" : "Indisponível") : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
                   {c.format === "int" && c.label === "Conversões / Vendas" && <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />}
-                  {c.format === "pct" && ("unavailable" in c && c.unavailable ? "Indisponível" : <><AnimatedNumber value={c.value ?? 0} decimals={c.decimals ?? 1} />%</>)}
+                  {c.format === "pct" && ("unavailable" in c && c.unavailable ? (("pending" in c && c.pending) ? "Sincronizando…" : "Indisponível") : <><AnimatedNumber value={c.value ?? 0} decimals={c.decimals ?? 1} />%</>)}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
-                  {c.format === "brl" && (("unavailable" in c && c.unavailable) ? "Aguardando sincronização" : fmtBRL(c.value))}
+                  {c.format === "brl" && (("unavailable" in c && c.unavailable) ? (("pending" in c && c.pending) ? "Aguardando sincronização" : "Indisponível") : fmtBRL(c.value))}
                   {c.format === "custom" && <span>{c.custom}</span>}
                 </div>
                 {c.detail && <p className="gd-funnel-kpi-detail text-muted-foreground">{c.detail}</p>}

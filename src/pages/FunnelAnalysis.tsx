@@ -50,6 +50,8 @@ import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpp
 import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
 import { filterRDPeriodDeals, mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
 import { buildFunnelCampaignOptions, splitFunnelCampaignSelection } from "@/lib/funnelCampaignOptions";
+import { buildFunnelMetricAvailability, hasRenderableFunnelStages } from "@/lib/funnelMetricAvailability";
+import { FunnelSyncStatusBadge } from "@/components/funnel-analysis/FunnelSyncStatusBadge";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -538,11 +540,19 @@ export default function FunnelAnalysis() {
     timezone: selectedMetaScope.timezone,
   }, visibleAccounts.length > 0);
 
+  // O snapshot persistido da Meta é lido pelo escopo exato de conta e
+  // período. A cobertura (`available`) confirma a reconciliação, mas sua
+  // ausência não invalida as linhas já gravadas: esconder esses números
+  // deixava a tela inteira em "Aguardando sincronização" mesmo com dados
+  // válidos no banco. O Dashboard já usa `rowCount` como autoridade para
+  // exibir o último snapshot; o Funil segue o mesmo contrato.
+  const hasMetaSnapshot = funnelMeta.data.rowCount > 0;
+  const metaLeadsAvailable = hasMetaSnapshot && (funnelMeta.data.metricAvailability.leads?.available ?? false);
   const mediaMetrics = useMemo(
     () => {
       // Use somente o adaptador canônico Meta. `insights.leads` é legado e não
       // pode substituir nem completar ações quando o snapshot estiver ausente.
-      const mediaRows = funnelMeta.data.available ? [{
+      const mediaRows = hasMetaSnapshot ? [{
         spend: funnelMeta.data.spend,
         impressions: funnelMeta.data.impressions,
         reach: funnelMeta.data.reach,
@@ -559,28 +569,28 @@ export default function FunnelAnalysis() {
       );
       return {
         ...computed,
-        spend: funnelMeta.data.available ? funnelMeta.data.spend : 0,
-        metaLeads: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : 0,
-        rdCpl: funnelMeta.data.available && periodAnalytics.totalLeads > 0
+        spend: hasMetaSnapshot ? funnelMeta.data.spend : 0,
+        metaLeads: metaLeadsAvailable ? funnelMeta.data.leads : 0,
+        rdCpl: hasMetaSnapshot && periodAnalytics.totalLeads > 0
           ? funnelMeta.data.spend / periodAnalytics.totalLeads
           : null,
-        metaCpl: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+        metaCpl: metaLeadsAvailable
           ? funnelMeta.data.cpl
           : null,
-        cac: funnelMeta.data.available && periodAnalytics.conversions > 0
+        cac: hasMetaSnapshot && periodAnalytics.conversions > 0
           ? funnelMeta.data.spend / periodAnalytics.conversions
           : null,
         // A análise de funil usa vendas e receita confirmadas no RD como
         // fonte financeira única. O investimento continua vindo da Meta.
-        roas: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+        roas: metaLeadsAvailable
           ? (funnelMeta.data.spend > 0 ? periodAnalytics.revenue / funnelMeta.data.spend : null)
           : null,
-        salesConversionRate: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+        salesConversionRate: metaLeadsAvailable
           ? computed.salesConversionRate
           : null,
       };
     },
-    [funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads],
+    [funnelMeta.data, hasMetaSnapshot, metaLeadsAvailable, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads],
   );
   const funnelTableInsights = useMemo(() => {
     const countedAds = new Set<string>();
@@ -596,9 +606,7 @@ export default function FunnelAnalysis() {
     });
   }, [funnelMeta.data.leadBreakdownByAd, scopedInsights]);
 
-  async function handleSync() {
-    if (!funnelId && visibleAccounts.length === 0) return;
-    setSyncing(true);
+  async function runProviderReconciliation() {
     try {
       // A atualização manual deve ser rápida e previsível: reconcilia apenas
       // o período atualmente selecionado. O backfill histórico é executado
@@ -680,7 +688,13 @@ export default function FunnelAnalysis() {
               throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
             }
             latestResult = data;
-            if (data?.complete !== false && !data?.partial) break;
+            // Só a paginação pendente justifica repetir a reconciliação. O
+            // catálogo de etapas é um enriquecimento opcional: quando ele
+            // falha, o backend restaura as etapas a partir do snapshot das
+            // negociações e marca `partial` sem deixar páginas em aberto.
+            // Repetir a chamada dez vezes por causa desse aviso apenas
+            // multiplicava o tempo no botão.
+            if (data?.complete !== false) break;
             if (pass === MAX_RESUMABLE_PASSES - 1) {
               throw new Error("O RD ainda não concluiu todas as páginas. O snapshot anterior foi preservado e a sincronização pode ser retomada.");
             }
@@ -751,7 +765,28 @@ export default function FunnelAnalysis() {
       toast.error(e.message || "Erro ao sincronizar");
     } finally {
       setSyncing(false);
+      setRdLastUpdatedAt(new Date());
     }
+  }
+
+  // A sincronização manual não pode prender a interface. O provider pode
+  // demorar dezenas de segundos para paginar uma conta grande, e um `await`
+  // dentro do handler mantinha a tela em "Sincronizando…" esse tempo todo.
+  // O trabalho real continua no servidor; a interface apenas informa o
+  // estado e deixa os dados já salvos visíveis.
+  function handleSync() {
+    if (syncing) {
+      toast.info("Sincronização já está em andamento", {
+        description: "Os dados atuais continuam visíveis e serão atualizados assim que o servidor concluir.",
+      });
+      return;
+    }
+    if (!funnelId && visibleAccounts.length === 0) return;
+    setSyncing(true);
+    toast.info("Sincronização em andamento", {
+      description: "Os dados atuais continuam disponíveis e serão atualizados assim que a Meta e o RD concluírem.",
+    });
+    void runProviderReconciliation();
   }
 
   // `isLoading` can briefly become true during a background refetch. The
@@ -764,15 +799,37 @@ export default function FunnelAnalysis() {
   // dozens of seconds while the same period snapshot was already available.
   // They now hydrate independently and the visible period remains truthful
   // until they arrive.
+  //
+  // A tela só troca o conteúdo por "Carregando…" quando nenhuma consulta do
+  // recorte foi concluída ainda. Um recorte já confirmado precisa continuar
+  // visível: as leituras mais lentas (histórico, vendas fechadas) hidratam
+  // sozinhas depois, sem apagar os números que o usuário já estava vendo.
+  const periodSnapshotReady = periodDealsFetched || periodDealsIsError;
+  const closedSnapshotReady = periodClosedDealsFetched || periodClosedDealsIsError;
   const initialDataLoading = !funnelsFetched
-    || (funnelScopeIds.length > 0 && !periodDealsFetched && !periodDealsIsError && periodDeals.length === 0)
-    || (funnelScopeIds.length > 0 && !periodClosedDealsFetched && !periodClosedDealsIsError && periodClosedDeals.length === 0);
+    || (funnelScopeIds.length > 0 && !periodSnapshotReady && !periodDeals.length)
+    || (funnelScopeIds.length > 0 && !closedSnapshotReady && !periodClosedDeals.length);
   const rdPeriodError = periodDealsIsError || periodClosedDealsIsError;
   const rdPeriodErrorMessage = [periodDealsError, periodClosedDealsError]
     .map((error) => error instanceof Error ? error.message : error ? String(error) : "")
     .filter(Boolean)
     .join(" · ");
-  const noStages = !initialDataLoading && operationalStages.length === 0;
+  // Um snapshot confirmado permanece visível enquanto o provedor reconcilia.
+  // O cartão só entra em estado pendente quando este recorte nunca produziu
+  // um snapshot salvo.
+  const funnelAvailability = useMemo(() => buildFunnelMetricAvailability({
+    hasMetaSnapshot,
+    metaLoading: funnelMeta.insightsLoading || funnelMeta.actionsLoading,
+    metaUnavailable: !hasMetaSnapshot,
+    metaReason: funnelMeta.data.unavailableReason,
+    hasRDSnapshot: periodDealsFetched && !periodDealsIsError,
+    rdLoading: loadingPeriodDeals || loadingPeriodClosedDeals,
+    rdError: periodDealsIsError || periodClosedDealsIsError,
+    rdReason: rdPeriodErrorMessage,
+    rdSyncing: syncing,
+  }), [funnelMeta.actionsLoading, funnelMeta.data.unavailableReason, funnelMeta.insightsLoading, hasMetaSnapshot, loadingPeriodClosedDeals, loadingPeriodDeals, periodClosedDealsIsError, periodDealsFetched, periodDealsIsError, rdPeriodErrorMessage, syncing]);
+  const renderableStages = hasRenderableFunnelStages(operationalStages.length, periodAnalytics.stages.length);
+  const lastUpdatedAt = funnelMeta.data.syncedAt ? new Date(funnelMeta.data.syncedAt) : rdLastUpdatedAt;
 
   return (
     <MotionPage className="gd-module-shell gd-funnel-analysis mx-auto max-w-[1700px] space-y-5">
@@ -784,12 +841,13 @@ export default function FunnelAnalysis() {
               Acompanhe a performance dos leads e funis reais do RD. Meta: última sincronização {funnelMeta.data.syncedAt ? `às ${new Date(funnelMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}; Insights podem atrasar.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <MetaHealthBadge accounts={visibleAccounts} selectedIds={selectedAccountIds} />
             <RDHealthBadge />
+            <FunnelSyncStatusBadge lastUpdatedAt={lastUpdatedAt} syncing={syncing} />
             <Button onClick={handleSync} disabled={syncing || syncMeta.isPending || (!funnelId && visibleAccounts.length === 0)} variant="default" size="sm">
               <RefreshCw className={`h-4 w-4 mr-2 ${syncing || syncMeta.isPending ? "animate-spin" : ""}`} />
-              Sincronizar Meta + RD
+              {syncing || syncMeta.isPending ? "Sincronização em andamento" : "Sincronizar Meta + RD"}
             </Button>
           </div>
         </div>
@@ -811,21 +869,21 @@ export default function FunnelAnalysis() {
         </MotionItem>
       ) : (
         <>
-          {(activeFunnels.length === 0 || noStages || rdPeriodError || (!fetchingPeriodDeals && operationalPeriodDeals.length === 0)) && (
+          {(activeFunnels.length === 0 || !renderableStages || rdPeriodError || (!fetchingPeriodDeals && operationalPeriodDeals.length === 0)) && (
             <MotionItem>
               <div className="flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     {activeFunnels.length === 0
                       ? "Nenhum funil RD ativo disponível."
-                      : noStages
+                      : !renderableStages
                         ? "O catálogo de etapas do RD não está disponível."
                     : rdPeriodError
                       ? "Não foi possível confirmar as negociações RD deste recorte."
                       : "Nenhuma negociação encontrada no histórico sincronizado."}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {noStages
+                    {!renderableStages
                       ? "A distribuição usa as etapas salvas nas negociações; o histórico de movimentações entre etapas continua indisponível. O período acima continua sendo usado para comparar a mídia Meta."
                     : rdPeriodError
                       ? `${rdPeriodErrorMessage || "A consulta expirou ou a sincronização está incompleta."} O snapshot anterior foi preservado; não exibiremos zero como se fosse ausência de negociações.`
@@ -834,7 +892,9 @@ export default function FunnelAnalysis() {
                 </div>
                 <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
                   <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                    {activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
+                    {syncing
+                      ? "Sincronização em andamento"
+                      : activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
                 </Button>
               </div>
             </MotionItem>
@@ -852,18 +912,17 @@ export default function FunnelAnalysis() {
               rdLeadsError={Boolean(periodDealsError) && periodAnalytics.totalLeads === 0}
               trafficSpend={mediaMetrics.spend}
               metaLeads={mediaMetrics.metaLeads}
-              metaLeadsAvailable={funnelMeta.data.available && (funnelMeta.data.metricAvailability.leads?.available ?? false)}
+              metaLeadsAvailable={metaLeadsAvailable}
               metaLeadsLoading={funnelMeta.actionsLoading}
-              trafficLoading={funnelMeta.insightsLoading}
-              trafficUnavailable={!funnelMeta.data.available}
               trafficReason={funnelMeta.data.unavailableReason}
               cpl={mediaMetrics.metaCpl}
               rdCpl={mediaMetrics.rdCpl}
-              metaCplLoading={funnelMeta.actionsLoading}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}
-              salesConversionRate={funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available ? mediaMetrics.salesConversionRate : null}
+              salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
+              metaAvailability={funnelAvailability.meta}
+              rdAvailability={funnelAvailability.rd}
             />
           </MotionItem>
 
