@@ -47,12 +47,18 @@ export async function resolveAuthorizedAdAccounts<T extends AdAccountRecord = Ad
   if (requestedIds.length) accessQuery = accessQuery.in("ad_account_id", requestedIds);
   const accessResult = await accessQuery.order("ad_account_id", { ascending: true });
   if (accessResult.error) throw accessResult.error;
+  // A chave de autorização usa sempre o workspace da própria conta. O
+  // workspace_id gravado na concessão só é usado quando a conta ainda não tem
+  // workspace (legada) — assim a comparação nunca casa com a conta de outro
+  // cliente por causa de um workspace_id divergente.
   const workspaceByAccount = new Map(accounts.map((account) => [account.id, account.workspace_id || null]));
-  const accountAccess = new Set<string>((accessResult.data || []).map((row: { ad_account_id: string; workspace_id?: string | null }) => adAccountAccessKey(
-    userId,
-    row.ad_account_id,
-    row.workspace_id === undefined ? workspaceByAccount.get(row.ad_account_id) || null : row.workspace_id,
-  )));
+  const accountAccess = new Set<string>((accessResult.data || []).map((row: { ad_account_id: string; workspace_id?: string | null }) => {
+    const accountWorkspaceId = workspaceByAccount.get(row.ad_account_id);
+    const resolvedWorkspaceId = accountWorkspaceId === undefined
+      ? (row.workspace_id ?? null)
+      : (accountWorkspaceId || row.workspace_id || null);
+    return adAccountAccessKey(userId, row.ad_account_id, resolvedWorkspaceId);
+  }));
 
   return filterAuthorizedAdAccounts(accounts, {
     userId,

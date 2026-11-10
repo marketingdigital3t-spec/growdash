@@ -28,9 +28,11 @@ export function isAdAccountAuthorized(account: AdAccountRecord, context: AdAccou
   if (account.metadata?.profile_disconnected === true) return false;
   if (context.master || account.user_id === context.userId) return true;
   if (account.workspace_id && context.managerWorkspaceIds.has(account.workspace_id)) return true;
-  // Permite acesso explícito concedido para a conta no workspace atual ou legado
-  return context.accountAccess.has(adAccountAccessKey(context.userId, account.id, account.workspace_id))
-    || context.accountAccess.has(adAccountAccessKey(context.userId, account.id, null));
+  // A concessão explícita é sempre registrada em relação ao workspace da
+  // própria conta. O conjunto de chaves já é construído com essa fonte da
+  // verdade, então basta uma única comparação — aceitar a chave "null" para
+  // qualquer conta permitiria vazamento entre clientes.
+  return context.accountAccess.has(adAccountAccessKey(context.userId, account.id, account.workspace_id));
 }
 
 export function filterAuthorizedAdAccounts<T extends AdAccountRecord>(accounts: T[], context: AdAccountAccessContext) {

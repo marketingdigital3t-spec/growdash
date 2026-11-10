@@ -40,8 +40,16 @@ describe("Meta account authorization contract", () => {
     expect(filterAuthorizedAdAccounts([legacy], context({ accountAccess: new Set(["delegated-1:other:null"]) }))).toEqual([]);
   });
 
-  it("allows delegated access when account has workspace but grant was recorded with null workspace", () => {
+  it("does not leak a grant recorded for another account into this account", () => {
+    // A chave carrega o id da conta: um acesso concedido para a conta-2 não
+    // pode autorizar a conta-1, mesmo dentro do mesmo workspace.
+    const granted = filterAuthorizedAdAccounts([account()], context({ accountAccess: new Set(["delegated-1:account-2:workspace-1"]) }));
+    expect(granted).toEqual([]);
+  });
+
+  it("requires the account workspace to match the granted workspace", () => {
+    // Concessão em workspace-2 não autoriza uma conta do workspace-1.
     const acct = account({ workspace_id: "workspace-1" });
-    expect(filterAuthorizedAdAccounts([acct], context({ accountAccess: new Set(["delegated-1:account-1:null"]) }))).toHaveLength(1);
+    expect(filterAuthorizedAdAccounts([acct], context({ accountAccess: new Set(["delegated-1:account-1:workspace-2"]) }))).toEqual([]);
   });
 });

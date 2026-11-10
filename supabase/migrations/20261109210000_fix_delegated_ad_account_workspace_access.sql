@@ -36,10 +36,27 @@ AS $$
               OR account.workspace_id IS NULL
               OR public.is_workspace_member(access.workspace_id, _user_id)
             )
+            -- A concessão só vale dentro de um workspace onde o usuário é
+            -- membro ativo. Sem esta âncora, uma conta legada sem
+            -- workspace poderia ser vista por membros de outro cliente.
             AND (
-              account.workspace_id IS NULL
-              OR public.is_workspace_member(account.workspace_id, _user_id)
-              OR (access.workspace_id IS NOT NULL AND public.is_workspace_member(access.workspace_id, _user_id))
+              public.is_workspace_member(access.workspace_id, _user_id)
+              OR (
+                account.workspace_id IS NOT NULL
+                AND public.is_workspace_member(account.workspace_id, _user_id)
+              )
+              OR (
+                account.workspace_id IS NULL
+                AND EXISTS (
+                  SELECT 1
+                  FROM public.workspace_members member
+                  JOIN public.workspaces owner_workspace
+                    ON owner_workspace.owner_id = account.user_id
+                  WHERE member.workspace_id = owner_workspace.id
+                    AND member.user_id = _user_id
+                    AND member.status = 'active'
+                )
+              )
             )
         )
       )
@@ -138,7 +155,19 @@ BEGIN
   WHERE account.id = ANY(COALESCE(_ad_account_ids, '{}'::uuid[]))
     AND (
       account.workspace_id = _workspace_id
-      OR account.workspace_id IS NULL
+      -- Conta legada sem workspace: só pertence a este workspace se o
+      -- proprietário dela for o owner (ou um membro ativo) deste workspace.
+      -- Sem esta âncora, uma conta de outro cliente seria concedível.
+      OR (
+        account.workspace_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM public.workspace_members member
+          WHERE member.workspace_id = _workspace_id
+            AND member.user_id = account.user_id
+            AND member.status = 'active'
+        )
+      )
       OR account.user_id = (SELECT workspace.owner_id FROM public.workspaces workspace WHERE workspace.id = _workspace_id)
       OR EXISTS (
         SELECT 1
