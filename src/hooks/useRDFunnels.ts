@@ -88,7 +88,13 @@ export function useUpdateRDFunnel() {
       }
       return data as RDFunnel;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["rd_funnels"] });
+      void qc.invalidateQueries({ queryKey: ["rd_deals"] });
+      void qc.invalidateQueries({ queryKey: ["rd_deals_period"] });
+      void qc.invalidateQueries({ queryKey: ["rd_crm_deals"] });
+      void qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
+    },
   });
 }
 

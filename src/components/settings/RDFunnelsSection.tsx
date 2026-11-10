@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle, Facebook } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 interface RDPipeline { id: string; name: string }
@@ -37,22 +38,27 @@ function LinkFunnelDialog({
   const { toast } = useToast();
   const create = useCreateRDFunnel();
   const { data: connections = [] } = useRDAccountConnections();
+  const { data: adAccounts = [] } = useAdAccounts(true);
   const [selectedConnectionId, setSelectedConnectionId] = useState(rdConnectionId || "");
   const { data: pipelines = [], isLoading, error } = useRDApiFunnels(open, selectedConnectionId);
   const [pipelineId, setPipelineId] = useState("");
+  const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>("none");
 
   const selected = pipelines.find((p) => p.id === pipelineId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="space-y-3">
         <DialogHeader>
           <DialogTitle>Vincular funil do RD Station</DialogTitle>
         </DialogHeader>
-        <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
-          <SelectTrigger><SelectValue placeholder="Escolha a conexão RD" /></SelectTrigger>
-          <SelectContent>{connections.map((connection) => <SelectItem key={connection.id} value={connection.id}>{connection.account_name} · {connection.status}</SelectItem>)}</SelectContent>
-        </Select>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground">Conexão do RD Station</label>
+          <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+            <SelectTrigger><SelectValue placeholder="Escolha a conexão RD" /></SelectTrigger>
+            <SelectContent>{connections.map((connection) => <SelectItem key={connection.id} value={connection.id}>{connection.account_name} · {connection.status}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
         {error ? (
           <div className="text-sm text-destructive">
             {(error as Error).message}. Configure o token no card acima.
@@ -60,15 +66,35 @@ function LinkFunnelDialog({
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando funis do RD...</p>
         ) : (
-          <Select value={pipelineId} onValueChange={setPipelineId}>
-            <SelectTrigger><SelectValue placeholder="Escolha um funil" /></SelectTrigger>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">Funil / Pipeline do RD</label>
+            <Select value={pipelineId} onValueChange={setPipelineId}>
+              <SelectTrigger><SelectValue placeholder="Escolha um funil" /></SelectTrigger>
+              <SelectContent>
+                {pipelines.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground">Conta de Anúncios Meta vinculada (opcional)</label>
+          <Select value={selectedAdAccountId} onValueChange={setSelectedAdAccountId}>
+            <SelectTrigger><SelectValue placeholder="Selecione a conta Meta correspondente" /></SelectTrigger>
             <SelectContent>
-              {pipelines.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              <SelectItem value="none">Sem conta vinculada (Apenas RD)</SelectItem>
+              {adAccounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name} {account.account_id ? `(${account.account_id})` : ""}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
+          <p className="text-[11px] text-muted-foreground">
+            Ao vincular uma conta Meta, este funil aparecerá automaticamente nos relatórios quando essa conta de anúncios for selecionada no topo.
+          </p>
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
@@ -76,16 +102,17 @@ function LinkFunnelDialog({
             onClick={async () => {
               if (!selected) return;
               await create.mutateAsync({
-                ad_account_id: null,
+                ad_account_id: selectedAdAccountId === "none" ? null : selectedAdAccountId,
                 rd_connection_id: selectedConnectionId,
                 name: selected.name,
                 expert_name: null,
                 rd_funnel_id: selected.id,
                 utm_campaign_pattern: null,
               });
-              toast({ title: "Funil vinculado!" });
+              toast({ title: "Funil vinculado com sucesso!" });
               onOpenChange(false);
               setPipelineId("");
+              setSelectedAdAccountId("none");
             }}
           >
             Vincular
@@ -96,7 +123,15 @@ function LinkFunnelDialog({
   );
 }
 
-function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; activationBlocked?: boolean }) {
+function FunnelRow({
+  funnel,
+  adAccounts = [],
+  activationBlocked = false,
+}: {
+  funnel: RDFunnel;
+  adAccounts?: Array<{ id: string; name: string; account_id?: string | null }>;
+  activationBlocked?: boolean;
+}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const update = useUpdateRDFunnel();
@@ -148,6 +183,31 @@ function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; ac
     onError: (e: Error) => toast({ title: "Erro ao sincronizar", description: e.message || "A sincronização falhou.", variant: "destructive" }),
   });
 
+  const handleAdAccountChange = (nextValue: string) => {
+    const nextAccountId = nextValue === "none" ? null : nextValue;
+    const targetAccount = adAccounts.find((a) => a.id === nextAccountId);
+    update.mutate(
+      { id: funnel.id, ad_account_id: nextAccountId },
+      {
+        onSuccess: () => {
+          toast({
+            title: nextAccountId ? "Conta Meta conectada ao funil!" : "Vínculo Meta removido",
+            description: nextAccountId
+              ? `O funil ${funnel.name} agora está associado a "${targetAccount?.name || 'Conta Meta'}".`
+              : `O funil ${funnel.name} agora opera como funil independente.`,
+          });
+        },
+        onError: (err: Error) => {
+          toast({
+            title: "Erro ao atualizar conta Meta",
+            description: err.message,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   return (
     <motion.div
       layout
@@ -155,10 +215,10 @@ function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; ac
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.2 }}
-      className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 gap-2"
+      className="flex flex-wrap items-center justify-between rounded-md bg-muted/40 px-3 py-2.5 gap-2"
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium truncate">{funnel.name}</p>
           {linked ? (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
@@ -170,9 +230,34 @@ function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; ac
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate">
-          {linked ? `RD ID: ${funnel.rd_funnel_id}` : "Edite para vincular a um funil real"}
-        </p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+          <span className="truncate">{linked ? `RD ID: ${funnel.rd_funnel_id}` : "Edite para vincular a um funil real"}</span>
+          <span aria-hidden="true">•</span>
+          <div className="inline-flex items-center gap-1.5">
+            <Facebook className="h-3 w-3 text-blue-500 shrink-0" />
+            <span className="text-[11px] font-medium">Conta Meta:</span>
+            <Select
+              value={funnel.ad_account_id || "none"}
+              disabled={update.isPending}
+              onValueChange={handleAdAccountChange}
+            >
+              <SelectTrigger
+                className="h-6 px-2 text-[11px] max-w-[200px] border-border/80 bg-background/80"
+                aria-label={`Conta de anúncios vinculada ao funil ${funnel.name}`}
+              >
+                <SelectValue placeholder="Vincular conta Meta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem conta Meta (Apenas RD)</SelectItem>
+                {adAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name} {account.account_id ? `(${account.account_id})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
       <div className="flex items-center gap-1">
         <Button
@@ -220,7 +305,19 @@ function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; ac
   );
 }
 
-function RDConnectionFunnelsBlock({ connectionId, accountName, funnels, activePipelineIds }: { connectionId: string; accountName: string; funnels: RDFunnel[]; activePipelineIds: Set<string> }) {
+function RDConnectionFunnelsBlock({
+  connectionId,
+  accountName,
+  funnels,
+  activePipelineIds,
+  adAccounts = [],
+}: {
+  connectionId: string;
+  accountName: string;
+  funnels: RDFunnel[];
+  activePipelineIds: Set<string>;
+  adAccounts?: Array<{ id: string; name: string; account_id?: string | null }>;
+}) {
   const [openLink, setOpenLink] = useState(false);
   const { data: pipelines = [], isLoading, error } = useRDApiFunnels(true, connectionId);
   const importFunnels = useImportRDFunnels();
@@ -228,7 +325,7 @@ function RDConnectionFunnelsBlock({ connectionId, accountName, funnels, activePi
   const importedCount = funnels.length;
   return <div className="rounded-lg border p-3 space-y-3">
     <div className="flex items-center justify-between gap-2 flex-wrap">
-      <div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">{importedCount} funil(is) carregado(s) · ativação independente da Meta</p></div>
+      <div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">{importedCount} funil(is) carregado(s) · vincule cada um à conta de anúncio correspondente</p></div>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={isLoading || !!error || importFunnels.isPending} onClick={() => importFunnels.mutate({ connectionId, pipelines }, { onSuccess: (result) => toast({ title: "Funis RD carregados", description: `${result.imported} novos funis importados de ${result.total} disponíveis.` }), onError: (importError: Error) => toast({ title: "Erro ao carregar funis", description: importError.message, variant: "destructive" }) })}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1 ${importFunnels.isPending ? "animate-spin" : ""}`} /> {importFunnels.isPending ? "Carregando…" : "Carregar todos os funis"}
@@ -237,25 +334,34 @@ function RDConnectionFunnelsBlock({ connectionId, accountName, funnels, activePi
       </div>
     </div>
     {error && <p className="text-xs text-destructive">Não foi possível consultar os funis desta conexão RD.</p>}
-    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} adAccounts={adAccounts} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
     {!funnels.length && !isLoading && <p className="text-sm text-muted-foreground">Nenhum funil carregado. Use “Carregar todos os funis”.</p>}
     <LinkFunnelDialog rdConnectionId={connectionId} open={openLink} onOpenChange={setOpenLink} />
   </div>;
 }
 
-function OrphanFunnelsBlock({ funnels, activePipelineIds }: { funnels: RDFunnel[]; activePipelineIds: Set<string> }) {
+function OrphanFunnelsBlock({
+  funnels,
+  activePipelineIds,
+  adAccounts = [],
+}: {
+  funnels: RDFunnel[];
+  activePipelineIds: Set<string>;
+  adAccounts?: Array<{ id: string; name: string; account_id?: string | null }>;
+}) {
   return <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
     <div>
       <p className="font-medium text-sm">Funis RD cadastrados</p>
-      <p className="text-xs text-muted-foreground">A conexão não foi listada nesta consulta, mas o vínculo permanece disponível para ativação ou desativação.</p>
+      <p className="text-xs text-muted-foreground">A conexão não foi listada nesta consulta, mas o vínculo com a conta de anúncios e a ativação permanecem disponíveis.</p>
     </div>
-    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} adAccounts={adAccounts} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
   </div>;
 }
 
 export function RDFunnelsSection() {
   const { data: allFunnels = [] } = useRDFunnels(undefined, true);
   const { data: connections = [] } = useRDAccountConnections();
+  const { data: adAccounts = [] } = useAdAccounts(true);
   const listedConnectionIds = new Set(connections.map((connection) => connection.id));
   const orphanFunnels = allFunnels.filter((funnel) => !funnel.rd_connection_id || !listedConnectionIds.has(funnel.rd_connection_id));
   const activePipelineIds = new Set(allFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.rd_funnel_id!));
@@ -267,15 +373,15 @@ export function RDFunnelsSection() {
           <Funnel className="h-5 w-5" /> Funis RD
         </CardTitle>
         <CardDescription>
-          Todos os funis do RD Station ficam disponíveis aqui. Ative ou desative cada funil sem vínculo com contas Meta.
+          Todos os funis do RD Station ficam disponíveis aqui. Ative, desative e conecte cada funil à conta de anúncios Meta correspondente.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {connections.length === 0 && !allFunnels.length ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
           const connectionFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
-          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} />;
+          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />;
         })}
-        {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} activePipelineIds={activePipelineIds} />}
+        {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />}
       </CardContent>
     </Card>
   );
