@@ -122,10 +122,23 @@ describe("frontend theme and responsive contracts", () => {
     expect(css).toContain(".gd-crm-metric-card > p.text-primary");
   });
 
-  it("ships the pure emerald neon palette without any purple or blue color bleeding", () => {
-    expect(premiumStyles).toContain('html[data-platform-theme="emerald"]');
-    expect(premiumStyles).toContain("--palette-accent: #10B981");
-    expect(premiumStyles).toContain("--palette-accent-bright: #00FF88");
+  it("ships one palette block per mission phase so the phase accent actually applies", () => {
+    // As fases reais são definidas por useAccentTheme.ts (terra | orbita |
+    // galaxia). Blocos com nomes antigos nunca casavam com o DOM e deixavam o
+    // premium.css travado no azul para todas as fases.
+    expect(premiumStyles).toContain('html[data-platform-theme="terra"]');
+    expect(premiumStyles).toContain('html[data-platform-theme="orbita"]');
+    expect(premiumStyles).toContain('html[data-platform-theme="galaxia"]');
+    expect(premiumStyles).not.toContain('html[data-platform-theme="emerald"]');
+    expect(premiumStyles).not.toContain('html[data-platform-theme="obsidian"]');
+
+    // Terra: azul cósmico.
+    expect(premiumStyles).toMatch(/\[data-platform-theme="terra"\][\s\S]*?--palette-accent:\s*#00A8FF/);
+    // Órbita: dourado solar.
+    expect(premiumStyles).toMatch(/\[data-platform-theme="orbita"\][\s\S]*?--palette-accent:\s*#FFC107/);
+    // Galáxia: púrpura neon.
+    expect(premiumStyles).toMatch(/\[data-platform-theme="galaxia"\][\s\S]*?--palette-accent:\s*#A855F7/);
+
     expect(premiumStyles).toContain("--accent-primary: var(--palette-accent)");
     // Zero roxo em qualquer lugar da folha
     expect(premiumStyles).not.toContain("#BC13FE");
@@ -147,13 +160,14 @@ describe("frontend theme and responsive contracts", () => {
     );
     expect(themeHook).toContain('root.dataset.platformTheme = themeName');
     expect(themeHook).toContain('root.classList.toggle("dark", mode === "dark")');
-    expect(themeHook).toContain('export type AccentTheme = "obsidian" | "emerald"');
+    expect(themeHook).toContain('export type AccentTheme = "terra" | "orbita" | "galaxia"');
   });
 
-  it("renders dark cards with translucent black glass over green cosmic nebula (Image 2 aesthetic)", () => {
+  it("renders dark cards with translucent black glass over the cosmic nebula", () => {
     expect(premiumStyles).toContain("linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important");
-    expect(premiumStyles).toContain("border: 1px solid rgba(0, 255, 136, 0.22) !important");
-    expect(premiumStyles).toContain("--bg-canvas: #020403");
+    expect(premiumStyles).toContain("border-color: rgba(56, 189, 248, 0.22) !important");
+    expect(premiumStyles).toContain("--bg-canvas: #030712");
+    expect(premiumStyles).toContain("--surface-card: linear-gradient(145deg, rgba(8, 15, 30, 0.85), rgba(4, 8, 18, 0.95))");
     expect(premiumStyles).not.toContain("--surface-card: rgba(15, 23, 42");
     expect(premiumStyles).not.toContain("--card: 222 47% 11%");
   });
@@ -194,10 +208,10 @@ describe("frontend theme and responsive contracts", () => {
 
   it("keeps palette and reading mode as independent dimensions", () => {
     // The palette (`data-platform-theme`) only decides the accent colour; the
-    // reading mode (`.dark`) only decides the surfaces. Esmeralda stays green
-    // and Obsidian stays purple no matter which reading mode is active, so
-    // every combination is valid: emerald+light, emerald+dark, obsidian+light,
-    // obsidian+dark.
+    // reading mode (`.dark`) only decides the surfaces. Each mission phase
+    // keeps its own accent no matter which reading mode is active, so every
+    // combination is valid: terra+light, terra+dark, orbita+light, orbita+dark,
+    // galaxia+light, galaxia+dark.
     const premiumStyles = readFileSync(
       fileURLToPath(new URL("../styles/premium.css", import.meta.url)),
       "utf8",
@@ -219,10 +233,12 @@ describe("frontend theme and responsive contracts", () => {
       "utf8",
     );
 
-    // Palette: a single emerald neon palette drives every accent.
-    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-accent:\s*#10B981/);
-    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-secondary:\s*#059669/);
-    expect(premiumStyles).toMatch(/\[data-platform-theme="emerald"\][\s\S]*?--palette-accent-bright:\s*#00FF88/);
+    // Palette: one accent per mission phase drives every accent token.
+    expect(premiumStyles).toMatch(/\[data-platform-theme="terra"\][\s\S]*?--palette-accent:\s*#00A8FF/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="terra"\][\s\S]*?--palette-secondary:\s*#0284C7/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="terra"\][\s\S]*?--palette-accent-bright:\s*#38BDF8/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="orbita"\][\s\S]*?--palette-accent:\s*#FFC107/);
+    expect(premiumStyles).toMatch(/\[data-platform-theme="galaxia"\][\s\S]*?--palette-accent:\s*#A855F7/);
 
     // Mode: the dark block depends only on `.dark`, not on the palette.
     expect(premiumStyles).toContain("html.dark {");
@@ -230,7 +246,7 @@ describe("frontend theme and responsive contracts", () => {
 
     // The cosmic background follows the palette, not the mode.
     expect(premiumStyles).toContain("radial-gradient(ellipse 120% 42% at 62% 108%");
-    expect(premiumStyles).toContain("rgba(0, 255, 136, 0.22)");
+    expect(premiumStyles).toContain("rgba(56, 189, 248, 0.22)");
 
     // The hook returns the reading mode separately and applies it.
     expect(hook).toContain("setMode");

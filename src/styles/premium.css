@@ -1,14 +1,15 @@
 /* ==========================================================================
-   Growdash Premium Layer — Obsidian & Esmeralda
+   Growdash Premium Layer — Fases Terra / Órbita / Galáxia
    --------------------------------------------------------------------------
    Authoritative visual contract for the platform. This file is imported AFTER
    `index.css` so it wins over the historical theme phases (monochrome,
    metallic-gold, space-phase) that still live in that 15k-line stylesheet.
 
-   Design contract (audit-front/05-design-system.md):
-   - Esmeralda (light): translucent greenish surfaces, high contrast copy.
-   - Obsidian (dark): deep matte black + violet nebula, data as the hero.
-   - Emerald drives action. Purple drives state, progress and intelligence.
+   Design contract:
+   - Terra (fase inicial): azul cósmico e prata.
+   - Órbita (fase de aceleração): dourado solar.
+   - Galáxia (fase de escala): púrpura e violeta neon.
+   - A fase carrega o ACENTO; o modo claro/escuro carrega as SUPERFÍCIES.
    - Borders are light, never heavy lead-gray outlines.
    ========================================================================== */
 
@@ -16,28 +17,33 @@
    1. Theme tokens (HSL triplets consumed by tailwind.config.ts)
 
    Two independent dimensions:
-     - `data-platform-theme` = the palette (emerald = green, obsidian = purple)
+     - `data-platform-theme` = the palette (terra, orbita, galaxia)
      - `.dark` on <html>        = the reading mode (light or dark)
 
-   Every combination is valid: emerald+light, emerald+dark, obsidian+light,
-   obsidian+dark. The palette drives the ACCENT colours (primary, accent
-   secondary, glow); the mode drives the SURFACE colours (background, card,
-   text). That is why the palette block below only sets accent tokens and
-   the mode blocks set the surfaces.
+   Every combination is valid: terra+light, terra+dark, orbita+light,
+   orbita+dark, galaxia+light, galaxia+dark. The palette drives the ACCENT
+   colours (primary, accent secondary, glow); the mode drives the SURFACE
+   colours (background, card, text). That is why the palette block below only
+   sets accent tokens and the mode blocks set the surfaces.
    -------------------------------------------------------------------------- */
 
-/* --- Palette: Esmeralda Neon Elétrico (100% pure green — ZERO purple) ---- */
+/* --- Palette base: Terra (azul cósmico) ------------------------------------
+   O seletor precisa casar com o valor real de data-platform-theme. A fase é
+   definida por useAccentTheme.ts como `terra` | `orbita` | `galaxia`; os
+   nomes antigos `emerald`/`obsidian` nunca casavam com o DOM e deixavam o
+   premium.css travado no azul para todas as fases.
+   -------------------------------------------------------------------------- */
 :root,
-html[data-platform-theme="emerald"] {
+html[data-platform-theme="terra"] {
   --palette-accent: #00A8FF;
   --palette-accent-bright: #38BDF8;
   --palette-accent-soft: rgba(0, 168, 255, .16);
   --palette-accent-rgb: 0, 168, 255;
   --palette-secondary: #0284C7;
-  --palette-secondary-rgb: 5, 150, 105;
-  --card-glow-color: 16, 185, 129;
-  --purple-glow-color: 16, 185, 129; /* Anula qualquer roxo em Esmeralda */
-  --emerald-glow-color: 16, 185, 129;
+  --palette-secondary-rgb: 2, 132, 199;
+  --card-glow-color: 0, 168, 255;
+  --purple-glow-color: 0, 168, 255;
+  --emerald-glow-color: 0, 168, 255;
 
   --primary: 199 89% 48% !important;
   --ring: 199 89% 58% !important;
@@ -48,7 +54,6 @@ html[data-platform-theme="emerald"] {
   --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
   --gd-emerald-border: rgba(0, 168, 255, .35) !important;
 
-  /* Glow neon intenso verde elétrico */
   --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
   --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
   --palette-favicon-start: #D1FAE5;
@@ -56,30 +61,56 @@ html[data-platform-theme="emerald"] {
   --palette-favicon-end: #00a8ff;
 }
 
-/* --- Palette: Fallback esmeralda neon (zero roxo em producao) -------------- */
-html[data-platform-theme="obsidian"] {
-  --palette-accent: #00A8FF !important;
-  --palette-accent-bright: #38BDF8 !important;
-  --palette-accent-soft: rgba(0, 168, 255, .16) !important;
-  --palette-accent-rgb: 0, 168, 255 !important;
-  --palette-secondary: #0284C7 !important;
-  --palette-secondary-rgb: 5, 150, 105 !important;
-  --card-glow-color: 16, 185, 129 !important;
-  --purple-glow-color: 16, 185, 129 !important;
-  --emerald-glow-color: 16, 185, 129 !important;
-  --primary: 199 89% 48% !important;
-  --ring: 199 89% 58% !important;
-  --sidebar-primary: 199 89% 48% !important;
-  --sidebar-ring: 199 89% 58% !important;
-  --gd-emerald: #00a8ff !important;
-  --gd-emerald-bright: #38bdf8 !important;
-  --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
-  --gd-emerald-border: rgba(0, 168, 255, .35) !important;
-  --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65) !important;
-  --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45) !important;
-  --palette-favicon-start: #D1FAE5;
-  --palette-favicon-mid: #38bdf8;
-  --palette-favicon-end: #00a8ff;
+/* --- Palette: Órbita (dourado solar) -------------------------------------- */
+html[data-platform-theme="orbita"] {
+  --palette-accent: #FFC107 !important;
+  --palette-accent-bright: #FFE082 !important;
+  --palette-accent-soft: rgba(255, 193, 7, .16) !important;
+  --palette-accent-rgb: 255, 193, 7 !important;
+  --palette-secondary: #A66B00 !important;
+  --palette-secondary-rgb: 166, 107, 0 !important;
+  --card-glow-color: 255, 193, 7 !important;
+  --purple-glow-color: 255, 193, 7 !important;
+  --emerald-glow-color: 255, 193, 7 !important;
+  --primary: 45 100% 50% !important;
+  --ring: 45 100% 58% !important;
+  --sidebar-primary: 45 100% 50% !important;
+  --sidebar-ring: 45 100% 58% !important;
+  --gd-emerald: #ffc107 !important;
+  --gd-emerald-bright: #ffe082 !important;
+  --gd-emerald-soft: rgba(255, 193, 7, .16) !important;
+  --gd-emerald-border: rgba(255, 193, 7, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(255, 193, 7, 0.55), 0 0 10px 1px rgba(255, 224, 130, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(255, 193, 7, 0.40), 0 0 8px -2px rgba(255, 224, 130, 0.45) !important;
+  --palette-favicon-start: #FFF3C4;
+  --palette-favicon-mid: #FFE082;
+  --palette-favicon-end: #FFC107;
+}
+
+/* --- Palette: Galáxia (púrpura neon) ------------------------------------- */
+html[data-platform-theme="galaxia"] {
+  --palette-accent: #A855F7 !important;
+  --palette-accent-bright: #D8B4FE !important;
+  --palette-accent-soft: rgba(168, 85, 247, .16) !important;
+  --palette-accent-rgb: 168, 85, 247 !important;
+  --palette-secondary: #6C3483 !important;
+  --palette-secondary-rgb: 108, 52, 131 !important;
+  --card-glow-color: 168, 85, 247 !important;
+  --purple-glow-color: 168, 85, 247 !important;
+  --emerald-glow-color: 168, 85, 247 !important;
+  --primary: 271 91% 65% !important;
+  --ring: 271 91% 68% !important;
+  --sidebar-primary: 271 91% 65% !important;
+  --sidebar-ring: 271 91% 68% !important;
+  --gd-emerald: #a855f7 !important;
+  --gd-emerald-bright: #d8b4fe !important;
+  --gd-emerald-soft: rgba(168, 85, 247, .16) !important;
+  --gd-emerald-border: rgba(168, 85, 247, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(168, 85, 247, 0.55), 0 0 10px 1px rgba(216, 180, 254, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(168, 85, 247, 0.40), 0 0 8px -2px rgba(216, 180, 254, 0.45) !important;
+  --palette-favicon-start: #F3E8FF;
+  --palette-favicon-mid: #D8B4FE;
+  --palette-favicon-end: #A855F7;
 }
 
 /* --- Mode: light surfaces -------------------------------------------------- */

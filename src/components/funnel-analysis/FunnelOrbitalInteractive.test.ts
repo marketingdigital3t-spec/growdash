@@ -34,6 +34,7 @@ describe("ETAPA 6 — Funil Orbital Interativo (seção 9.4)", () => {
 
   it("integra o funil orbital interativo na Análise de Funis", () => {
     expect(funnelAnalysisSource).toContain("<FunnelOrbitalInteractive");
-    expect(funnelAnalysisSource).toContain("import { FunnelOrbitalInteractive }");
+    // O import usa o alias "@/components/..." adotado pelo projeto.
+    expect(funnelAnalysisSource).toMatch(/import \{ FunnelOrbitalInteractive \} from "@\/components\/funnel-analysis\/FunnelOrbitalInteractive"/);
   });
 });

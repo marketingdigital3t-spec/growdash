@@ -224,7 +224,7 @@ export default function Auth() {
                 <div className="rounded-xl border border-sky-400/30 bg-sky-950/30 p-3 text-xs text-slate-300 space-y-2">
                   <p>Recupere a senha ou receba um link de acesso por e-mail:</p>
                   <div className="flex gap-2">
-                    <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="seu@email.com" className="flex-1 bg-black/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-white" />
+                    <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="seu@email.com" aria-label="E-mail para recuperação" className="flex-1 bg-black/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-white" />
                     <button type="button" onClick={recover} disabled={loading} className="bg-primary text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-primary/90">Enviar</button>
                   </div>
                   <button type="button" onClick={sendAccessLink} disabled={loading} className="text-sky-400 hover:underline text-[11px] block text-center w-full pt-1">

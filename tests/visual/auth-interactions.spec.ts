@@ -27,7 +27,8 @@ test.describe("autenticação pública — interação e acessibilidade básica"
     await page.getByRole("button", { name: "Esqueceu a senha?" }).click();
     await expect(page.getByLabel("E-mail para recuperação")).toBeVisible();
 
-    await page.getByRole("button", { name: "Criar uma conta" }).click();
+    // O alternador para cadastro é rotulado "Criar conta" (Auth.tsx).
+    await page.getByRole("button", { name: "Criar conta", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Criar conta" })).toBeVisible();
     await expect(page.getByLabel("Nome completo")).toBeVisible();
     await expect(page.getByRole("checkbox")).toBeVisible();

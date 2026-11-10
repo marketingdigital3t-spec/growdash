@@ -175,7 +175,9 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
     try {
       localStorage.clear();
       sessionStorage.clear();
-    } catch (e) {}
+    } catch {
+      // Cache indisponível (modo privado/permissões): recarregar ainda resolve.
+    }
     window.location.assign("/");
   };
 

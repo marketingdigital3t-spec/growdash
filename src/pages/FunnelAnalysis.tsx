@@ -381,6 +381,22 @@ export default function FunnelAnalysis() {
     excludedDealIds,
   }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
   const periodAnalytics = periodBaseAnalytics;
+  // Funil Orbital: reúne as etapas do funil canônico (RD) com a taxa de conversão
+  // entre etapas e o índice do maior gargalo, derivado das mesmas Facts que
+  // alimentam o resto da página.
+  const orbitalStages = useMemo(() => periodAnalytics.stages.map((stage) => ({
+    key: stage.rd_stage_id,
+    label: stage.name,
+    current: stage.count,
+  })), [periodAnalytics.stages]);
+  const orbitalConversionRates = useMemo(
+    () => periodAnalytics.stageConversion.map((transition) => transition.rate),
+    [periodAnalytics.stageConversion],
+  );
+  const orbitalBottleneckIndex = useMemo(() => {
+    const index = periodAnalytics.stageConversion.findIndex((transition) => transition.isBottleneck);
+    return index >= 0 ? index : undefined;
+  }, [periodAnalytics.stageConversion]);
   const previousAvgDaysToConvert = useMemo(() => {
     const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
     const previousStart = subDays(startDate, span);
@@ -852,7 +868,13 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           {/* Funil Orbital interativo: comparativo por etapa e destaque do gargalo */}
-          
+          <MotionItem>
+            <FunnelOrbitalInteractive
+              stages={orbitalStages}
+              conversionRates={orbitalConversionRates}
+              bottleneckIndex={orbitalBottleneckIndex}
+            />
+          </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

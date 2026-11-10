@@ -9,7 +9,9 @@ describe("Finance tabs visual contract", () => {
     expect(financePage).toContain('className="finance-tab"');
     expect(stylesheet).toContain('html.dark body .brand-shell .finance-page .finance-tab[role="tab"][data-state="active"]');
     expect(stylesheet).toContain("background: var(--gd-accent) !important;");
-    expect(stylesheet).toContain("color: #062015 !important;");
+    // O texto da aba ativa precisa de contraste sobre o acento; o valor
+    // vigente é #040810 (o #062015 antigo falhava o gate de contraste).
+    expect(stylesheet).toContain("color: #040810 !important;");
   });
 
   it("keeps the unselected tab strip neutral", () => {

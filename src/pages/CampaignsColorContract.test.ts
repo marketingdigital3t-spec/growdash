@@ -42,7 +42,7 @@ describe("dark campaign color contract", () => {
       /campaign-account-pill[^}]*background:\s*(?:#17241e|var\(--gd-surface-raised\)|var\(--gd-emerald-soft\)|var\(--traffic-raised-dark\))/s,
     );
     expect(indexCss).toMatch(
-      /meta-toolbar-button-active[^}]*background:\s*(?:#10b981|var\(--gd-emerald\))/s,
+      /meta-toolbar-button-active[^}]*background:\s*var\(--gd-surface-raised\)/s,
     );
   });
 });
