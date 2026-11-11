@@ -121,11 +121,11 @@ export default function Auth() {
   }
 
   return (
-    <main className="auth-cosmic-viewport">
-      <div
-        className="auth-cosmic-container"
-        style={{ backgroundImage: `url(${authCosmicScene})` }}
-      >
+    <main
+      className="auth-cosmic-viewport"
+      style={{ backgroundImage: `url(${authCosmicScene})` }}
+    >
+      <div className="auth-cosmic-container">
         {/* COLUNA ESQUERDA: a arte cósmica com o foguete e a copy da missão já vivem
             no fundo de tela cheia com alta fidelidade. O texto permanece no DOM como
             camada acessível (sr-only no desktop e legível em leitores de tela). */}
