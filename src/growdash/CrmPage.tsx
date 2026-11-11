@@ -164,6 +164,7 @@ export default function CrmPage() {
     adAccountId,
     setAdAccountId,
     adAccountIds,
+    setAdAccountIds,
     funnelIds: selectedFunnelIds,
     setFunnelIds: setSelectedFunnelIds,
     preset,
@@ -181,6 +182,12 @@ export default function CrmPage() {
   const availableAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
+  // The CRM must not mix accounts the owner deactivated. Only accounts still
+  // active in the Integrations screen are selectable here.
+  const activeOnlyAccounts = useMemo(
+    () => availableAccounts.filter((account) => account.connection_status !== "disconnected"),
+    [availableAccounts],
+  );
   const availableAccountIds = useMemo(() => new Set(availableAccounts.map((account) => account.id)), [availableAccounts]);
   const accountScopeIds = useMemo(
     () => adAccountIds.length ? adAccountIds.filter((id) => availableAccountIds.has(id)) : Array.from(availableAccountIds),
@@ -1025,11 +1032,47 @@ export default function CrmPage() {
           <Search className="h-4 w-4 text-primary" />
           <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro e os indicadores respeitam o período selecionado e os filtros ativos.</p></div>
         </div>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(190px,1.1fr)_minmax(170px,.85fr)_minmax(170px,.85fr)_minmax(150px,.7fr)_minmax(160px,.72fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
+          <div className="flex min-w-0 flex-col gap-1">
+            <label htmlFor="crm-scope-account" className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">Conta Meta ativa</label>
+            <select
+              id="crm-scope-account"
+              aria-label="Filtrar por conta Meta ativa"
+              value={adAccountIds.length === 1 ? adAccountIds[0] : "all"}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "all") setAdAccountIds([]);
+                else setAdAccountIds([value]);
+                // The account is the canonical scope. Resetting the funnel
+                // avoids keeping a pipeline that belongs to another account.
+                setSelectedFunnelIds([]);
+              }}
+              className="gd-button h-11 min-w-0 text-xs font-bold"
+            >
+              <option value="all">Todas as contas ativas ({activeOnlyAccounts.length})</option>
+              {activeOnlyAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <label htmlFor="crm-scope-funnel" className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">Funil RD ativo</label>
+            <select
+              id="crm-scope-funnel"
+              aria-label="Filtrar por funil RD ativo"
+              value={selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "all"}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedFunnelIds(value === "all" ? [] : [value]);
+              }}
+              className="gd-button h-11 min-w-0 text-xs font-bold"
+            >
+              <option value="all">Todos os funis ativos ({availableFunnels.length})</option>
+              {availableFunnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
+            </select>
+          </div>
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}

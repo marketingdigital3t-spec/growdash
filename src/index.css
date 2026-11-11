@@ -15915,11 +15915,11 @@ html[data-space-phase="terra"],
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 1360px;
+  max-width: 1500px;
   min-height: min(860px, calc(100svh - 48px));
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 460px);
-  align-items: center;
+  grid-template-columns: minmax(0, 1.25fr) minmax(400px, 470px);
+  align-items: start;
   gap: clamp(24px, 4vw, 64px);
 }
 
@@ -16025,11 +16025,11 @@ html[data-space-phase="terra"],
   max-width: 440px;
   padding: clamp(28px, 3.5vw, 42px);
   border-radius: 26px;
-  background: rgba(5, 10, 24, 0.88);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.9), 0 0 35px -5px rgba(0, 168, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(6, 12, 28, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.95), 0 0 45px -5px rgba(0, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 

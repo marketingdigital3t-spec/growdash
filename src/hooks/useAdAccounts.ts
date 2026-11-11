@@ -86,3 +86,30 @@ export function useAdAccounts(includeDisconnected = false) {
     },
   });
 }
+
+export type MetaAccountStatusFilter = "all" | "active" | "disconnected";
+
+/**
+ * The Integrations switch writes `connection_status = "disconnected"` when the
+ * owner deactivates an account. That flag is the only reliable answer to "did
+ * I leave this account active", so the visual filter must trust it instead of
+ * `isActiveMetaAccount`, which also keeps accounts that only have a historical
+ * snapshot.
+ */
+export function isMetaAccountEnabled(account: { connection_status?: string | null }) {
+  return account.connection_status !== "disconnected";
+}
+
+export function countMetaAccountsByStatus(accounts: Array<{ connection_status?: string | null }>) {
+  const active = accounts.filter(isMetaAccountEnabled).length;
+  return { active, disconnected: accounts.length - active, total: accounts.length };
+}
+
+export function filterMetaAccountsByStatus<T extends { connection_status?: string | null }>(
+  accounts: T[],
+  filter: MetaAccountStatusFilter,
+): T[] {
+  if (filter === "active") return accounts.filter(isMetaAccountEnabled);
+  if (filter === "disconnected") return accounts.filter((account) => !isMetaAccountEnabled(account));
+  return accounts;
+}

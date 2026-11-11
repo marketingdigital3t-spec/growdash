@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { businessCalendarDate } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useAdAccounts, isMetaAccountEnabled } from "@/hooks/useAdAccounts";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { formatDistanceToNow } from "date-fns";
@@ -13,15 +13,22 @@ import { Button } from "@/components/ui/button";
 export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncState = "idle", syncError = null, onSyncNow = null }: { syncing?: boolean; lastSyncAt?: Date | null; syncState?: string; syncError?: string | null; onSyncNow?: (() => void) | null }) {
   const { adAccountIds, setAdAccountIds, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
+  // Only accounts the owner kept active in Integrations belong in the global
+  // scope. A deactivated account must disappear from every module at once.
+  const activeAccounts = accounts.filter(isMetaAccountEnabled);
 
   return (
     <div className="gd-global-scope-toolbar gd-filter-strip mb-4 flex min-w-0 flex-wrap items-center gap-2">
       <AccountMultiSelect
-        accounts={accounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
+        accounts={activeAccounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
         selectedIds={adAccountIds}
         onChange={setAdAccountIds}
         className="min-h-9 sm:h-9"
-        ariaLabel="Filtrar por contas Meta"
+        ariaLabel="Filtrar por contas Meta ativas"
+        selectionMode="single"
+        emptyLabel="Todas as contas ativas"
+        singularLabel="conta"
+        pluralLabel="contas"
       />
       <MetaDateRangePicker
         preset={preset}

@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
 
     const { data: account, error: accountError } = await admin
       .from("ad_accounts")
-      .select("id, account_id, name, access_token, token_expires_at")
+      .select("id, account_id, name, access_token, token_expires_at, connection_status")
       .eq("id", accountId)
       .maybeSingle();
     if (accountError) throw accountError;
@@ -111,12 +111,16 @@ Deno.serve(async (req) => {
     const returnedAccountId = `act_${String(meta.account_id ?? meta.id ?? "").replace(/^act_/i, "")}`;
     if (returnedAccountId !== account.account_id) return json({ error: "A Meta retornou uma conta diferente da conta salva." }, 409);
 
+    // A valid token must not silently re-enable an account the owner turned
+    // off. Activation is an explicit action in the Integrations screen.
+    const manuallyDisabled = account.connection_status === "disconnected";
+
     const { error: updateError } = await admin.from("ad_accounts").update({
       name: meta.name ? String(meta.name).slice(0, 255) : account.name,
       currency: meta.currency ? String(meta.currency).slice(0, 16) : null,
       timezone_name: meta.timezone_name ? String(meta.timezone_name).slice(0, 100) : null,
       timezone_offset_hours_utc: Number.isFinite(Number(meta.timezone_offset_hours_utc)) ? Number(meta.timezone_offset_hours_utc) : null,
-      connection_status: "connected",
+      connection_status: manuallyDisabled ? "disconnected" : "connected",
       oauth_health_status: "healthy",
       oauth_checked_at: now,
       oauth_permissions: inspection.permissions,
