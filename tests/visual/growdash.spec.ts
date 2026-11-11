@@ -45,14 +45,14 @@ test("login não cria overflow horizontal", async ({ page }) => {
   expect(layout.submitVisible).toBe(true);
   expect(layout.submitWithinDocument).toBe(true);
   expect(layout.headingVisible).toBe(true);
-  // No desktop/tablet a página inteira cabe no viewport; no mobile o
-  // documento é longo e a soma das linhas de texto varia alguns pixels entre
-  // renderizadores de fonte (macOS vs Ubuntu headless do CI), o que quebra
+  // Em viewports estreitos (mobile e tablet <= 980px), as colunas empilham na
+  // vertical, o documento é longo e a soma das linhas de texto varia alguns pixels
+  // entre renderizadores de fonte (macOS vs Ubuntu headless do CI), o que quebra
   // o `toHaveScreenshot` por dimensão total antes de aplicar o maxDiffPixelRatio.
   // O formulário de login visível no viewport inicial é o contrato estável.
-  const isMobile = (page.viewportSize()?.width ?? 0) < 600;
+  const isStackedLayout = (page.viewportSize()?.width ?? 0) <= 980;
   await expect(page).toHaveScreenshot("auth.png", {
-    fullPage: !isMobile,
+    fullPage: !isStackedLayout,
     animations: "disabled",
     maxDiffPixelRatio: 0.06,
   });
