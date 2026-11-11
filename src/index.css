@@ -15956,34 +15956,30 @@ html[data-space-phase="terra"],
   padding: 24px;
 }
 
-/* A arte cósmica cobre o contêiner com o mesmo aspecto da imagem original
-   (1536x1024) e o card de acesso fica sobreposto nas coordenadas exatas onde
-   a composição reserva espaço: o quadrante superior direito. */
-.auth-cosmic-scene-bg {
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-}
-
+/* A arte cósmica e o card de acesso vivem no mesmo contêiner, com o mesmo
+   aspecto da composição original (1536x1024). Assim as porcentagens do card
+   correspondem exatamente às coordenadas da arte e o formulário nunca sai
+   do quadro, em qualquer tamanho de janela. */
 .auth-cosmic-container {
   position: relative;
   z-index: 2;
+  container-type: inline-size;
   width: min(100%, calc((100svh - 48px) * 1.5));
   aspect-ratio: 1536 / 1024;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(400px, 470px);
-  align-items: start;
-  gap: clamp(24px, 4vw, 64px);
+  max-height: calc(100svh - 48px);
+  background-size: 100% 100%;
+  background-position: center center;
+  background-repeat: no-repeat;
+  border-radius: 22px;
+  overflow: hidden;
 }
 
-@media (min-width: 981px) {
-  .auth-cosmic-right-panel {
-    position: absolute;
-    left: 63%;
-    top: 19%;
-    width: clamp(320px, 27%, 406px);
-    z-index: 10;
-  }
+.auth-cosmic-right-panel {
+  position: absolute;
+  top: 20.3%;
+  left: 63.7%;
+  width: 26.7%;
+  z-index: 10;
 }
 
 @media (max-width: 980px) {
@@ -15991,13 +15987,10 @@ html[data-space-phase="terra"],
     width: 100%;
     max-width: 540px;
     aspect-ratio: auto;
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
-
-  .auth-cosmic-scene-bg {
-    background-image: none;
+    max-height: none;
+    background-image: none !important;
     background: radial-gradient(circle at 50% 22%, #06173a 0%, #02091c 45%, #01030c 85%, #000206 100%);
+    overflow: visible;
   }
 }
 
@@ -16125,25 +16118,52 @@ html[data-space-phase="terra"],
   width: 100%;
 }
 
+@media (min-width: 981px) {
+  .auth-cosmic-right-panel {
+    position: absolute;
+    top: 20.3%;
+    left: 63.7%;
+    width: 26.7%;
+  }
+}
+
 .auth-card-docked {
   width: 100%;
-  max-width: 440px;
-  padding: clamp(28px, 3.5vw, 42px);
-  border-radius: 26px;
-  background: rgba(6, 12, 28, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.95), 0 0 45px -5px rgba(0, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  max-width: none;
+  padding: clamp(14px, 1.55cqw, 30px);
+  border-radius: 22px;
+  background: rgba(4, 10, 24, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
+/* O formulário escala com a largura do container para caber sempre dentro da
+   moldura de vidro da composição, sem estourar as bordas. */
+.auth-card-docked h1 {
+  font-size: clamp(19px, 1.72cqw, 30px);
+}
+
+.auth-card-docked .text-xs {
+  font-size: clamp(9px, 0.76cqw, 12px);
+}
+
+.auth-card-docked .auth-input-group > span {
+  font-size: clamp(10px, 0.86cqw, 13px);
+}
+
+.auth-card-docked .auth-input-premium input {
+  font-size: clamp(12px, 0.95cqw, 15px) !important;
+}
+
 .auth-card-docked .auth-submit-button {
-  height: 52px !important;
+  height: clamp(38px, 2.9cqw, 52px) !important;
   border-radius: 12px !important;
   background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%) !important;
   color: #09090b !important;
-  font-size: 15px !important;
+  font-size: clamp(12px, 1.05cqw, 16px) !important;
   font-weight: 800 !important;
   border: 1px solid rgba(255, 255, 255, 0.9) !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 255, 255, 0.35), inset 0 1px 0 #ffffff !important;
@@ -16157,7 +16177,7 @@ html[data-space-phase="terra"],
 }
 
 .auth-card-docked .auth-input-premium {
-  height: 52px !important;
+  height: clamp(38px, 2.9cqw, 52px) !important;
   border-radius: 12px !important;
   background: rgba(3, 7, 18, 0.75) !important;
   border-color: rgba(56, 189, 248, 0.25) !important;
