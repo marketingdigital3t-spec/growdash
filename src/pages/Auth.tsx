@@ -6,7 +6,7 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
-import rocketLogo from "@/assets/rocket-logo.jpg";
+import rocketFeathered from "@/assets/rocket-logo-feathered.png";
 
 type Mode = "login" | "register";
 
@@ -122,38 +122,28 @@ export default function Auth() {
   return (
     <main className="auth-cosmic-viewport">
       <div className="auth-cosmic-container">
-        {/* COLUNA ESQUERDA: Foguete com Jato de Fogo e Copy Centralizada Abaixo da Chama */}
+        {/* COLUNA ESQUERDA: a nave se dissolve no espaço sideral (alfa suave nas
+            bordas da arte) e a copy da missão fica harmonizada sobre a fumaça. */}
         <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
-          {/* Fundo do Foguete */}
-          <div className="auth-cosmic-left-bg">
-            <img src={rocketLogo} alt="Growdash Rocket Mission" />
-            <div className="auth-cosmic-left-overlay" />
+          <div className="auth-rocket-hero-frame">
+            <img src={rocketFeathered} alt="Growdash Rocket Mission" className="auth-rocket-hero-img" />
+            <div className="auth-rocket-hero-glow" />
           </div>
 
-          {/* Jato de fogo azul/ciano na base do foguete */}
-          <div className="auth-left-thruster">
-            <div className="auth-left-flame-plume" />
-            <div className="auth-left-flame-core" />
-            {/* Faíscas de energia subindo pela fuselagem */}
+          {/* Faíscas de energia subindo pela fuselagem */}
+          <div className="auth-spark-field">
             {[...Array(10)].map((_, i) => (
               <span
                 key={i}
                 className="auth-spark"
                 style={{
-                  left: `${30 + (i * 4.5)}%`,
-                  top: `${15 + (i * 7.5)}%`,
+                  left: `${42 + (i * 1.6)}%`,
+                  top: `${26 + (i * 3.4)}%`,
                   animationDelay: `${i * 0.18}s`,
                   ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
                 }}
               />
             ))}
-          </div>
-
-          {/* Fumaça volumétrica viva ondulando e se espalhando na base */}
-          <div className="auth-smoke-container">
-            <div className="auth-smoke-cloud auth-smoke-cloud-3" />
-            <div className="auth-smoke-cloud auth-smoke-cloud-2" />
-            <div className="auth-smoke-cloud auth-smoke-cloud-1" />
           </div>
 
           {/* Conteúdo textual da missão PERFEITAMENTE CENTRALIZADO ABAIXO DA CHAMA */}
