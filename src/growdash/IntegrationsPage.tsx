@@ -8,7 +8,7 @@ import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
 import { mapWithConcurrency, isProviderRateLimited } from "@/lib/concurrency";
 import { recordRuntimeDiagnostic, withRequestTimeout } from "@/lib/resilience";
-import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useAdAccounts, countMetaAccountsByStatus, filterMetaAccountsByStatus } from "@/hooks/useAdAccounts";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useDebounce } from "@/hooks/useDebounce";

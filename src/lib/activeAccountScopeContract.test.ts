@@ -40,4 +40,9 @@ describe("Contas ativas — escopo de Integrações e CRM", () => {
     expect(integrationsPage).toContain("filteredAdAccounts");
     expect(integrationsPage).toContain('metaStatusFilter !== "active"');
   });
+
+  it("importa countMetaAccountsByStatus e filterMetaAccountsByStatus em IntegrationsPage", () => {
+    expect(integrationsPage).toMatch(/import\s*\{[^}]*countMetaAccountsByStatus[^}]*\}\s*from\s*["']@\/hooks\/useAdAccounts["']/);
+    expect(integrationsPage).toMatch(/import\s*\{[^}]*filterMetaAccountsByStatus[^}]*\}\s*from\s*["']@\/hooks\/useAdAccounts["']/);
+  });
 });
