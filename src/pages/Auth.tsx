@@ -6,8 +6,8 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
-import rocketFeathered from "@/assets/rocket-logo-feathered.png";
-import authCosmicScene from "@/assets/auth-cosmic-scene.jpg";
+import rocketFeathered from "@/assets/rocket-logo-feathered.webp";
+import authCosmicScene from "@/assets/auth-cosmic-scene.webp";
 
 type Mode = "login" | "register";
 
