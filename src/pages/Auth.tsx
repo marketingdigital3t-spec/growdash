@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
 import rocketFeathered from "@/assets/rocket-logo-feathered.png";
+import authCosmicScene from "@/assets/auth-cosmic-scene.jpg";
 
 type Mode = "login" | "register";
 
@@ -120,45 +121,37 @@ export default function Auth() {
   }
 
   return (
-    <main className="auth-cosmic-viewport">
+    <main
+      className="auth-cosmic-viewport auth-cosmic-scene-bg"
+      style={{
+        backgroundImage: `url(${authCosmicScene})`,
+      }}
+    >
       <div className="auth-cosmic-container">
-        {/* COLUNA ESQUERDA: a nave se dissolve no espaço sideral (alfa suave nas
-            bordas da arte) e a copy da missão fica harmonizada sobre a fumaça. */}
+        {/* COLUNA ESQUERDA: a arte cósmica com o foguete e a copy da missão já vivem
+            no fundo de tela cheia com alta fidelidade. O texto permanece no DOM como
+            camada acessível (sr-only no desktop e legível em leitores de tela). */}
         <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
-          <div className="auth-rocket-hero-frame">
+          {/* Abaixo de 980px a arte de tela cheia não cabe: a nave entra com
+              alfa suave sobre o céu do espaço e o texto volta a ser visível. */}
+          <div className="auth-rocket-hero-frame lg:hidden">
             <img src={rocketFeathered} alt="Growdash Rocket Mission" className="auth-rocket-hero-img" />
             <div className="auth-rocket-hero-glow" />
           </div>
 
-          {/* Faíscas de energia subindo pela fuselagem */}
-          <div className="auth-spark-field">
-            {[...Array(10)].map((_, i) => (
-              <span
-                key={i}
-                className="auth-spark"
-                style={{
-                  left: `${42 + (i * 1.6)}%`,
-                  top: `${26 + (i * 3.4)}%`,
-                  animationDelay: `${i * 0.18}s`,
-                  ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Conteúdo textual da missão PERFEITAMENTE CENTRALIZADO ABAIXO DA CHAMA */}
-          <div className="auth-cosmic-left-content">
+          {/* Texto semântico da missão (acessibilidade para leitor de tela / SEO) */}
+          <div className="auth-cosmic-left-content pointer-events-none">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-400/40 bg-sky-950/70 text-sky-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3.5 shadow-[0_0_20px_rgba(0,168,255,0.45)] backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
               Growdash Mission Control
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-[1.12] drop-shadow-[0_4px_25px_rgba(0,0,0,0.95)]">
+            <h2 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-[1.12]">
               Da Terra à Galáxia: lance, acelere e escale seu negócio.
             </h2>
-            <p className="mt-3.5 text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed drop-shadow-[0_2px_15px_rgba(0,0,0,0.95)]">
+            <p className="mt-3.5 text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed">
               Tráfego, leads, funil e faturamento alimentando o combustível da sua missão. Suba de fase em tempo real.
             </p>
-            <p className="mt-4 text-xs font-bold text-sky-400 tracking-wider uppercase drop-shadow-[0_2px_10px_rgba(0,168,255,0.5)]">
+            <p className="mt-4 text-xs font-bold text-sky-400 tracking-wider uppercase">
               Sua jornada começa na Terra, ganha órbita e conquista a Galáxia.
             </p>
           </div>
