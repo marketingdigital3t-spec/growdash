@@ -45,7 +45,10 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     staleTime: 2 * 60 * 1000,
     placeholderData: cachedFunnels,
     queryFn: async () => {
-      let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
+      let q = supabase
+        .from("rd_funnels")
+        .select("id,user_id,ad_account_id,rd_connection_id,name,expert_name,rd_funnel_id,utm_campaign_pattern,is_active,created_at,updated_at")
+        .order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
       else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
       const { data, error } = await withRequestTimeout(q, RD_SCOPE_TIMEOUT_MS);

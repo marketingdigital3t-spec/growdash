@@ -6,7 +6,7 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
-import cosmicLoginBg from "@/assets/rocket-bg-cosmic.jpg";
+import { CosmicLaunchScene3D } from "@/components/auth/CosmicLaunchScene3D";
 
 type Mode = "login" | "register";
 
@@ -120,7 +120,9 @@ export default function Auth() {
   }
 
   return (
-    <main className="auth-cosmic-viewport" style={{ backgroundImage: `url(${cosmicLoginBg})`, backgroundSize: "cover", backgroundPosition: "center center", backgroundRepeat: "no-repeat" }}>
+    <main className="auth-cosmic-viewport">
+      {/* Cena WebGL 3D cinematográfica viva em 60fps (foguete metálico PBR, plasma de propulsão, faíscas e fumaça volumétrica) */}
+      <CosmicLaunchScene3D launching={launching} />
       <div className="auth-cosmic-container">
         {/* COLUNA ESQUERDA: a arte cósmica (nave na nebulosa) vive no fundo do
             viewport; aqui ficam apenas a copy da missão e o efeito de decolagem. */}

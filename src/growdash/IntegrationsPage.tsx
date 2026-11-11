@@ -11,6 +11,7 @@ import { recordRuntimeDiagnostic, withRequestTimeout } from "@/lib/resilience";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,6 +131,7 @@ function IntegrationsContent() {
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     // Browsers and password managers sometimes autofill an account email into
@@ -395,7 +397,7 @@ function IntegrationsContent() {
     onError: (error: Error) => toast({ title: "Não foi possível desconectar o Instagram", description: error.message, variant: "destructive" }),
   });
 
-  const providerFilter = (name: string) => name.toLowerCase().includes(search.toLowerCase().trim());
+  const providerFilter = (name: string) => name.toLowerCase().includes(debouncedSearch.toLowerCase().trim());
   const changeTab = (value: string) => {
     setSearch("");
     if (searchInputRef.current) searchInputRef.current.value = "";

@@ -26,7 +26,7 @@ export function useCustomMetrics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("custom_metrics" as any)
-        .select("*")
+        .select("id,user_id,name,kind,source,color,position,is_active,is_default_lead,metadata,created_at,updated_at")
         .order("position", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;

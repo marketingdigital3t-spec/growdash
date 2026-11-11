@@ -1,5 +1,4 @@
 /*
-  Cache-Control: no-store, no-cache, must-revalidate
   Pragma: no-cache
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
@@ -8,9 +7,14 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://static.cloudflareinsights.com 'sha256-rsD/HYNQLaUf1R9dARCjEfUg9j1Ke+FQvx7xpPX/Nuk='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://*.facebook.com https://api.openai.com https://cloudflareinsights.com https://*.cloudflareinsights.com
 
+/
+  Cache-Control: no-store, no-cache, must-revalidate
+
 /index.html
   Cache-Control: no-store, no-cache, must-revalidate
-  Pragma: no-cache
+
+/growdash-boot.js
+  Cache-Control: public, max-age=86400, must-revalidate
 
 /apresentacao-trafego-pago/*
   Cache-Control: public, max-age=3600, must-revalidate

@@ -5,6 +5,7 @@ import { useIsMaster } from "@/hooks/useIsMaster";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,10 +262,11 @@ export default function UsersPage() {
       rd_funnel_ids: selected ? rdFunnels.map((funnel) => funnel.id) : [],
     });
 
+  const debouncedQuery = useDebounce(query, 250);
   const visibleUsers = useMemo(() => users.filter((u) => {
     const text = `${u.name} ${u.email}`.toLocaleLowerCase();
-    return (!query.trim() || text.includes(query.trim().toLocaleLowerCase())) && (statusFilter === "all" || u.status === statusFilter);
-  }), [query, statusFilter, users]);
+    return (!debouncedQuery.trim() || text.includes(debouncedQuery.trim().toLocaleLowerCase())) && (statusFilter === "all" || u.status === statusFilter);
+  }), [debouncedQuery, statusFilter, users]);
 
   if (loadingMaster || loadingWorkspace) return null;
   if (!isMaster && !["owner", "admin"].includes(workspace?.role ?? "")) return <Navigate to="/" replace />;

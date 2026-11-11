@@ -1,6 +1,6 @@
 import { Fuel, Globe2, Rocket, Sparkles } from "lucide-react";
 import type { CSSProperties } from "react";
-import earthTexture from "@/assets/growth/earth-blue-marble-dashboard.jpg";
+import earthTexture from "@/assets/growth/earth-8k-300dpi.jpg";
 import { SpaceRocket } from "./SpaceRocket";
 
 export type SpacePhase = "terra" | "orbita" | "galaxia";
