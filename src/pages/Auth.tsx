@@ -6,7 +6,7 @@ import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
-import { CosmicLaunchScene3D } from "@/components/auth/CosmicLaunchScene3D";
+import rocketLogo from "@/assets/rocket-logo.jpg";
 
 type Mode = "login" | "register";
 
@@ -121,13 +121,42 @@ export default function Auth() {
 
   return (
     <main className="auth-cosmic-viewport">
-      {/* Cena WebGL 3D cinematográfica viva em 60fps (foguete metálico PBR, plasma de propulsão, faíscas e fumaça volumétrica) */}
-      <CosmicLaunchScene3D launching={launching} />
       <div className="auth-cosmic-container">
-        {/* COLUNA ESQUERDA: a arte cósmica (nave na nebulosa) vive no fundo do
-            viewport; aqui ficam apenas a copy da missão e o efeito de decolagem. */}
+        {/* COLUNA ESQUERDA: Foguete com Jato de Fogo e Copy Centralizada Abaixo da Chama */}
         <section className={cn("auth-cosmic-left-panel", launching && "launching")}>
-          {/* Conteúdo textual da missão, alinhado sobre a fumaça da arte */}
+          {/* Fundo do Foguete */}
+          <div className="auth-cosmic-left-bg">
+            <img src={rocketLogo} alt="Growdash Rocket Mission" />
+            <div className="auth-cosmic-left-overlay" />
+          </div>
+
+          {/* Jato de fogo azul/ciano na base do foguete */}
+          <div className="auth-left-thruster">
+            <div className="auth-left-flame-plume" />
+            <div className="auth-left-flame-core" />
+            {/* Faíscas de energia subindo pela fuselagem */}
+            {[...Array(10)].map((_, i) => (
+              <span
+                key={i}
+                className="auth-spark"
+                style={{
+                  left: `${30 + (i * 4.5)}%`,
+                  top: `${15 + (i * 7.5)}%`,
+                  animationDelay: `${i * 0.18}s`,
+                  ["--spark-x" as any]: `${(i % 2 === 0 ? 1 : -1) * (12 + i * 3)}px`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Fumaça volumétrica viva ondulando e se espalhando na base */}
+          <div className="auth-smoke-container">
+            <div className="auth-smoke-cloud auth-smoke-cloud-3" />
+            <div className="auth-smoke-cloud auth-smoke-cloud-2" />
+            <div className="auth-smoke-cloud auth-smoke-cloud-1" />
+          </div>
+
+          {/* Conteúdo textual da missão PERFEITAMENTE CENTRALIZADO ABAIXO DA CHAMA */}
           <div className="auth-cosmic-left-content">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-sky-400/40 bg-sky-950/70 text-sky-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3.5 shadow-[0_0_20px_rgba(0,168,255,0.45)] backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
