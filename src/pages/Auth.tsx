@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { BrandMark } from "@/components/BrandLogo";
 import rocketFeathered from "@/assets/rocket-logo-feathered.webp";
 import authCosmicScene from "@/assets/auth-cosmic-scene.webp";
-
-type Mode = "login" | "register";
 
 function isTransientAuthError(error: { status?: number; message?: string } | null | undefined) {
   return !!error && ([0, 408, 429, 500, 501, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530].includes(Number(error.status)) || /HTTP\s*5\d\d|upstream|temporar|tempo de carregamento|timed out|timeout|network|fetch failed/i.test(error.message || ""));
@@ -21,17 +18,14 @@ function authErrorMessage(error: { status?: number; message?: string } | null | 
 }
 
 export default function Auth() {
-  const [mode, setMode] = useState<Mode>("login");
-  const [name, setName] = useState("");
+  const mode = "login" as const;
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [legalAccepted, setLegalAccepted] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -42,50 +36,34 @@ export default function Auth() {
       toast({ title: "Informe um e-mail válido", description: "Use o e-mail completo cadastrado na Growdash.", variant: "destructive" });
       return;
     }
-    if (mode === "register" && password !== confirmPassword) { toast({ title: "As senhas não coincidem", variant: "destructive" }); return; }
-    if (mode === "register" && !legalAccepted) { toast({ title: "Aceite os documentos legais", description: "Leia e aceite os Termos de Uso e a Política de Privacidade para criar sua conta.", variant: "destructive" }); return; }
     setLoading(true);
-    if (mode === "login") {
-      setAuthPersistence(true);
-      let error: { status?: number; message?: string } | null = null;
-      try {
-        ({ error } = await supabase.auth.signInWithPassword({ email, password }));
-      } catch (requestError) {
-        error = { status: 0, message: requestError instanceof Error ? requestError.message : "Falha de rede no serviço de autenticação." };
+    setAuthPersistence(true);
+    let error: { status?: number; message?: string } | null = null;
+    try {
+      ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+    } catch (requestError) {
+      error = { status: 0, message: requestError instanceof Error ? requestError.message : "Falha de rede no serviço de autenticação." };
+    }
+    setLoading(false);
+    if (error) {
+      const invalidCredentials = error.message === "Invalid login credentials";
+      if (invalidCredentials) {
+        setForgotEmail(email);
+        setForgotOpen(true);
       }
-      setLoading(false);
-      if (error) {
-        const invalidCredentials = error.message === "Invalid login credentials";
-        if (invalidCredentials) {
-          setForgotEmail(email);
-          setForgotOpen(true);
-        }
-        toast({
-          title: invalidCredentials ? "Acesso não reconhecido" : "Não foi possível entrar",
-          description: invalidCredentials
-            ? "A senha foi recusada. Use a recuperação ou envie um link de acesso abaixo; a conta e os dados não foram alterados."
-            : authErrorMessage(error),
-          variant: "destructive",
-        });
-        return;
-      }
-      setLaunching(true);
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 1600);
+      toast({
+        title: invalidCredentials ? "Acesso não reconhecido" : "Não foi possível entrar",
+        description: invalidCredentials
+          ? "A senha foi recusada. Use a recuperação ou envie um link de acesso abaixo; a conta e os dados não foram alterados."
+          : authErrorMessage(error),
+        variant: "destructive",
+      });
       return;
     }
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
-    setLoading(false);
-    if (error) { toast({ title: "Não foi possível criar a conta", description: authErrorMessage(error), variant: "destructive" }); return; }
-    if (data.session) {
-      await (supabase as any).rpc("record_legal_consent", { _terms_version: "1.0", _privacy_version: "1.0" });
-      setLaunching(true);
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 1600);
-    }
-    else toast({ title: "Cadastro realizado", description: "Confirme seu email para acessar a Growdash." });
+    setLaunching(true);
+    setTimeout(() => {
+      navigate("/", { replace: true });
+    }, 1600);
   }
 
   async function recover() {
@@ -112,12 +90,6 @@ export default function Auth() {
     setLoading(false);
     if (error) toast({ title: "Link de acesso não enviado", description: authErrorMessage(error), variant: "destructive" });
     else toast({ title: "Link de acesso enviado", description: "Verifique a caixa de entrada e o spam para entrar sem a senha." });
-  }
-
-  async function social(provider: "google" | "apple") {
-    setAuthPersistence(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
-    if (error) toast({ title: `Login ${provider === "google" ? "Google" : "Apple"} indisponível`, description: "Confira se o provedor está habilitado no Supabase.", variant: "destructive" });
   }
 
   return (
@@ -159,48 +131,19 @@ export default function Auth() {
         <section className="auth-cosmic-right-panel">
           <div className={cn("auth-card-docked", launching && "launching")}>
             <div className="text-center mb-6">
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {mode === "login" ? "Seja Bem-Vindo(a)" : "Criar conta"}
-              </h1>
-              <p className="text-xs text-slate-400 mt-1.5">
-                {mode === "login" ? "Acesse sua operação Growdash." : "Crie o acesso da sua operação."}
-              </p>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Seja Bem-Vindo(a)</h1>
+              <p className="text-xs text-slate-400 mt-1.5">Acesse sua operação Growdash.</p>
             </div>
 
-            {mode === "register" && (
-              <div className="auth-mode-switch mb-4" role="tablist" aria-label="Tipo de acesso">
-                <button type="button" role="tab" aria-selected={false} onClick={() => setMode("login")}>
-                  Entrar
-                </button>
-                <button type="button" role="tab" aria-selected className="is-active">
-                  Cadastrar
-                </button>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-3.5">
-              {mode === "register" && (
-                <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />
-              )}
               <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />
-              <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:text-white" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>} />
-              {mode === "register" && (
-                <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />
-              )}
-              {mode === "register" && (
-                <label className="flex items-start gap-2 text-[11px] text-slate-400">
-                  <input type="checkbox" checked={legalAccepted} onChange={(e) => setLegalAccepted(e.target.checked)} required className="mt-0.5" />
-                  <span>Li e aceito os <Link to="/termos" target="_blank" className="font-bold text-sky-400 hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="font-bold text-sky-400 hover:underline">Política de Privacidade</Link>.</span>
-                </label>
-              )}
-              {mode === "login" && (
-                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+              <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" trailing={<button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:text-white" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>} />
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                   <span>Acesso mantido neste dispositivo</span>
                   <button type="button" onClick={() => { setForgotOpen((v) => !v); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="font-semibold text-sky-400 hover:underline">
                     Esqueceu a senha?
                   </button>
-                </div>
-              )}
+              </div>
               {forgotOpen && (
                 <div className="rounded-xl border border-sky-400/30 bg-sky-950/30 p-3 text-xs text-slate-300 space-y-2">
                   <p>Recupere a senha ou receba um link de acesso por e-mail:</p>
@@ -214,21 +157,11 @@ export default function Auth() {
                 </div>
               )}
               <button type="submit" disabled={loading || launching} className="auth-submit-button w-full mt-4">
-                {launching ? "Decolando missão..." : loading ? "Acessando..." : mode === "login" ? "Entrar na Plataforma" : "Criar conta"}
+                {launching ? "Decolando missão..." : loading ? "Acessando..." : "Entrar na Plataforma"}
               </button>
             </form>
 
-            {mode === "login" && (
-              <p className="mt-4 text-center text-xs text-slate-400">
-                Ainda não tem acesso? <button type="button" className="text-sky-400 font-bold hover:underline" onClick={() => setMode("register")}>Criar conta</button>
-              </p>
-            )}
 
-            <div className="auth-divider"><span />ou continue com<span /></div>
-            <div className="auth-social-grid">
-              <button type="button" onClick={() => social("Claude Opus 5")}><span className="auth-google-mark">G</span>Continuar com Claude Opus 5</button>
-              <button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span>Continuar com iCloud</button>
-            </div>
           </div>
         </section>
       </div>

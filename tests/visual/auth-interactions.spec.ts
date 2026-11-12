@@ -9,7 +9,7 @@ import { expect, test } from "@playwright/test";
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("autenticação pública — interação e acessibilidade básica", () => {
-  test("campos têm nome acessível e os fluxos de senha/cadastro são alcançáveis", async ({ page }) => {
+  test("campos de acesso têm nome acessível e o fluxo de senha é alcançável", async ({ page }) => {
     await page.goto("/auth");
     await expect(page.getByRole("heading", { name: /seja bem-vindo/i })).toBeVisible();
 
@@ -26,11 +26,5 @@ test.describe("autenticação pública — interação e acessibilidade básica"
 
     await page.getByRole("button", { name: "Esqueceu a senha?" }).click();
     await expect(page.getByLabel("E-mail para recuperação")).toBeVisible();
-
-    // O alternador para cadastro é rotulado "Criar conta" (Auth.tsx).
-    await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Criar conta" })).toBeVisible();
-    await expect(page.getByLabel("Nome completo")).toBeVisible();
-    await expect(page.getByRole("checkbox")).toBeVisible();
   });
 });

@@ -15951,9 +15951,12 @@ html[data-space-phase="terra"],
   align-items: center;
   justify-content: center;
   background: #01030c;
-  /* A arte cobre a viewport inteira: nenhuma faixa preta nas laterais. */
+  /* A arte cobre a viewport inteira: nenhuma faixa preta nas laterais.
+     Em janelas 16:9 a arte é mais alta que a tela e o crop central cortaria
+     o topo da nave. O deslocamento vertical mantém a nave e a frase da
+     missão sempre visíveis juntas. */
   background-size: cover;
-  background-position: center center;
+  background-position: center 44%;
   background-repeat: no-repeat;
   perspective: 1200px;
   padding: 0;
@@ -15975,9 +15978,9 @@ html[data-space-phase="terra"],
 
 .auth-cosmic-right-panel {
   position: absolute;
-  top: 20.3%;
-  left: 63.8%;
-  width: 26.4%;
+  top: 19.5%;
+  left: 63.4%;
+  width: 28.4%;
   z-index: 10;
 }
 
@@ -16145,10 +16148,10 @@ html[data-space-phase="terra"],
 .auth-card-docked {
   width: 100%;
   max-width: none;
-  padding: clamp(14px, 1.55cqw, 30px);
-  border-radius: 22px;
-  background: rgba(4, 10, 24, 0.55);
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: clamp(18px, 1.9cqw, 36px);
+  border-radius: 24px;
+  background: rgba(4, 10, 24, 0.58);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
