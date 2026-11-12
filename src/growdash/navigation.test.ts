@@ -1,35 +1,52 @@
 import { describe, expect, it } from "vitest";
 import { ALL_MODULES, findModule, NAV_SECTIONS } from "./navigation";
 
-describe("Growdash sidebar navigation", () => {
-  it("keeps Intelligence available only inside Campaigns, not in the sidebar", () => {
-    expect(ALL_MODULES.some((module) => module.label === "Intelligence")).toBe(false);
-  });
-
-  it("keeps the functional modules while keeping Commercial visible", () => {
-    expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago" && module.path === "/campanhas")).toBe(true);
+describe("Growdash sidebar navigation — abas ativas", () => {
+  it("mantém os módulos essenciais visíveis", () => {
+    expect(ALL_MODULES.some((module) => module.label === "Dashboard" && module.path === "/")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "CRM" && module.path === "/crm")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Comercial" && module.path === "/comercial")).toBe(true);
-    expect(["Growdash Flow", "Análise de Mídia Social", "Alertas", "Leads incompletos", "Automação"]
-      .every((label) => ALL_MODULES.some((module) => module.label === label))).toBe(true);
-    expect(ALL_MODULES.some((module) => module.label === "Quadro")).toBe(false);
-    expect(ALL_MODULES.some((module) => module.label === "Business")).toBe(false);
-    expect(ALL_MODULES.some((module) => module.label === "Automação" && !module.external && module.path === "/automacoes")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago" && module.path === "/campanhas")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Análise de Funis" && module.path === "/analise-de-funis")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Alertas" && module.path === "/alertas")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Kanban" && module.path === "/kanban")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Financeiro" && module.path === "/financeiro")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Integrações" && module.path === "/integracoes")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Usuários" && module.path === "/usuarios")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Agentes" && module.path === "/agentes")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Configurações" && module.path === "/configuracoes")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Saúde dos Dados" && module.path === "/saude-dos-dados")).toBe(true);
   });
 
-  it("uses a unique route for every sidebar item", () => {
+  it("garante que as 13 abas removidas não constam mais na barra lateral", () => {
+    const removedLabels = [
+      "Comandos",
+      "Growdash Flow",
+      "Análise de Mídia Social",
+      "Agenda & Turmas",
+      "Chamados",
+      "WhatsApp",
+      "Inteligência dos agentes",
+      "Leads incompletos",
+      "Automação",
+      "Armazenamento",
+      "Anúncios",
+      "Marcas",
+      "Produtos",
+      "Quadro",
+      "Business",
+    ];
+    for (const label of removedLabels) {
+      expect(ALL_MODULES.some((module) => module.label === label)).toBe(false);
+    }
+  });
+
+  it("usa rota única para cada item ativo da barra lateral", () => {
     const paths = ALL_MODULES.map((module) => module.path);
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  it("keeps the core intelligence modules together", () => {
-    const intelligence = NAV_SECTIONS.find((section) => section.label === "Inteligência");
-    const labels = intelligence?.items.map((item) => item.label) ?? [];
-    expect(labels.indexOf("Análise de Funis")).toBeGreaterThanOrEqual(0);
-    expect(labels.indexOf("Tráfego Pago")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
-    expect(labels).not.toContain("Business");
-  });
-
-  it("keeps sidebar section labels tied to their section instead of filtered position", () => {
+  it("mantém os rótulos de seção corretos", () => {
     expect(NAV_SECTIONS.map((section) => section.sidebarLabel)).toEqual([
       "MISSÃO",
       "NAVE",
@@ -37,17 +54,9 @@ describe("Growdash sidebar navigation", () => {
       "GESTÃO",
       "ADMINISTRAÇÃO",
     ]);
-
-    const visibleSections = NAV_SECTIONS.filter((section) => section.label !== "Visão geral");
-    expect(visibleSections.map((section) => section.sidebarLabel)).toEqual([
-      "NAVE",
-      "TRIPULAÇÃO",
-      "GESTÃO",
-      "ADMINISTRAÇÃO",
-    ]);
   });
 
-  it("resolves content for every sidebar destination", () => {
+  it("resolve o conteúdo para cada destino da barra lateral", () => {
     for (const module of ALL_MODULES) {
       expect(findModule(module.path)?.label).toBe(module.label);
     }

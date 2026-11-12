@@ -193,9 +193,9 @@ export default function BrandDiagnosticPage() {
     return [...grouped.entries()].sort((a, b) => b[1] - a[1]);
   }, [deals]);
 
-  if (!brandId) return <Navigate to="/marcas" replace />;
+  if (!brandId) return <Navigate to="/integracoes" replace />;
   if (isLoading) return <div className="grid min-h-[50vh] place-items-center"><RefreshCw className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (error || !brand) return <div className="mx-auto max-w-xl py-16 text-center"><TriangleAlert className="mx-auto h-9 w-9 text-amber-500" /><h1 className="mt-4 text-xl font-black">Marca não encontrada</h1><p className="mt-2 text-sm text-muted-foreground">A marca pode ter sido removida ou ainda não foi sincronizada.</p><Link to="/marcas" className="gd-button mt-5"><ArrowLeft className="h-4 w-4" /> Voltar para Marcas</Link></div>;
+  if (error || !brand) return <div className="mx-auto max-w-xl py-16 text-center"><TriangleAlert className="mx-auto h-9 w-9 text-amber-500" /><h1 className="mt-4 text-xl font-black">Marca não encontrada</h1><p className="mt-2 text-sm text-muted-foreground">A marca pode ter sido removida ou ainda não foi sincronizada.</p><Link to="/integracoes" className="gd-button mt-5"><ArrowLeft className="h-4 w-4" /> Voltar para Integrações</Link></div>;
 
   const loadingData = insightsQuery.isLoading || campaignsQuery.isLoading || rdQuery.isLoading;
   const syncOk = !account?.last_sync_error && !["error", "expired", "disconnected"].includes(String(account?.connection_status));
@@ -207,7 +207,7 @@ export default function BrandDiagnosticPage() {
         eyebrow="Diagnóstico da marca"
         title={brand.name}
         description={`Meta Ads e RD Station reconciliados para ${dateLabel}. Nenhum valor é simulado.`}
-        actions={<div className="flex flex-col gap-2 sm:flex-row"><Link to="/marcas" className="gd-button"><ArrowLeft className="h-4 w-4" /> Marcas</Link><Link to={`/campanhas?aba=campaigns&conta=${accountId || "all"}`} className="gold-action"><Facebook className="h-4 w-4" /> Abrir campanhas</Link></div>}
+        actions={<div className="flex flex-col gap-2 sm:flex-row"><Link to="/integracoes" className="gd-button"><ArrowLeft className="h-4 w-4" /> Integrações</Link><Link to={`/campanhas?aba=campaigns&conta=${accountId || "all"}`} className="gold-action"><Facebook className="h-4 w-4" /> Abrir campanhas</Link></div>}
       />
 
       {!account ? <div className="mb-5 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-300"><TriangleAlert className="mr-2 inline h-4 w-4" />A marca existe, mas não está vinculada a uma conta Meta Ads válida. Revise o vínculo em Integrações.</div> : null}

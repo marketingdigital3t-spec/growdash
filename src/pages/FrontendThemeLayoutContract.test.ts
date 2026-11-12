@@ -10,18 +10,7 @@ const businessPage = readFileSync(
   fileURLToPath(new URL("../growdash/BusinessWorkspacePage.tsx", import.meta.url)),
   "utf8",
 );
-const incompleteLeadsPage = readFileSync(
-  fileURLToPath(new URL("./LeadsIncompletos.tsx", import.meta.url)),
-  "utf8",
-);
-const announcementsPage = readFileSync(
-  fileURLToPath(new URL("../growdash/AnnouncementsPage.tsx", import.meta.url)),
-  "utf8",
-);
-const whatsappPage = readFileSync(
-  fileURLToPath(new URL("./WhatsApp.tsx", import.meta.url)),
-  "utf8",
-);
+// Páginas de Leads Incompletos, Anúncios e WhatsApp foram removidas do escopo.
 const modulePage = readFileSync(
   fileURLToPath(new URL("../growdash/ModulePage.tsx", import.meta.url)),
   "utf8",
@@ -79,14 +68,7 @@ describe("frontend theme and responsive contracts", () => {
     expect(businessPage).not.toContain("border-slate-200 bg-white text-slate-900");
   });
 
-  it("names bulk-selection checkboxes for assistive technology", () => {
-    expect(incompleteLeadsPage).toContain('aria-label="Selecionar todos os leads incompletos"');
-    expect(incompleteLeadsPage).toContain("aria-label={`Selecionar ${s.contact_name || s.contact_email || s.id}`}");
-    expect(announcementsPage).toContain("aria-label={label}");
-  });
-
   it("names icon-only actions and switches across audited modules", () => {
-    expect(whatsappPage).toContain('aria-label="Enviar mensagem"');
     expect(modulePage).toContain("aria-label={`Excluir automação ${automation.name}`}");
     expect(financePage).toContain('aria-label="Incluir imposto Meta no cálculo"');
     expect(settingsPage).toContain("Evolução da Missão por Faturamento");

@@ -441,7 +441,7 @@ function IntegrationsContent() {
               {socialAccounts.map((account) => <article key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span><div className="min-w-0"><b className="block truncate text-sm">{account.display_name}</b><p className="truncate text-xs text-muted-foreground">@{account.username || "perfil"}</p></div><CheckCircle2 className="h-5 w-5 text-emerald-500" /><Button type="button" size="sm" variant="outline" onClick={() => disconnectInstagram.mutate(account.id)} disabled={disconnectInstagram.isPending}>Desconectar</Button></div></article>)}
               {loadingSocial ? <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground" role="status" aria-live="polite">Verificando perfis conectados…</div> : !socialAccounts.length && <EmptyState text="Nenhum perfil profissional conectado." />}
             </div>
-            <div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button><Button asChild variant="outline"><Link to="/midia-social">Abrir análise de mídia social</Link></Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Somente contas Business ou Creator são suportadas pela API oficial.</span></div>
+            <div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Somente contas Business ou Creator são suportadas pela API oficial.</span></div>
           </section>
         </TabsContent>
 
@@ -477,7 +477,6 @@ function SectionHeader({ icon, title, description, status, connected }: { icon: 
 function IntegrationAccordion({ title, description, defaultOpen = true, children }: { title: string; description: string; defaultOpen?: boolean; children: ReactNode }) { return <details className="gd-panel overflow-hidden" open={defaultOpen}><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><div className="min-w-0 grow"><h2 className="text-sm font-black">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{description}</p></div><span className="shrink-0 text-xs font-semibold text-primary">Mostrar / recolher</span></summary><div className="border-t border-border p-4">{children}</div></details>; }
 const AVAILABLE_PROVIDER_ROUTES: Record<string, { href: string; action: string }> = {
   "WhatsApp Cloud API": { href: "/campanhas?aba=campaigns&analise=intelligence&intelligence=whatsapp", action: "Configurar relatórios" },
-  n8n: { href: "/automacoes", action: "Abrir automações" },
   Stripe: { href: "/perfil?tab=plans", action: "Gerenciar assinatura" },
 };
 

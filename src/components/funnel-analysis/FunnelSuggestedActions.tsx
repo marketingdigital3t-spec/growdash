@@ -6,7 +6,7 @@ import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 export function FunnelSuggestedActions({ a }: { a: FunnelAnalytics }) {
   const navigate = useNavigate();
   const actions = [
-    a.agingBuckets.gt7 > 0 ? { color: "border-red-500/30 bg-red-500/5", Icon: AlertTriangle, title: `${a.agingBuckets.gt7} leads parados há mais de 7 dias`, detail: "Priorize o contato antes que a oportunidade esfrie.", buttons: [["Exportar leads", Download, () => navigate("/crm?status=open")], ["Disparar automação", Bot, () => navigate("/automacoes")]] } : null,
+    a.agingBuckets.gt7 > 0 ? { color: "border-red-500/30 bg-red-500/5", Icon: AlertTriangle, title: `${a.agingBuckets.gt7} leads parados há mais de 7 dias`, detail: "Priorize o contato antes que a oportunidade esfrie.", buttons: [["Exportar leads", Download, () => navigate("/crm?status=open")], ["Ver no CRM", Bot, () => navigate("/crm")]] } : null,
     a.bottleneck ? { color: "border-amber-500/30 bg-amber-500/5", Icon: Palette, title: `Gargalo em ${a.bottleneck.from} → ${a.bottleneck.to}`, detail: `${(Number(a.bottleneck.lossPct) || 0).toFixed(0)}% de perda nesta passagem. Revise abordagem, oferta e criativos de origem.`, buttons: [["Revisar criativos", Palette, () => navigate("/campanhas")], ["Ver CRM", ArrowRight, () => navigate("/crm")]] } : null,
   ].filter(Boolean) as { color: string; Icon: any; title: string; detail: string; buttons: [string, any, () => void][] }[];
   if (!actions.length) return null;

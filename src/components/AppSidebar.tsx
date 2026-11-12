@@ -1,4 +1,4 @@
-import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse, Sparkles, BriefcaseBusiness } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, GitBranch, Users as UsersIcon, HeartPulse, Sparkles, BriefcaseBusiness } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -30,8 +30,6 @@ export function AppSidebar() {
     { title: "Campanhas", url: "/campanhas", icon: Megaphone, show: perms.canCampaigns },
     { title: "Análise de Funis", url: "/analise-de-funis", icon: GitBranch, show: perms.canFunnels },
     { title: "Business", url: "/business", icon: BriefcaseBusiness, show: perms.canCampaigns },
-    { title: "Datas & Turmas", url: "/agenda-turmas", icon: CalendarDays, show: perms.canClasses },
-    { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster },
     // Keep the sidebar link aligned with the canonical route used by the
     // Growdash layout. The old `/alerts` path fell through to the dashboard.
     { title: "Alertas", url: "/alertas", icon: Bell, show: perms.isMaster },

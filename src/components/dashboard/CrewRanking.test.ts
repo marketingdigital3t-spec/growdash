@@ -14,12 +14,7 @@ const calendarSource = readFileSync(
   fileURLToPath(new URL("./ClassCalendar.tsx", import.meta.url)),
   "utf8",
 );
-const agendaPageSource = readFileSync(
-  fileURLToPath(new URL("../../pages/AgendaTurmas.tsx", import.meta.url)),
-  "utf8",
-);
-
-describe("ETAPA 7 — Tripulação (Comercial, CRM e Agenda & Turmas)", () => {
+describe("ETAPA 7 — Tripulação (Comercial e CRM Kanban)", () => {
   it("implementa o ranking comercial com formato de tripulação e pódio", () => {
     expect(crewRankingSource).toContain("Ranking da Tripulação");
     expect(crewRankingSource).toContain("Crown");
@@ -45,10 +40,4 @@ describe("ETAPA 7 — Tripulação (Comercial, CRM e Agenda & Turmas)", () => {
     expect(calendarSource).toContain("Receita gerada");
   });
 
-  it("integra a página Agenda & Turmas com eventos da missão", () => {
-    expect(agendaPageSource).toContain("Agenda & Turmas");
-    expect(agendaPageSource).toContain("Próximos Encontros da Missão");
-    expect(agendaPageSource).toContain("Mentoria");
-    expect(agendaPageSource).toContain("ClassCalendar");
-  });
 });

@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 const routes = [
-  "/", "/crm", "/comercial", "/campanhas", "/analise-de-funis", "/financeiro",
-  "/integracoes", "/saude-dos-dados", "/agenda-turmas", "/leads-incompletos", "/kanban",
-  "/inteligencia", "/growdash-flow", "/midia-social", "/configuracoes", "/usuarios", "/armazenamento",
+  "/", "/painel-expert", "/crm", "/comercial", "/campanhas", "/analise-de-funis", "/financeiro",
+  "/integracoes", "/saude-dos-dados", "/kanban",
+  "/inteligencia", "/configuracoes", "/usuarios", "/agentes",
 ];
 
 test.describe("matriz de carregamento autenticada", () => {

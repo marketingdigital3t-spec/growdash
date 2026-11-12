@@ -42,9 +42,9 @@ export function buildDecisionAlerts({ classes = [], insights = [], analytics, to
     const sold = Math.max(0, Number(eventClass.studentCount || 0));
     const pct = goal > 0 ? (sold / goal) * 100 : null;
     if (days >= 0 && days <= DECISION_ALERT_CONFIG.classDaysLimit && goal > 0 && sold === 0) {
-      alerts.push({ id: `class-zero-${eventClass.id}`, severity: "critical", title: `Risco de cancelamento: ${eventClass.title}`, description: `${brl.format(0)} em inscrições: 0 de ${goal} vagas preenchidas e faltam ${days} dia${days === 1 ? "" : "s"} para o início.`, actionLabel: "Abrir Agenda & Turmas", action: "review_class", requiresConfirmation: true, href: "/agenda-turmas" });
+      alerts.push({ id: `class-zero-${eventClass.id}`, severity: "critical", title: `Risco de cancelamento: ${eventClass.title}`, description: `${brl.format(0)} em inscrições: 0 de ${goal} vagas preenchidas e faltam ${days} dia${days === 1 ? "" : "s"} para o início.`, actionLabel: "Revisar operação", action: "review_class", requiresConfirmation: true, href: "/comercial" });
     } else if (days >= 0 && days <= DECISION_ALERT_CONFIG.classDaysLimit && pct !== null && pct < DECISION_ALERT_CONFIG.classMinimumPercent) {
-      alerts.push({ id: `class-low-${eventClass.id}`, severity: "attention", title: `Venda insuficiente: ${eventClass.title}`, description: `${sold} de ${goal} vagas (${pct.toFixed(0)}%) com ${days} dia${days === 1 ? "" : "s"} restantes; abaixo da meta mínima de ${DECISION_ALERT_CONFIG.classMinimumPercent}%.`, actionLabel: "Revisar turma", action: "review_class", requiresConfirmation: true, href: "/agenda-turmas" });
+      alerts.push({ id: `class-low-${eventClass.id}`, severity: "attention", title: `Venda insuficiente: ${eventClass.title}`, description: `${sold} de ${goal} vagas (${pct.toFixed(0)}%) com ${days} dia${days === 1 ? "" : "s"} restantes; abaixo da meta mínima de ${DECISION_ALERT_CONFIG.classMinimumPercent}%.`, actionLabel: "Revisar operação", action: "review_class", requiresConfirmation: true, href: "/comercial" });
     }
   }
 

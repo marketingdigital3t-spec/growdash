@@ -35,21 +35,15 @@ const FunnelAnalysis = lazyWithRetry(() => import("@/pages/FunnelAnalysis"), "fu
 const BusinessPage = lazyWithRetry(() => import("@/growdash/BusinessPage"), "business");
 const FullAlerts = lazyWithRetry(() => import("@/pages/Alerts"), "alerts");
 const EventClasses = lazyWithRetry(() => import("@/pages/EventClasses"), "event-classes");
-const IncompleteLeads = lazyWithRetry(() => import("@/pages/LeadsIncompletos"), "incomplete-leads");
 const DataHealth = lazyWithRetry(() => import("@/pages/DataHealth"), "data-health");
 const FullSettings = lazyWithRetry(() => import("@/pages/Settings"), "settings");
 const FullUsers = lazyWithRetry(() => import("@/pages/Users"), "users");
-const Products = lazyWithRetry(() => import("@/pages/Products"), "products");
-const Funnelytics = lazyWithRetry(() => import("@/pages/Funnelytics"), "funnelytics");
 const CrmPage = lazyWithRetry(() => import("@/growdash/CrmPage"), "crm");
 const KanbanPage = lazyWithRetry(() => import("@/growdash/KanbanPage"), "kanban");
 const CommercialPage = lazyWithRetry(() => import("@/growdash/CommercialPage"), "commercial");
 const FinancePage = lazyWithRetry(() => import("@/growdash/FinancePage"), "finance");
-const StoragePage = lazyWithRetry(() => import("@/growdash/StoragePage"), "storage");
 const IntegrationsPage = lazyWithRetry(() => import("@/growdash/IntegrationsPage"), "integrations");
 const ProfilePage = lazyWithRetry(() => import("@/growdash/ProfilePage"), "profile");
-const SocialMediaPage = lazyWithRetry(() => import("@/growdash/SocialMediaPage"), "social-media");
-const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPage"), "announcements");
 const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "module");
 const TrafficAgentPage = lazyWithRetry(() => import("@/growdash/TrafficAgentPage"), "traffic-agent");
 const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "brand-diagnostic");
@@ -62,13 +56,9 @@ const PublicInvoiceForm = lazyWithRetry(() => import("@/pages/PublicInvoiceForm"
 const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBrandDiagnosticForm"), "public-brand-diagnostic");
 const PublicExpertQuestionnaire = lazyWithRetry(() => import("@/pages/PublicExpertQuestionnaire"), "public-expert-questionnaire");
 const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
-const WhatsApp = lazyWithRetry(() => import("@/pages/WhatsApp"), "whatsapp");
-const AgentTrainingPage = lazyWithRetry(() => import("@/growdash/AgentTrainingPage"), "agent-training");
 const QuadroPage = lazyWithRetry(() => import("@/growdash/QuadroPage"), "quadro");
 const LegalPage = lazyWithRetry(() => import("@/pages/LegalPage"), "legal");
 const JornadaPage = lazyWithRetry(() => import("@/pages/Jornada"), "jornada");
-const ComandosPage = lazyWithRetry(() => import("@/pages/Comandos"), "comandos");
-const AgendaTurmasPage = lazyWithRetry(() => import("@/pages/AgendaTurmas"), "agenda-turmas");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -353,7 +343,6 @@ export default function App() {
                     <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="jornada" element={<ResilientRoute><JornadaPage /></ResilientRoute>} />
-                    <Route path="comandos" element={<ResilientRoute><RequirePage page="dashboard"><ComandosPage /></RequirePage></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<ResilientRoute><RequirePage page="crm"><CrmPage /></RequirePage></ResilientRoute>} />
@@ -390,37 +379,22 @@ export default function App() {
                         a redirect so old bookmarks and cached menu chunks do
                         not land on the dashboard by accident. */}
                     <Route path="alerts" element={<Navigate to="/alertas" replace />} />
-                    <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<AgendaTurmasPage />)}</RequirePage>} />
-                    <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
-                    <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
-                    <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />
-                    <Route path="growdash-flow" element={<ResilientRoute><RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage></ResilientRoute>} />
                     <Route path="estrategia" element={<ResilientRoute><RequirePage page="brands">{analytics(<StrategyPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="saude-dos-dados" element={<RequirePage page="dataHealth">{analytics(<DataHealth />)}</RequirePage>} />
                     <Route path="data-health" element={<Navigate to="/saude-dos-dados" replace />} />
-                    <Route path="produtos" element={<RequirePage page="products">{analytics(<Products />)}</RequirePage>} />
                     <Route path="configuracoes" element={<RequirePage page="settings">{analytics(<FullSettings />)}</RequirePage>} />
                     <Route path="settings" element={<Navigate to="/configuracoes" replace />} />
                     <Route path="usuarios" element={<RequirePage page="users">{analytics(<FullUsers />)}</RequirePage>} />
                     <Route path="usuarios/avancado" element={<Navigate to="/usuarios" replace />} />
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
                     <Route path="financeiro" element={<ResilientRoute><RequirePage page="finance"><FinancePage /></RequirePage></ResilientRoute>} />
-                    <Route path="armazenamento" element={<RequirePage page="storage"><StoragePage /></RequirePage>} />
                     <Route path="integracoes" element={<ResilientRoute><RequirePage page="integrations"><IntegrationsPage /></RequirePage></ResilientRoute>} />
                     <Route path="perfil" element={<ProfilePage />} />
-                    <Route path="midia-social" element={<ResilientRoute><RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="kanban" element={<RequirePage page="kanban"><KanbanPage /></RequirePage>} />
-                    <Route path="chamados" element={<RequirePage page="tickets"><ModulePage /></RequirePage>} />
-                    <Route path="anuncios" element={<RequirePage page="announcements"><AnnouncementsPage /></RequirePage>} />
-                    <Route path="marcas" element={<RequirePage page="brands"><ModulePage /></RequirePage>} />
-                    <Route path="marcas/:brandId" element={<RequirePage page="brands">{analytics(<BrandDiagnosticPage />)}</RequirePage>} />
-                    <Route path="marca" element={<Navigate to="/marcas" replace />} />
                     {/* Legacy URL: Meta Connect is now the paid tab in the unified integrations center. */}
                     <Route path="meta-connect" element={<RequirePage page="integrations"><Navigate to="/integracoes?tab=paid" replace /></RequirePage>} />
                     <Route path="agentes" element={<RequirePage page="agents"><AgentsOfficePage /></RequirePage>} />
                     <Route path="gestor-trafego" element={<RequirePage page="agents"><TrafficAgentPage /></RequirePage>} />
-                    <Route path="whatsapp" element={<RequirePage page="integrations">{analytics(<WhatsApp />)}</RequirePage>} />
-                    <Route path="treinamento-agentes" element={<RequirePage page="integrations">{analytics(<AgentTrainingPage />)}</RequirePage>} />
                     <Route path="quadro" element={<ResilientRoute><QuadroPage /></ResilientRoute>} />
                     <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="life-sim" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
