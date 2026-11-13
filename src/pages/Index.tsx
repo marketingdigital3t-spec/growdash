@@ -29,7 +29,7 @@ import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
 import { type MetricAvailability } from "@/lib/metricAvailability";
 import { buildDashboardMetricAvailability } from "@/lib/dashboardMetricAvailability";
-import { MissionDashboard } from "@/components/dashboard/MissionDashboard";
+import { PerformanceSummaryDashboard } from "@/components/dashboard/PerformanceSummaryDashboard";
 
 const Index = () => {
   const {
@@ -206,6 +206,31 @@ const Index = () => {
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
+
+  // Investimento desmembrado por conta de anúncio para o resumo de performance
+  const accountsSpend = useMemo(() => {
+    const spendByAcc = new Map<string, number>();
+    for (const row of dashboardInsights) {
+      if (row.ad_account_id) {
+        spendByAcc.set(row.ad_account_id, (spendByAcc.get(row.ad_account_id) || 0) + Number(row.spend || 0));
+      }
+    }
+    return visibleAccounts
+      .filter((acc) => spendByAcc.has(acc.id))
+      .map((acc, index) => ({
+        id: acc.id,
+        name: acc.name ? (acc.name.length > 20 ? `Investimento CA0${index + 1}` : acc.name) : `Investimento CA0${index + 1}`,
+        spend: spendByAcc.get(acc.id) || 0,
+      }));
+  }, [dashboardInsights, visibleAccounts]);
+
+  const accountTitle = useMemo(() => {
+    if (selectedAccount !== "all") {
+      const acc = visibleAccounts.find((a) => a.id === selectedAccount);
+      if (acc?.name) return acc.name;
+    }
+    return "Aluna";
+  }, [selectedAccount, visibleAccounts]);
   // A confirmed Insights snapshot and the lead/action watermark are separate
   // provider blocks. Keep spend visible while actions are still reconciling,
   // but never render a missing lead block as a legitimate zero.
@@ -354,66 +379,15 @@ const Index = () => {
         <button type="button" className="font-bold underline underline-offset-2" onClick={() => { void refetchRDDeals(); void refetchRDWonDeals(); }}>Tentar novamente</button>
       </div>}
 
-      {/* 4 blocos fundamentais: Investimento, Leads, CPL, Vendas e Faturamento + Funil 3D e Radar */}
-      <MissionDashboard
-        metrics={{
-          spend: glassSpend,
-          leads: dashboardDeals.length > 0 ? dashboardDeals.length : glassLeads,
-          cpl: glassCpl,
-          sales: glassSales.totalQuantity,
-          revenue: glassSales.totalGross,
-          roas: glassRoas,
-          impressions: dashboardInsights.reduce((sum, r) => sum + Number(r.impressions || 0), 0),
-          // Puxa APENAS a negociação que está na etapa de Oportunidade no funil do RD Station (sem somar conversa iniciada/contato)
-          opportunities: dashboardDeals.filter((d) => {
-            const name = String(d.rd_stage_name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            // Ignora conversas iniciadas, contatos ou novas entradas
-            if (/conversa|iniciad|contat|whatsapp|mensagem|msg|novo|lead/.test(name)) return false;
-            // Conta estritamente quem está na etapa de Oportunidade do RD
-            return name.includes("oportunidade") || d.stage_bucket === "opportunity";
-          }).length,
-        }}
+      {/* Dashboard Fiel ao Resumo de Performance Solicitado: Investimento por Conta + Total, Vendas, CAC, Leads Totais, Taxa de Conversão e Pipeline Trapezoidal */}
+      <PerformanceSummaryDashboard
+        accountTitle={accountTitle}
+        totalSpend={glassSpend}
+        accountsSpend={accountsSpend}
+        salesCount={glassSales.totalQuantity}
+        totalLeads={dashboardDeals.length > 0 ? dashboardDeals.length : glassLeads}
+        deals={dashboardDeals}
       />
-
-      <div>
-        <TrafficClassAlerts classes={eventClasses} insights={dashboardInsights} />
-      </div>
-
-      {(isEditing ? draftView : activeView) && (
-        <DashboardProvider
-          value={{
-            startDate,
-            endDate,
-            adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-            insights: dashboardInsights,
-            sales: dashboardSales,
-            rdDeals: dashboardDeals,
-            revenueDeals: dashboardRevenueDeals,
-            alerts,
-            campaigns: visibleCampaigns,
-            adAccounts: visibleAccounts,
-            products,
-            isLoading,
-            revenueAvailability,
-            metricAvailability: dashboardMetricAvailability,
-            leadBreakdown,
-            metaAvailability: {
-              spend: hasCanonicalMetaRows || dashboardInsights.length > 0,
-              reason: hasCanonicalMetaRows || dashboardInsights.length > 0 ? null : dashboardMeta.data.unavailableReason,
-            },
-          }}
-        >
-          <DashboardGrid
-            view={(isEditing ? draftView : activeView)!}
-            isEditing={isEditing && canEditDashboard}
-            onChange={(layout, widgets) => {
-              if (!canEditDashboard || !isEditing) return;
-              setDraftView((current) => current ? { ...current, layout, widgets } : current);
-            }}
-            onEditSale={(s) => { setEditingSale(s); setSalesDialogOpen(true); }}
-          />
-        </DashboardProvider>
-      )}
 
       {salesDialogOpen && <SalesDialog
           open
