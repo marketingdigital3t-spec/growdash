@@ -54,6 +54,22 @@ describe("PerformanceSummaryDashboard — conta selecionada e funil CRM", () => 
     expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(5);
   });
 
+  it("classifica 'Sem contato' em Sem Conversa e não em Conversa", () => {
+    const rannielyDeals = [
+      { rd_stage_name: "Lead Novo", win: false },
+      { rd_stage_name: "Lead Novo", win: false },
+      { rd_stage_name: "Sem contato", win: false },
+      { rd_stage_name: "Sem contato", win: false },
+      { rd_stage_name: "Sem contato", win: false },
+      { rd_stage_name: "Em conversa", win: false },
+      { rd_stage_name: "Oportunidade", win: false },
+    ];
+    render(<PerformanceSummaryDashboard {...defaultProps} deals={rannielyDeals} totalLeads={7} />);
+    // 3 em Sem Conversa, 1 em Conversa, 2 em Novo Lead, 1 em Oportunidade
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("não quebra com o escopo zerado", () => {
     expect(() =>
       render(

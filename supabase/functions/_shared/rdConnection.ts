@@ -50,7 +50,10 @@ export async function resolveRDConnection(
   const { data, error } = await query.maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("RD_CONNECTION_NOT_FOUND");
-  if (data.status !== "connected" || !data.api_token) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
+  // Allow any connection with a valid token that has not been explicitly
+  // blocked/revoked. A transient "failed" or "partial" status from a prior
+  // sync must not invalidate reads or block recovery attempts.
+  if (data.status === "blocked" || !data.api_token) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
   if (userId && data.user_id !== userId) {
     if (!data.workspace_id) throw new Error("RD_CONNECTION_NOT_AUTHORIZED");
     const { data: membership, error: membershipError } = await admin.from("workspace_members")
@@ -74,7 +77,7 @@ export async function listAuthorizedRDConnections(admin: AdminClient, userIds?: 
   let query = admin
     .from("rd_account_connections")
     .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions,write_enabled")
-    .eq("status", "connected")
+    .neq("status", "blocked")
     .not("api_token", "is", null);
   if (userIds?.length) query = query.in("user_id", userIds);
   const { data, error } = await query.order("account_name", { ascending: true });

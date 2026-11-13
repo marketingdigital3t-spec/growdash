@@ -147,5 +147,22 @@ BEGIN
   WHERE d.rd_funnel_id = f.id
     AND f.ad_account_id IS NOT NULL
     AND d.ad_account_id IS NULL;
+
+  -- 3) REATIVAR TODAS AS CONEXÕES RD QUE POSSUEM TOKEN VÁLIDO
+  -- Evita que um timeout pontual trave a autorização de leitura dos funis
+  UPDATE public.rd_account_connections
+  SET status = 'connected',
+      last_error = NULL,
+      updated_at = now()
+  WHERE api_token IS NOT NULL
+    AND status IN ('failed', 'partial', 'pending')
+    AND (last_error ILIKE '%timeout%' OR last_error ILIKE '%partial%' OR last_error IS NULL);
+
+  -- 4) REATIVAR TODOS OS FUNIS DO RD STATION QUE POSSUEM PIPELINE ID VÁLIDO
+  UPDATE public.rd_funnels
+  SET is_active = true,
+      updated_at = now()
+  WHERE rd_funnel_id IS NOT NULL
+    AND is_active = false;
 END;
 $$;

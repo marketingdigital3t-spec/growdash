@@ -49,8 +49,8 @@ function getPipelineStages(deals: PerformanceSummaryDashboardProps["deals"], sal
     const stage = normalizedStageName(deal.rd_stage_name || deal.stage_bucket || "");
     if (/perdid|lost|desqualif/.test(stage) || deal.lost_reason) counts.perdidas += 1;
     else if (/oportun/.test(stage)) counts.oportunidade += 1;
-    else if (/sem conversa|nao atendeu|no show|sem resposta/.test(stage)) counts.semConversa += 1;
-    else if (/conversa|atendimento|contato|whatsapp/.test(stage)) counts.conversa += 1;
+    else if (/sem contato|sem conversa|nao atendeu|no show|sem resposta|tentativa/.test(stage)) counts.semConversa += 1;
+    else if (/conversa|atendimento|whatsapp/.test(stage) || (stage.includes("contato") && !stage.includes("sem"))) counts.conversa += 1;
     else if (/novo|lead|entrada|inici/.test(stage)) counts.novo += 1;
     else counts.conversa += 1;
   }

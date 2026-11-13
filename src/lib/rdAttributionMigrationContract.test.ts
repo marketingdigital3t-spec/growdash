@@ -23,4 +23,11 @@ describe("20261113190000_optimize_rd_attribution_and_link_sister_accounts", () =
     expect(migration).toContain("name ILIKE '%Natália Barragão%'");
     expect(migration).toContain("UPDATE public.rd_deals d");
   });
+
+  it("reativa conexões e funis do RD Station para corrigir o status desconectado", () => {
+    expect(migration).toContain("UPDATE public.rd_account_connections");
+    expect(migration).toContain("SET status = 'connected'");
+    expect(migration).toContain("UPDATE public.rd_funnels");
+    expect(migration).toContain("SET is_active = true");
+  });
 });
