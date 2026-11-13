@@ -104,14 +104,14 @@ export function PerformanceSummaryDashboard({
           </div>
         </header>
 
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
           {metrics.map(({ label, value, icon: Icon, emphasis }) => (
-            <article key={label} className={`min-w-0 rounded-xl border p-3 ${emphasis ? "border-sky-400/60 bg-[#0b2a54]" : "border-primary/20 bg-[#07172f]/80"}`}>
-              <div className="flex min-w-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[.1em] text-slate-400">
-                <Icon className="h-4 w-4 shrink-0 text-sky-400" />
+            <article key={label} className={`min-w-0 rounded-xl border p-2.5 sm:p-3 ${emphasis ? "border-sky-400/60 bg-[#0b2a54]" : "border-primary/20 bg-[#07172f]/80"}`}>
+              <div className="flex min-w-0 items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 sm:text-[10px]">
+                <Icon className="h-3.5 w-3.5 shrink-0 text-sky-400 sm:h-4 sm:w-4" />
                 <span className="truncate" title={label}>{label}</span>
               </div>
-              <strong className="mt-3 block truncate text-xl font-black tabular-nums text-white sm:text-2xl" title={value}>{value}</strong>
+              <strong className="mt-2 block truncate text-base font-black tabular-nums text-white sm:text-lg lg:text-xl" title={value}>{value}</strong>
             </article>
           ))}
         </div>
