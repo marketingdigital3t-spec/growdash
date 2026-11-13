@@ -173,7 +173,7 @@ export default function PerformanceSummaryPage() {
         </div>
       </MotionItem>
       <MotionItem>
-        <PerformanceSummaryDashboard accountTitle={accountTitle} totalSpend={totalSpend} accountsSpend={accountsSpend} salesCount={glassSales.totalQuantity} totalLeads={totalLeads} deals={dashboardDeals} />
+        <PerformanceSummaryDashboard accountTitle={accountTitle} totalSpend={totalSpend} salesCount={glassSales.totalQuantity} totalLeads={totalLeads} deals={dashboardDeals} />
       </MotionItem>
     </MotionPage>
   );
