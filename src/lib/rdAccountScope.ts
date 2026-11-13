@@ -78,7 +78,27 @@ export function resolveLinkedRDFunnelIds(
   const candidateFunnels = directlyLinkedFunnels.length > 0
     ? directlyLinkedFunnels
     : activeFunnels.filter((funnel) => funnel.rd_connection_id && connectionIds.has(funnel.rd_connection_id));
-  const linkedFunnels = dedupeActiveRDFunnels(candidateFunnels, selectedAccountIds);
+
+  let resolvedCandidates = candidateFunnels;
+  // When sister accounts (e.g. CA01 / CA02) belong to the same expert but
+  // only one has an explicit link row in the mirror, resolve by the shared
+  // expert signature so selecting CA02 does not return an empty scope.
+  if (!resolvedCandidates.length && selectedAccounts.length > 0) {
+    const signatures = selectedAccounts
+      .map((account) => String((account as any).name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\bca0?\d+\b/gi, "").replace(/\[.*?\]/g, "").replace(/[^a-z0-9\s]/g, "").trim())
+      .filter((sig) => sig.length >= 4);
+    if (signatures.length > 0) {
+      resolvedCandidates = activeFunnels.filter((funnel) => {
+        const funnelText = `${(funnel as any).name || ""} ${(funnel as any).expert_name || ""}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        return signatures.some((sig) => {
+          const tokens = sig.split(/\s+/).filter((token) => token.length >= 4 && !/^(dra?|dro?|grupo|zntt|conta|anuncio)$/i.test(token));
+          return tokens.length > 0 && tokens.every((token) => funnelText.includes(token));
+        });
+      });
+    }
+  }
+
+  const linkedFunnels = dedupeActiveRDFunnels(resolvedCandidates, selectedAccountIds);
 
   return linkedFunnels.length ? linkedFunnels.map((funnel) => funnel.id) : [NO_LINKED_RD_FUNNEL_SCOPE_ID];
 }

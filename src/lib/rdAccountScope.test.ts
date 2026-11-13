@@ -89,4 +89,31 @@ describe("resolveScopedRDFunnelIds", () => {
       funnels,
     )).toEqual(["ranniely-paciente"]);
   });
+
+  it("resolves funnels for sister accounts with shared expert name when no direct link exists", () => {
+    const extendedAccounts = [
+      { id: "ca01-natalia", name: "CA01 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]", account_id: "act_2836556270048145" },
+      { id: "ca02-natalia", name: "CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]", account_id: "act_975324268974435" },
+    ];
+    const extendedConnections = [
+      { id: "conn-ca01", external_account_id: "act_2836556270048145" },
+      { id: "conn-ca02", external_account_id: "act_975324268974435" },
+    ];
+    const extendedFunnels = [
+      {
+        id: "funnel-natalia",
+        name: "Dra. Natália Barragão - Aluna",
+        expert_name: "Dra. Natália Barragão",
+        ad_account_id: "ca01-natalia",
+        rd_connection_id: "conn-ca01",
+        rd_funnel_id: "pipe-nat",
+        is_active: true,
+      },
+    ];
+    // When CA02 is selected, even though the funnel points directly to CA01,
+    // CA02 must still resolve the expert funnel instead of returning NO_LINKED_RD_FUNNEL_SCOPE_ID
+    expect(resolveLinkedRDFunnelIds(["ca02-natalia"], extendedAccounts, extendedConnections, extendedFunnels)).toEqual([
+      "funnel-natalia",
+    ]);
+  });
 });
