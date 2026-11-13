@@ -4,6 +4,7 @@ import { ALL_MODULES, findModule, NAV_SECTIONS } from "./navigation";
 describe("Growdash sidebar navigation — abas ativas", () => {
   it("mantém os módulos essenciais visíveis", () => {
     expect(ALL_MODULES.some((module) => module.label === "Dashboard" && module.path === "/")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Resumo de Performance" && module.path === "/resumo-performance")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "CRM" && module.path === "/crm")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Comercial" && module.path === "/comercial")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago" && module.path === "/campanhas")).toBe(true);

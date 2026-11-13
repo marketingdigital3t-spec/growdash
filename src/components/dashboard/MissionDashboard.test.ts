@@ -62,8 +62,8 @@ describe("ETAPA 3 — Dashboard Completo da Missão", () => {
     expect(missionDashboardSource).toContain("AnomalyRadar");
   });
 
-  it("integra o PerformanceSummaryDashboard fiel à referência no Index.tsx", () => {
-    expect(indexPageSource).toContain("<PerformanceSummaryDashboard");
-    expect(indexPageSource).toContain("import { PerformanceSummaryDashboard }");
+  it("integra o MissionDashboard no Index.tsx", () => {
+    expect(indexPageSource).toContain("<MissionDashboard");
+    expect(indexPageSource).toContain("import { MissionDashboard }");
   });
 });

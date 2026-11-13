@@ -30,6 +30,9 @@ const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage
 // Statically importing them defeated code splitting and made one stale asset
 // capable of delaying the whole authenticated application.
 const FullDashboard = lazyWithRetry(() => import("@/pages/Index"), "dashboard");
+const PerformanceSummaryPage = lazyWithRetry(() => import("@/pages/PerformanceSummaryPage"), "performance-summary");
+
+// A rota dedicada permite explorar o resumo sem alterar o Dashboard original.
 const TrafficPage = lazyWithRetry(() => import("@/growdash/TrafficPage"), "campaigns");
 const FunnelAnalysis = lazyWithRetry(() => import("@/pages/FunnelAnalysis"), "funnel-analysis");
 const BusinessPage = lazyWithRetry(() => import("@/growdash/BusinessPage"), "business");
@@ -341,6 +344,7 @@ export default function App() {
                   <Route path="/questionario-expert/:token" element={<PublicExpertQuestionnaire />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
+                    <Route path="resumo-performance" element={<ResilientRoute><RequirePage page="dashboard">{analytics(<PerformanceSummaryPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="jornada" element={<ResilientRoute><JornadaPage /></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />

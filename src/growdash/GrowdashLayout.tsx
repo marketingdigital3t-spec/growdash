@@ -59,6 +59,7 @@ const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
 // pause from menu navigation without making the initial login/app shell heavy.
 const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/": () => import("@/pages/Index"),
+  "/resumo-performance": () => import("@/pages/PerformanceSummaryPage"),
   "/painel-expert": () => import("@/pages/ExpertDashboard"),
   "/crm": () => import("@/growdash/CrmPage"),
   "/comercial": () => import("@/growdash/CommercialPage"),
@@ -240,6 +241,7 @@ export default function GrowdashLayout() {
     const pathnameOnly = path.split("?")[0];
     const guarded: Record<string, boolean> = {
       "/": permissions.canDashboard,
+      "/resumo-performance": permissions.canDashboard,
       "/painel-expert": permissions.canExpertDashboard,
       "/crm": permissions.canCrm,
       "/comercial": permissions.canCommercial,

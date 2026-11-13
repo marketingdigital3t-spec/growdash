@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 const routes = [
-  "/", "/painel-expert", "/crm", "/comercial", "/campanhas", "/analise-de-funis", "/financeiro",
+  "/", "/resumo-performance", "/painel-expert", "/crm", "/comercial", "/campanhas", "/analise-de-funis", "/financeiro",
   "/integracoes", "/saude-dos-dados", "/kanban",
   "/inteligencia", "/configuracoes", "/usuarios", "/agentes",
 ];

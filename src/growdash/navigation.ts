@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BadgeDollarSign,
+  TrendingUp,
   BrainCircuit,
   Building2,
   Cable,
@@ -57,6 +58,14 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Uma visão consolidada das principais métricas da sua operação.",
         metrics: [],
         highlights: [],
+      },
+      {
+        label: "Resumo de Performance",
+        path: "/resumo-performance",
+        icon: TrendingUp,
+        description: "Consolidado executivo de investimento, CAC, leads e funil.",
+        metrics: [],
+        highlights: ["Investimento por conta", "CAC por vendas", "Pipeline de leads"],
       },
       {
         label: "Painel do Expert",
