@@ -139,18 +139,18 @@ function CrmMetricCard({ source, label, value, description, icon, tone, availabi
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-foreground";
   return (
-    <article className="gd-panel gd-metric-card gd-crm-metric-card min-w-0 overflow-hidden p-4">
-      <div className="flex items-start justify-between gap-3">
+    <article className="gd-panel gd-metric-card gd-crm-metric-card flex min-h-[174px] min-w-0 flex-col overflow-hidden p-4">
+      <div className="flex min-h-[68px] items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+          <span className="inline-flex min-h-5 items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
             {source}
           </span>
-          <h3 className="mt-2 text-xs font-black uppercase tracking-[.08em] text-muted-foreground">{label}</h3>
+          <h3 className="mt-2 line-clamp-2 min-h-8 text-xs font-black uppercase tracking-[.08em] text-muted-foreground">{label}</h3>
         </div>
         <span className={cn("gd-metric-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl", toneClass)}>{icon}</span>
       </div>
-      <p className={cn("mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight", toneClass, availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) && "text-muted-foreground")} title={availability?.reason || value}>{availability?.state === "loading" ? "Carregando…" : availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) ? "Indisponível" : value}</p>
-      <p className="mt-1 line-clamp-2 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
+      <p className={cn("mt-2 min-h-9 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight", toneClass, availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) && "text-muted-foreground")} title={availability?.reason || value}>{availability?.state === "loading" ? "Carregando…" : availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) ? "Indisponível" : value}</p>
+      <p className="mt-auto line-clamp-2 min-h-8 pt-1 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
     </article>
   );
 }
@@ -1030,66 +1030,74 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro e os indicadores respeitam o período selecionado e os filtros ativos.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">Ajuste primeiro o escopo; depois refine as negociações.</p></div>
         </div>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(190px,1.1fr)_minmax(170px,.85fr)_minmax(170px,.85fr)_minmax(150px,.7fr)_minmax(160px,.72fr)_auto]">
-          <label className="relative min-w-0">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
-          </label>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label htmlFor="crm-scope-account" className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">Conta Meta ativa</label>
-            <select
-              id="crm-scope-account"
-              aria-label="Filtrar por conta Meta ativa"
-              value={adAccountIds.length === 1 ? adAccountIds[0] : "all"}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === "all") setAdAccountIds([]);
-                else setAdAccountIds([value]);
-                // The account is the canonical scope. Resetting the funnel
-                // avoids keeping a pipeline that belongs to another account.
-                setSelectedFunnelIds([]);
-              }}
-              className="gd-button h-11 min-w-0 text-xs font-bold"
-            >
-              <option value="all">Todas as contas ativas ({activeOnlyAccounts.length})</option>
-              {activeOnlyAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
+        <div className="crm-filter-layout">
+          <div className="crm-filter-row crm-filter-row-primary">
+            <label className="crm-filter-search relative min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="crm-filter-control h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
+            </label>
+            <label className="crm-filter-field" htmlFor="crm-scope-account">
+              <span className="crm-filter-label">Conta Meta ativa</span>
+              <select
+                id="crm-scope-account"
+                aria-label="Filtrar por conta Meta ativa"
+                value={adAccountIds.length === 1 ? adAccountIds[0] : "all"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "all") setAdAccountIds([]);
+                  else setAdAccountIds([value]);
+                  setSelectedFunnelIds([]);
+                }}
+                className="gd-button crm-filter-control h-11 min-w-0 text-xs font-bold"
+              >
+                <option value="all">Todas as contas ativas ({activeOnlyAccounts.length})</option>
+                {activeOnlyAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+            </label>
+            <label className="crm-filter-field" htmlFor="crm-scope-funnel">
+              <span className="crm-filter-label">Funil RD ativo</span>
+              <select
+                id="crm-scope-funnel"
+                aria-label="Filtrar por funil RD ativo"
+                value={selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "all"}
+                onChange={(event) => setSelectedFunnelIds(event.target.value === "all" ? [] : [event.target.value])}
+                className="gd-button crm-filter-control h-11 min-w-0 text-xs font-bold"
+              >
+                <option value="all">Todos os funis ativos ({availableFunnels.length})</option>
+                {availableFunnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
+              </select>
+            </label>
           </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <label htmlFor="crm-scope-funnel" className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">Funil RD ativo</label>
-            <select
-              id="crm-scope-funnel"
-              aria-label="Filtrar por funil RD ativo"
-              value={selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "all"}
-              onChange={(event) => {
-                const value = event.target.value;
-                setSelectedFunnelIds(value === "all" ? [] : [value]);
-              }}
-              className="gd-button h-11 min-w-0 text-xs font-bold"
-            >
-              <option value="all">Todos os funis ativos ({availableFunnels.length})</option>
-              {availableFunnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
-            </select>
+          <div className="crm-filter-row crm-filter-row-secondary">
+            <div className="crm-filter-field">
+              <span className="crm-filter-label">Status da negociação</span>
+              <div className="crm-filter-status flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
+                {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
+                  <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
+                ))}
+              </div>
+            </div>
+            <label className="crm-filter-field" htmlFor="crm-scope-owner">
+              <span className="crm-filter-label">Responsável</span>
+              <select id="crm-scope-owner" aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button crm-filter-control h-11 min-w-0">
+                <option value="all">Todos os responsáveis</option>
+                {owners.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <div className="crm-filter-advanced">
+              <span className="crm-filter-label">Filtros adicionais</span>
+              <CRMAdvancedFiltersSheet
+                filters={advancedFilters}
+                onApplyFilters={setAdvancedFilters}
+                availableCampaigns={availableCampaigns}
+                availableSources={availableSources}
+                availableProducts={availableProducts}
+                triggerClassName="crm-filter-control h-11 w-full gap-2 border-border/80 bg-background/50 text-xs font-semibold"
+              />
+            </div>
           </div>
-          <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
-            <option value="all">Todos os responsáveis</option>
-            {owners.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-          <div className="crm-filter-status flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
-            {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
-              <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
-            ))}
-          </div>
-          <CRMAdvancedFiltersSheet
-            filters={advancedFilters}
-            onApplyFilters={setAdvancedFilters}
-            availableCampaigns={availableCampaigns}
-            availableSources={availableSources}
-            availableProducts={availableProducts}
-            triggerClassName="h-11 w-full gap-2 border-border/80 bg-background/50 text-xs font-semibold xl:w-auto"
-          />
         </div>
         {/* Chips de filtros ativos, no padrão do RD Station CRM */}
         {(activeFilterChips.length > 0) && (
