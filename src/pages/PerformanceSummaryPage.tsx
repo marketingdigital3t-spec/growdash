@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { TrendingUp, RefreshCw } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -160,18 +159,6 @@ export default function PerformanceSummaryPage() {
 
   return (
     <MotionPage className="performance-summary-page gd-module-shell mx-auto w-full min-w-0 max-w-[1500px] space-y-5">
-      <MotionItem>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/20 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><TrendingUp className="h-5 w-5" /></div>
-            <div>
-              <h1 className="text-xl font-black text-white sm:text-2xl">Resumo de Performance</h1>
-              <p className="text-xs text-muted-foreground sm:text-sm">Consolidado de investimento, leads, CAC e conversão do pipeline.</p>
-            </div>
-          </div>
-          {isLoading && <div className="flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />Atualizando dados…</div>}
-        </div>
-      </MotionItem>
       <MotionItem>
         <PerformanceSummaryDashboard accountTitle={accountTitle} totalSpend={totalSpend} salesCount={glassSales.totalQuantity} totalLeads={totalLeads} deals={dashboardDeals} />
       </MotionItem>
