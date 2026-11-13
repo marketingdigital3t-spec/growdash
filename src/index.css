@@ -16453,11 +16453,21 @@ html:not(.dark) .brand-shell .growdash-main :is(.gd-filter-strip, .gd-global-sco
   color: #0284c7 !important;
 }
 
-html:not(.dark) .brand-shell .growdash-main select,
-html:not(.dark) .brand-shell .growdash-main input {
+html:not(.dark) .brand-shell .growdash-main select:not(.crm-filter-control),
+html:not(.dark) .brand-shell .growdash-main input:not(.crm-filter-control) {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: #94a3b8 !important;
+}
+
+/* Garante que os selects e inputs do CRM mantenham o tema dark cósmico com alto contraste */
+.brand-shell .crm-page .crm-filter-strip select,
+.brand-shell .crm-page .crm-filter-strip input,
+html:not(.dark) .brand-shell .crm-page .crm-filter-strip select,
+html:not(.dark) .brand-shell .crm-page .crm-filter-strip input {
+  background-color: #07172f !important;
+  color: #f8fafc !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
 }
 
 /* ==========================================================================
