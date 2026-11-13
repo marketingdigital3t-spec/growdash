@@ -104,7 +104,7 @@ export function PerformanceSummaryDashboard({
           </div>
         </header>
 
-        <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {metrics.map(({ label, value, icon: Icon, emphasis }) => (
             <article key={label} className={`min-w-0 rounded-xl border p-3 ${emphasis ? "border-sky-400/60 bg-[#0b2a54]" : "border-primary/20 bg-[#07172f]/80"}`}>
               <div className="flex min-w-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[.1em] text-slate-400">
@@ -116,24 +116,46 @@ export function PerformanceSummaryDashboard({
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-primary/20 bg-[#07172f]/75 p-4 sm:p-5">
-          <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-primary/20 pb-3">
-            <Filter className="h-5 w-5 shrink-0 text-sky-400" />
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-black uppercase tracking-wider text-white sm:text-base">Funil CRM</h2>
-              <p className="truncate text-[10px] text-slate-400">Distribuição dos negócios no escopo selecionado</p>
+        {/* 2. PIPELINE / FUNIL DE LEADS VERTICAL EM FORMATO DE FUNIL REAL (TRAPÉZIO DECRESCENTE) */}
+        <div className="mt-6 rounded-xl border border-primary/20 bg-[#07172f]/75 p-5 sm:p-7">
+          <div className="mb-6 flex min-w-0 items-center justify-between border-b border-primary/20 pb-3">
+            <div className="flex items-center gap-2.5">
+              <Filter className="h-6 w-6 shrink-0 text-sky-400 stroke-[2.5]" />
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-black tracking-tight text-white sm:text-lg">
+                  Pipeline / Funil de leads
+                </h2>
+              </div>
             </div>
+            <span className="h-[2px] w-24 bg-gradient-to-r from-emerald-400 to-sky-400 rounded-full" />
           </div>
-          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
-            {pipelineStages.map(({ id, label, count, Icon, className: stageClass }) => (
-              <article key={id} className={`min-w-0 rounded-lg border p-3 ${stageClass}`}>
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.08em] text-slate-200">
-                  <Icon className="h-4 w-4 shrink-0 text-sky-300" />
-                  <span className="truncate" title={label}>{label}</span>
-                </div>
-                <strong className="mt-3 block text-2xl font-black tabular-nums text-white">{formatInteger(count)}</strong>
-              </article>
-            ))}
+
+          {/* Etapas empilhadas verticalmente com largura decrescente em trapézio real */}
+          <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2 py-2">
+            {pipelineStages.map(({ id, label, count, Icon, className: stageClass }, idx) => {
+              // Escala de larguras decrescentes em trapézio: 100% -> 92% -> 84% -> 76% -> 68% -> 60%
+              const widths = ["w-full", "w-[92%]", "w-[84%]", "w-[76%]", "w-[68%]", "w-[60%]"];
+              const widthClass = widths[idx] || "w-[60%]";
+
+              return (
+                <article
+                  key={id}
+                  className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-5 py-3 shadow-md transition hover:scale-[1.01] ${widthClass} ${stageClass}`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Icon className="h-5 w-5 shrink-0 text-sky-300" />
+                    <span className="truncate text-xs font-black uppercase tracking-wider text-white sm:text-sm">
+                      {label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 border-l border-white/20 pl-4">
+                    <strong className="text-lg font-black tabular-nums text-white sm:text-xl lg:text-2xl">
+                      {formatInteger(count)}
+                    </strong>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
 

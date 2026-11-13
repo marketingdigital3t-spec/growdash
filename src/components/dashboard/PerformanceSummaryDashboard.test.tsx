@@ -41,9 +41,9 @@ describe("PerformanceSummaryDashboard — conta selecionada e funil CRM", () => 
     expect(screen.getByText("4,40%")).toBeTruthy();
   });
 
-  it("renderiza o Funil CRM abaixo com as seis etapas observadas", () => {
+  it("renderiza o Pipeline / Funil de leads abaixo em formato trapezoidal com as seis etapas", () => {
     render(<PerformanceSummaryDashboard {...defaultProps} />);
-    expect(screen.getByText("Funil CRM")).toBeTruthy();
+    expect(screen.getByText("Pipeline / Funil de leads")).toBeTruthy();
     for (const label of ["Novo Lead", "Sem Conversa", "Conversa", "Oportunidade", "Vendas", "Perdidas"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
