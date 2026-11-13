@@ -360,11 +360,11 @@ const Index = () => {
   return (
     <MotionPage className="dashboard-page gd-module-shell mx-auto w-full min-w-0 max-w-[1700px] space-y-5">
       <MotionItem>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Visão geral financeira e de performance · Meta: última sincronização {dashboardMeta.data.syncedAt ? `às ${new Date(dashboardMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}</p>
-          </div>
+        <div className="flex items-center justify-end gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]" />
+          <span>Dados vivos</span>
+          <span className="text-white/35">·</span>
+          <span>{dashboardMeta.data.syncedAt ? `Sync ${new Date(dashboardMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "Aguardando sync"}</span>
         </div>
       </MotionItem>
 
