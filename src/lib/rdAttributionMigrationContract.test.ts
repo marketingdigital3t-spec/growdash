@@ -30,4 +30,11 @@ describe("20261113190000_optimize_rd_attribution_and_link_sister_accounts", () =
     expect(migration).toContain("UPDATE public.rd_funnels");
     expect(migration).toContain("SET is_active = true");
   });
+
+  it("recupera o histórico completo de etapas em rd_deals a partir de rd_funnel_stages", () => {
+    expect(migration).toContain("RECUPERAR O HISTÓRICO DE ETAPAS DO RD STATION EM TODAS AS CONTAS");
+    expect(migration).toContain("FROM public.rd_funnel_stages s");
+    expect(migration).toContain("WHERE d.rd_stage_id = s.rd_stage_id");
+    expect(migration).toContain("rd_stage_name = s.name");
+  });
 });

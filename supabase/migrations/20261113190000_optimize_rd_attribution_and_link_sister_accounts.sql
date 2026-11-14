@@ -164,5 +164,23 @@ BEGIN
       updated_at = now()
   WHERE rd_funnel_id IS NOT NULL
     AND is_active = false;
+
+  -- 5) RECUPERAR O HISTÓRICO DE ETAPAS DO RD STATION EM TODAS AS CONTAS
+  -- Preenche rd_stage_name e rd_stage_order para todo o histórico de rd_deals
+  -- a partir da tabela oficial rd_funnel_stages, eliminando negociações com etapa nula.
+  UPDATE public.rd_deals d
+  SET rd_stage_name = s.name,
+      rd_stage_order = coalesce(d.rd_stage_order, s.order),
+      stage_bucket = CASE
+        WHEN s.is_won THEN 'client'
+        WHEN s.is_lost THEN 'lost'
+        WHEN s.name ILIKE '%oportun%' THEN 'opportunity'
+        WHEN s.name ILIKE '%qualif%' THEN 'sql'
+        ELSE d.stage_bucket
+      END,
+      updated_at = now()
+  FROM public.rd_funnel_stages s
+  WHERE d.rd_stage_id = s.rd_stage_id
+    AND (d.rd_stage_name IS NULL OR d.rd_stage_name = '' OR d.rd_stage_name = 'Sem etapa');
 END;
 $$;

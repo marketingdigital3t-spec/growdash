@@ -6,6 +6,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { useSales, dedupeCanonicalSales } from "@/hooks/useSales";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { filterOperationalRDDeals, excludedOperationalRDDealIds } from "@/lib/crmPipelineStages";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
@@ -97,6 +98,11 @@ export default function PerformanceSummaryPage() {
   );
 
   const activeScopedFunnelIds = useMemo(() => new Set(scopedRDfunnelIds), [scopedRDfunnelIds]);
+  const { data: scopedFunnelStages = [] } = useFunnelStagesForIds(scopedRDfunnelIds);
+  const stageNameById = useMemo(
+    () => new Map(scopedFunnelStages.map((stage) => [stage.rd_stage_id, stage.name])),
+    [scopedFunnelStages],
+  );
   const canonicalUnitSales = useMemo(
     () =>
       dedupeCanonicalSales(
@@ -111,8 +117,17 @@ export default function PerformanceSummaryPage() {
   );
 
   const dashboardDeals = useMemo(
-    () => operationalRDDeals.filter((deal) => !!deal.rd_funnel_id && activeScopedFunnelIds.has(deal.rd_funnel_id)),
-    [activeScopedFunnelIds, operationalRDDeals],
+    () => operationalRDDeals
+      .filter((deal) => !!deal.rd_funnel_id && activeScopedFunnelIds.has(deal.rd_funnel_id))
+      .map((deal) => {
+        const canonicalName = deal.rd_stage_name
+          || (deal.rd_stage_id ? stageNameById.get(deal.rd_stage_id) : null)
+          || null;
+        return canonicalName && canonicalName !== deal.rd_stage_name
+          ? { ...deal, rd_stage_name: canonicalName }
+          : deal;
+      }),
+    [activeScopedFunnelIds, operationalRDDeals, stageNameById],
   );
 
   const dashboardRevenueDeals = useMemo(

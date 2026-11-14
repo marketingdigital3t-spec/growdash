@@ -966,6 +966,7 @@ Deno.serve(async (req) => {
 
     // Buscar e cachear etapas reais do funil no RD
     const stageOrderMap = new Map<string, number>();
+    const stageNameMap = new Map<string, string>();
     const stageWonMap = new Map<string, boolean>();
     const stageLostMap = new Map<string, boolean>();
     let stageSnapshotSource: "rd_api" | "deal_snapshot" | "unavailable" = "unavailable";
@@ -997,6 +998,7 @@ Deno.serve(async (req) => {
           const ord = Number(s?.order ?? s?.position ?? idx);
           const sid = String(s?.id || s?._id);
           stageOrderMap.set(sid, ord);
+          stageNameMap.set(sid, name);
           stageWonMap.set(sid, isWon);
           stageLostMap.set(sid, isLost);
           return {
@@ -1187,8 +1189,8 @@ Deno.serve(async (req) => {
     async function persistDeal(d: any, existingProfile: any = null) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseLocaleAmount(d.amount_total ?? d.amount);
-      const stageName = rdDealStageName(d);
       const stageId = rdDealStageId(d);
+      const stageName = rdDealStageName(d) || (stageId ? stageNameMap.get(stageId) : null) || null;
       const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
       // A API do RD envia `win: false` também para negócios ainda abertos.
       // Portanto, perda só pode ser inferida pela etapa de perda ou por um
@@ -1631,8 +1633,8 @@ Deno.serve(async (req) => {
       const rows = operationalItems.map((d) => {
         const rdDealId = String(d.id || d._id);
         seenAnalyticsDealIds.add(rdDealId);
-        const stageName = rdDealStageName(d);
         const stageId = rdDealStageId(d);
+        const stageName = rdDealStageName(d) || (stageId ? stageNameMap.get(stageId) : null) || null;
         const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
         const lost =
           !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
