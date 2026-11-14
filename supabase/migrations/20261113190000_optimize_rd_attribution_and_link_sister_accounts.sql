@@ -121,14 +121,20 @@ BEGIN
   SELECT id INTO _acc_ca02_ranniely FROM public.ad_accounts WHERE account_id = 'act_1064564169282353' LIMIT 1;
   SELECT id INTO _acc_ca01_fernanda FROM public.ad_accounts WHERE account_id = 'act_1383268530531334' LIMIT 1;
 
-  -- Propagar conexões RD para CA02 quando a CA01 possuir conexão ativa
+  -- Propagar conexões RD para CA02 quando a CA01 possuir conexão ativa.
+  -- O token do RD é o mesmo para as duas contas do mesmo titular/expert, por isso
+  -- a autorização precisa ser copiada: sem api_token a CA02 fica sem acesso real.
   IF _acc_ca02_natalia IS NOT NULL THEN
-    INSERT INTO public.rd_account_connections (user_id, workspace_id, external_account_id, account_name, status, created_at, updated_at)
-    SELECT c.user_id, c.workspace_id, 'act_975324268974435', 'CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]', 'connected', now(), now()
+    INSERT INTO public.rd_account_connections (user_id, workspace_id, external_account_id, account_name, api_token, status, permissions, created_at, updated_at)
+    SELECT c.user_id, c.workspace_id, 'act_975324268974435', 'CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]', c.api_token, 'connected', c.permissions, now(), now()
     FROM public.rd_account_connections c
     WHERE c.external_account_id = 'act_2836556270048145'
+      AND c.api_token IS NOT NULL
     ON CONFLICT (user_id, external_account_id) DO UPDATE
-    SET status = 'connected', updated_at = now();
+    SET api_token = coalesce(public.rd_account_connections.api_token, excluded.api_token),
+        status = 'connected',
+        permissions = excluded.permissions,
+        updated_at = now();
   END IF;
 
   -- Vincular funis da Natália que ainda estejam desvinculados
