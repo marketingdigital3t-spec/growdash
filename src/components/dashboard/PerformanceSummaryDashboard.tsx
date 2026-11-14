@@ -28,6 +28,8 @@ export interface PerformanceSummaryDashboardProps {
     lost_reason?: string | null;
   }>;
   className?: string;
+  onSyncRD?: () => void;
+  syncingRD?: boolean;
 }
 
 type PipelineStage = {
@@ -49,10 +51,10 @@ function getPipelineStages(deals: PerformanceSummaryDashboardProps["deals"], sal
     const stage = normalizedStageName(deal.rd_stage_name || deal.stage_bucket || "");
     if (/perdid|lost|desqualif/.test(stage) || deal.lost_reason) counts.perdidas += 1;
     else if (/oportun/.test(stage)) counts.oportunidade += 1;
-    else if (/sem contato|sem conversa|nao atendeu|no show|sem resposta|tentativa/.test(stage)) counts.semConversa += 1;
+    else if (/sem contato|sem conversa|nao atendeu|no show|sem resposta|tentativa|stand by|espera/.test(stage)) counts.semConversa += 1;
     else if (/conversa|atendimento|whatsapp/.test(stage) || (stage.includes("contato") && !stage.includes("sem"))) counts.conversa += 1;
-    else if (/novo|lead|entrada|inici/.test(stage)) counts.novo += 1;
-    else counts.conversa += 1;
+    else if (/\b(lead novo|novo lead|novo|novos|entrada|inici\w*)\b/.test(stage)) counts.novo += 1;
+    else counts.semConversa += 1;
   }
 
   if (!deals?.length) counts.vendas = salesCount;
@@ -74,6 +76,8 @@ export function PerformanceSummaryDashboard({
   totalLeads,
   deals = [],
   className = "",
+  onSyncRD,
+  syncingRD = false,
 }: PerformanceSummaryDashboardProps) {
   const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
   const cac = salesCount > 0 ? totalSpend / salesCount : 0;
@@ -92,16 +96,29 @@ export function PerformanceSummaryDashboard({
   return (
     <section className={`w-full min-w-0 ${className}`} aria-label="Resumo de performance">
       <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-b from-[#07172f]/96 via-[#040e20]/96 to-[#020712]/98 p-4 shadow-[0_20px_50px_-20px_rgba(0,100,255,0.3)] backdrop-blur-2xl sm:p-6">
-        <header className="mb-6 flex min-w-0 items-center gap-3 border-b border-primary/20 pb-5">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/40 bg-sky-950/60 text-sky-400">
-            <TrendingUp className="h-5 w-5" />
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-primary/20 pb-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/40 bg-sky-950/60 text-sky-400">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl">
+                Resumo de Performance <span className="font-light text-slate-500">|</span> <span className="text-sky-400">{accountTitle}</span>
+              </h1>
+              <p className="mt-1 text-xs text-slate-400 sm:text-sm">Investimento, leads, vendas e eficiência do pipeline.</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl">
-              Resumo de Performance <span className="font-light text-slate-500">|</span> <span className="text-sky-400">{accountTitle}</span>
-            </h1>
-            <p className="mt-1 text-xs text-slate-400 sm:text-sm">Investimento, leads, vendas e eficiência do pipeline.</p>
-          </div>
+          {onSyncRD && (
+            <button
+              type="button"
+              onClick={onSyncRD}
+              disabled={syncingRD}
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-400/40 bg-[#0a2548] px-3.5 py-2 text-xs font-black text-sky-200 shadow-sm transition hover:bg-[#0d3160] hover:text-white disabled:opacity-50"
+            >
+              <Coins className={`h-3.5 w-3.5 ${syncingRD ? "animate-spin text-sky-400" : "text-sky-400"}`} />
+              {syncingRD ? "Sincronizando RD…" : "Atualizar RD"}
+            </button>
+          )}
         </header>
 
         <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">

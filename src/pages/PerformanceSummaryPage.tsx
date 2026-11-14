@@ -6,7 +6,13 @@ import { useInsights } from "@/hooks/useInsights";
 import { useSales, dedupeCanonicalSales } from "@/hooks/useSales";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
+import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { filterOperationalRDDeals, excludedOperationalRDDealIds } from "@/lib/crmPipelineStages";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
@@ -40,12 +46,18 @@ export default function PerformanceSummaryPage() {
   }, [selectedAccountIds, visibleAccounts]);
 
   const { data: rdFunnels = [] } = useRDFunnels();
+  const resolvedRDAccountScope = useResolvedRDAccountFunnelScope({
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : (selectedAccount === "all" ? undefined : selectedAccount),
+    adAccountIds: selectedAccountIds,
+    funnelIds: selectedFunnelIds,
+  });
   const scopedRDfunnelIds = useMemo(() => {
+    const resolved = resolvedRDAccountScope.funnelIds;
+    if (resolved && resolved.length > 0) return resolved;
+    if (resolvedRDAccountScope.accountScoped) return [NO_LINKED_RD_FUNNEL_SCOPE_ID];
     const active = rdFunnels.filter((f) => f.is_active && f.rd_funnel_id);
-    return selectedFunnelIds.length
-      ? selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || active.some((f) => f.id === id))
-      : active.map((f) => f.id);
-  }, [rdFunnels, selectedFunnelIds]);
+    return active.map((f) => f.id);
+  }, [rdFunnels, resolvedRDAccountScope]);
 
   const insightsAccountIds = selectedAccountIds.length ? selectedAccountIds : scopedAccountIds;
   const { data: insights = [], isLoading: loadingInsights } = useInsights({
@@ -170,12 +182,53 @@ export default function PerformanceSummaryPage() {
     return "Aluna";
   }, [selectedAccount, visibleAccounts]);
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [syncingRD, setSyncingRD] = useState(false);
+
+  async function syncRD() {
+    if (syncingRD) return;
+    setSyncingRD(true);
+    try {
+      const targetFunnels = rdFunnels.filter((f) => f.is_active && scopedRDfunnelIds.includes(f.id));
+      for (const funnel of targetFunnels) {
+        await supabase.functions.invoke("rd-sync-deals", {
+          body: {
+            funnel_id: funnel.id,
+            analytics_mode: true,
+            full_history: true,
+            trigger_source: "summary_refresh",
+          },
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
+        queryClient.invalidateQueries({ queryKey: ["sales"] }),
+      ]);
+      toast({ title: "RD Station atualizado", description: "Os dados do funil e negociações foram sincronizados." });
+    } catch (err) {
+      toast({ title: "Erro ao atualizar RD", description: err instanceof Error ? err.message : "Não foi possível sincronizar o RD.", variant: "destructive" });
+    } finally {
+      setSyncingRD(false);
+    }
+  }
+
   const isLoading = loadingAccounts || loadingInsights;
 
   return (
     <MotionPage className="performance-summary-page gd-module-shell mx-auto w-full min-w-0 max-w-[1500px] space-y-5">
       <MotionItem>
-        <PerformanceSummaryDashboard accountTitle={accountTitle} totalSpend={totalSpend} salesCount={glassSales.totalQuantity} totalLeads={totalLeads} deals={dashboardDeals} />
+        <PerformanceSummaryDashboard
+          accountTitle={accountTitle}
+          totalSpend={totalSpend}
+          salesCount={glassSales.totalQuantity}
+          totalLeads={totalLeads}
+          deals={dashboardDeals}
+          onSyncRD={syncRD}
+          syncingRD={syncingRD}
+        />
       </MotionItem>
     </MotionPage>
   );
