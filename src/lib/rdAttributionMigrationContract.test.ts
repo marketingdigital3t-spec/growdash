@@ -16,7 +16,12 @@ describe("20261113190000_optimize_rd_attribution_and_link_sister_accounts", () =
   it("estabelece vínculo e conexão para a CA02 da Natália", () => {
     expect(migration).toContain("act_975324268974435");
     expect(migration).toContain("CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]");
-    expect(migration).toContain("ON CONFLICT (user_id, external_account_id) DO UPDATE");
+    expect(migration).toContain("UPDATE public.rd_account_connections target");
+    expect(migration).toContain("AND NOT EXISTS (");
+    expect(migration).toContain("api_token, status, permissions, created_at, updated_at)");
+    // O índice único de rd_account_connections é parcial, então ON CONFLICT
+    // sem o predicado do índice falha com SQLSTATE 42P10.
+    expect(migration).not.toContain("ON CONFLICT (user_id, external_account_id)");
   });
 
   it("vincula funis da Natália que estejam sem ad_account_id", () => {

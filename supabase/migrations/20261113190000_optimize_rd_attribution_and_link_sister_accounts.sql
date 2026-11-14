@@ -124,17 +124,32 @@ BEGIN
   -- Propagar conexões RD para CA02 quando a CA01 possuir conexão ativa.
   -- O token do RD é o mesmo para as duas contas do mesmo titular/expert, por isso
   -- a autorização precisa ser copiada: sem api_token a CA02 fica sem acesso real.
+  -- Não usamos ON CONFLICT porque o índice único de rd_account_connections é
+  -- parcial (WHERE external_account_id IS NOT NULL) e o Postgres exige que o
+  -- predicado do índice seja reproduzido na cláusula de conflito.
   IF _acc_ca02_natalia IS NOT NULL THEN
+    UPDATE public.rd_account_connections target
+    SET api_token = coalesce(target.api_token, source.api_token),
+        status = 'connected',
+        permissions = coalesce(target.permissions, source.permissions),
+        account_name = target.account_name,
+        updated_at = now()
+    FROM public.rd_account_connections source
+    WHERE source.external_account_id = 'act_2836556270048145'
+      AND source.api_token IS NOT NULL
+      AND target.external_account_id = 'act_975324268974435'
+      AND target.user_id = source.user_id;
+
     INSERT INTO public.rd_account_connections (user_id, workspace_id, external_account_id, account_name, api_token, status, permissions, created_at, updated_at)
     SELECT c.user_id, c.workspace_id, 'act_975324268974435', 'CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]', c.api_token, 'connected', c.permissions, now(), now()
     FROM public.rd_account_connections c
     WHERE c.external_account_id = 'act_2836556270048145'
       AND c.api_token IS NOT NULL
-    ON CONFLICT (user_id, external_account_id) DO UPDATE
-    SET api_token = coalesce(public.rd_account_connections.api_token, excluded.api_token),
-        status = 'connected',
-        permissions = excluded.permissions,
-        updated_at = now();
+      AND NOT EXISTS (
+        SELECT 1 FROM public.rd_account_connections existing
+        WHERE existing.user_id = c.user_id
+          AND existing.external_account_id = 'act_975324268974435'
+      );
   END IF;
 
   -- Vincular funis da Natália que ainda estejam desvinculados
