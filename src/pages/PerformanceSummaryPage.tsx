@@ -95,18 +95,31 @@ export default function PerformanceSummaryPage() {
     enabled: true,
   });
 
+  // Never render a previous account/funnel/period snapshot as the new scope.
+  // React Query keeps placeholder data for CRM continuity, but this executive
+  // view must wait for the selected scope to be confirmed.
+  const scopeRefreshing = Boolean(
+    salesQuery.isFetching
+      || rdDealsQuery.isFetching
+      || rdWonDealsQuery.isFetching
+      || rdDealsQuery.isPlaceholderData
+      || rdWonDealsQuery.isPlaceholderData
+      || salesQuery.isPlaceholderData,
+  );
   const operationalRDDeals = useMemo(
-    () => filterOperationalRDDeals(rdDealsQuery.data || [], rdFunnels),
-    [rdDealsQuery.data, rdFunnels],
+    () => scopeRefreshing ? [] : filterOperationalRDDeals(rdDealsQuery.data || [], rdFunnels),
+    [rdDealsQuery.data, rdFunnels, scopeRefreshing],
   );
   const operationalRDWonDeals = useMemo(
-    () => filterOperationalRDDeals(rdWonDealsQuery.data || [], rdFunnels),
-    [rdFunnels, rdWonDealsQuery.data],
+    () => scopeRefreshing ? [] : filterOperationalRDDeals(rdWonDealsQuery.data || [], rdFunnels),
+    [rdFunnels, rdWonDealsQuery.data, scopeRefreshing],
   );
 
+  const confirmedSales = scopeRefreshing ? [] : (salesQuery.data || []);
+
   const excludedRDDealIds = useMemo(
-    () => excludedOperationalRDDealIds([...(rdDealsQuery.data || []), ...(rdWonDealsQuery.data || [])], rdFunnels),
-    [rdDealsQuery.data, rdFunnels, rdWonDealsQuery.data],
+    () => excludedOperationalRDDealIds([...operationalRDDeals, ...operationalRDWonDeals], rdFunnels),
+    [operationalRDDeals, operationalRDWonDeals, rdFunnels],
   );
 
   const activeScopedFunnelIds = useMemo(() => new Set(scopedRDfunnelIds), [scopedRDfunnelIds]);
@@ -118,7 +131,7 @@ export default function PerformanceSummaryPage() {
   const canonicalUnitSales = useMemo(
     () =>
       dedupeCanonicalSales(
-        (salesQuery.data || []).filter((sale) => {
+        confirmedSales.filter((sale) => {
           if (sale.rd_deal_id && excludedRDDealIds.has(sale.rd_deal_id)) return false;
           if (sale.ad_account_id)
             return visibleAccountIds.has(sale.ad_account_id) && (selectedAccountIds.length === 0 || selectedAccountIds.includes(sale.ad_account_id));

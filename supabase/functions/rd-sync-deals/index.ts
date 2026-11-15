@@ -1126,6 +1126,8 @@ Deno.serve(async (req) => {
       try {
         const dr = await fetchWithRetry(
           `https://crm.rdstation.com/api/v1/deals/${id}?token=${encodeURIComponent(token)}`,
+          RD_REQUEST_ATTEMPTS,
+          runtimeDeadline,
         );
         if (dr.ok) {
           detail = { ...d, ...(await dr.json()) };
@@ -1143,6 +1145,8 @@ Deno.serve(async (req) => {
       try {
         const cr = await fetchWithRetry(
           `https://crm.rdstation.com/api/v1/deals/${id}/contacts?token=${encodeURIComponent(token)}`,
+          RD_REQUEST_ATTEMPTS,
+          runtimeDeadline,
         );
         if (cr.ok) {
           const cj = await cr.json();
@@ -1171,6 +1175,8 @@ Deno.serve(async (req) => {
           try {
             const r = await fetchWithRetry(
               `https://crm.rdstation.com/api/v1/contacts/${cid}?token=${encodeURIComponent(token)}`,
+              RD_REQUEST_ATTEMPTS,
+              runtimeDeadline,
             );
             if (r.ok) {
               const cj = await r.json();
@@ -1428,26 +1434,36 @@ Deno.serve(async (req) => {
         throw e;
       }
 
+      // A identidade canônica da receita é (rd_connection_id, rd_deal_id).
+      // Sem a conexão, dois negócios com o mesmo ID em contas diferentes
+      // sobrescrevem a receita uma da outra.
+      const salesConnectionId = funnel!.rd_connection_id ?? null;
+      const scopeSalesToDeal = (query: any) => {
+        const scoped = query.eq("user_id", userId!).eq("rd_deal_id", rdDealId);
+        return salesConnectionId
+          ? scoped.eq("rd_connection_id", salesConnectionId)
+          : scoped.is("rd_connection_id", null);
+      };
+
       // Se o negócio foi reaberto/perdido, a receita anteriormente realizada
       // deve sair de todos os painéis sem apagar o vínculo de auditoria.
       if (!won) {
-        const { error: cancelError } = await admin
-          .from("sales")
-          .update({ status: "cancelled", attribution_reason: "rd_deal_not_won" })
-          .eq("user_id", userId!)
-          .eq("rd_deal_id", rdDealId);
+        const { error: cancelError } = await scopeSalesToDeal(
+          admin
+            .from("sales")
+            .update({ status: "cancelled", attribution_reason: "rd_deal_not_won" }),
+        );
         if (cancelError) throw cancelError;
         return;
       }
 
-      const { data: existing, error: existingSalesError } = await admin
-        .from("sales")
-        .select(
-          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
-        )
-        .eq("user_id", userId!)
-        .eq("rd_deal_id", rdDealId)
-        .maybeSingle();
+      const { data: existing, error: existingSalesError } = await scopeSalesToDeal(
+        admin
+          .from("sales")
+          .select(
+            "id, rd_connection_id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
+          ),
+      ).maybeSingle();
       if (existingSalesError) throw existingSalesError;
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
@@ -1471,6 +1487,7 @@ Deno.serve(async (req) => {
       const baseData: Record<string, any> = {
         user_id: userId!,
         rd_deal_id: rdDealId,
+        rd_connection_id: salesConnectionId,
         ad_account_id: funnel!.ad_account_id,
         gross_revenue: amountTotal,
         net_revenue: netRevenue,
@@ -1511,7 +1528,9 @@ Deno.serve(async (req) => {
           update.payment_method = rdPayment;
           update.payment_method_source = "rd";
         }
-        const { error: salesUpdateError } = await admin.from("sales").update(update).eq("user_id", userId!).eq("rd_deal_id", rdDealId);
+        const { error: salesUpdateError } = await scopeSalesToDeal(
+          admin.from("sales").update(update),
+        );
         if (salesUpdateError) throw salesUpdateError;
         totalUpdated++;
       } else {
@@ -1568,6 +1587,13 @@ Deno.serve(async (req) => {
         }
         const HYDRATION_BATCH_SIZE = 4;
         for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
+          // A hidratação consome orçamento do gateway. Sem esta checagem, uma
+          // página cheia de negócios mata a função antes do checkpoint e o
+          // cursor fica na página anterior com a página corrente sem persistir.
+          if (Date.now() >= runtimeDeadline - 5000) {
+            hydratedItems.push(...items.slice(index));
+            break;
+          }
           const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
           const resolved = await Promise.all(batch.map((item) => {
             const id = String(item?.id || item?._id || "");
@@ -1856,10 +1882,18 @@ Deno.serve(async (req) => {
         : [{ name: "ongoing", stageId: null, params: "", won: false }];
       analyticsRangeComplete = analytics_mode;
 
-      const cursorPrefix = `${funnel.id}|${start_date || ""}|${end_date || ""}`;
+      // A chave do cursor precisa incluir a conexão RD. Sem isso, um funil
+      // reconectado a outra conta reaproveita o next_page da conexão anterior
+      // e pula as primeiras páginas do novo histórico.
+      const cursorPrefix = `${funnel.id}|${funnel.rd_connection_id || "no-connection"}|${start_date || ""}|${end_date || ""}`;
       const { data: storedCursors } = analytics_mode
         ? await admin.from("rd_sync_cursors").select("scope_key,segment,next_page").eq("funnel_id", funnel.id).like("scope_key", `${cursorPrefix}|%`)
         : { data: [] as Array<{ scope_key: string; segment: string; next_page: number }> };
+      // Cursors de versões antigas da chave (sem conexão) não podem ser
+      // reaproveitados: eles não provam qual conta foi percorrida.
+      if (analytics_mode) {
+        await admin.from("rd_sync_cursors").delete().eq("funnel_id", funnel.id).not("scope_key", "like", `${cursorPrefix}|%`);
+      }
       const cursorBySegment = new Map((storedCursors || []).map((row: any) => [String(row.segment), Number(row.next_page) || 1]));
 
       // Persist the current segment and every segment that has not started yet
