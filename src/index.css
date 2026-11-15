@@ -12026,7 +12026,7 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   .crm-filter-row-primary .crm-filter-search, .crm-filter-advanced { grid-column: auto; }
   .brand-shell .crm-page .crm-filter-strip .crm-filter-status { overflow-x: auto !important; }
   .brand-shell .crm-page .crm-filter-status button { padding-inline: 8px !important; }
-  .brand-shell .crm-page .gd-crm-metric-card { height: 164px !important; min-height: 164px !important; }
+  .brand-shell .crm-page .gd-crm-metric-card { height: 174px !important; min-height: 174px !important; }
 }
 
 /* Funnel KPI grid: reduce the vertical footprint and reserve a clear lane
