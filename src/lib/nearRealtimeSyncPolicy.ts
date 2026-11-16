@@ -42,3 +42,40 @@ export function shouldUseSelectedPeriodSync(
   const today = businessDateKey(now, timezone);
   return startDate !== today || endDate !== today;
 }
+
+/**
+ * Realtime fires once per written row. A full RD reconciliation persists
+ * hundreds of rows in micro-batches, so invalidating on every event makes the
+ * UI refetch and repaint the numbers several times per second. While a sync
+ * is running, the invalidation is only recorded and applied once it settles.
+ */
+export type LiveInvalidationGate = {
+  syncInFlight: boolean;
+  pending: boolean;
+};
+
+export function createLiveInvalidationGate(): LiveInvalidationGate {
+  return { syncInFlight: false, pending: false };
+}
+
+/** Returns true when the invalidation must be applied immediately. */
+export function shouldApplyLiveInvalidationNow(gate: LiveInvalidationGate): boolean {
+  return !gate.syncInFlight;
+}
+
+/** Records an invalidation while a sync is running. */
+export function deferLiveInvalidation(gate: LiveInvalidationGate): boolean {
+  gate.pending = true;
+  return false;
+}
+
+/**
+ * Ends the sync window. Returns true when a pending invalidation must be
+ * applied now, so the caller can refresh the affected queries exactly once.
+ */
+export function closeLiveInvalidationWindow(gate: LiveInvalidationGate): boolean {
+  gate.syncInFlight = false;
+  if (!gate.pending) return false;
+  gate.pending = false;
+  return true;
+}

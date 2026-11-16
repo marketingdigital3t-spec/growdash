@@ -44,6 +44,31 @@ function canonicalExternalAccountId(value: string | null | undefined) {
 }
 
 /**
+ * Extrai a titularidade completa de um nome de conta ou de funil RD.
+ *
+ * Remove o identificador da conta de anúncio (CA01), o nome do grupo e as
+ * variações de pipeline (Aluna, Paciente Modelo, Expanção). O resultado é a
+ * pessoa responsável ("DRA RANNIELY SILVA"), e não palavras soltas: casar
+ * tokens avulsos mistura funis de titulares diferentes no mesmo escopo.
+ */
+export function expertSignature(value: string | null | undefined): string {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  if (!normalized.trim()) return "";
+  // Remove prefixos de conta e sufixos de grupo antes de tokenizar.
+  const withoutAccount = normalized
+    .replace(/\bca\s?\d+\b/gi, " ")
+    .replace(/\[.*?\]/g, " ");
+  const tokens = withoutAccount
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .filter((token) => !/^(dra|dro|dr|grupo|zntt|conta|anuncio|anuncios|aluna|aluno|paciente|modelo|expansao|expansao|atendimento|contato|conversa)$/i.test(token));
+  return tokens.join(" ").trim();
+}
+
+/**
  * Resolves the RD pipelines belonging to the selected Meta accounts. Newer RD
  * links live on rd_account_connections (external_account_id = Meta act_ ID),
  * while older installations may still store the internal account UUID on the
@@ -83,17 +108,25 @@ export function resolveLinkedRDFunnelIds(
   // When sister accounts (e.g. CA01 / CA02) belong to the same expert but
   // only one has an explicit link row in the mirror, resolve by the shared
   // expert signature so selecting CA02 does not return an empty scope.
+  //
+  // The signature must match the whole expert name, not loose fragments:
+  // matching individual tokens let "DRA RANNIELY SILVA" resolve funnels of
+  // another expert that happens to share one of those words, which inflated
+  // the pipeline of the selected account with foreign negotiations.
   if (!resolvedCandidates.length && selectedAccounts.length > 0) {
     const signatures = selectedAccounts
-      .map((account) => String((account as any).name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\bca0?\d+\b/gi, "").replace(/\[.*?\]/g, "").replace(/[^a-z0-9\s]/g, "").trim())
+      .map((account) => expertSignature((account as any).name))
       .filter((sig) => sig.length >= 4);
     if (signatures.length > 0) {
       resolvedCandidates = activeFunnels.filter((funnel) => {
-        const funnelText = `${(funnel as any).name || ""} ${(funnel as any).expert_name || ""}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-        return signatures.some((sig) => {
-          const tokens = sig.split(/\s+/).filter((token) => token.length >= 4 && !/^(dra?|dro?|grupo|zntt|conta|anuncio)$/i.test(token));
-          return tokens.length > 0 && tokens.every((token) => funnelText.includes(token));
-        });
+        const funnelSignature = expertSignature(
+          `${(funnel as any).expert_name || ""} ${(funnel as any).name || ""}`,
+        );
+        if (!funnelSignature) return false;
+        // A funnel matches when it carries the complete expert signature or
+        // one of its parts, so "DRA RANNIELY SILVA" matches "DRA RANNIELY SILVA"
+        // but never a funnel that only says "RANNIELY".
+        return signatures.some((sig) => funnelSignature.includes(sig) || sig.includes(funnelSignature));
       });
     }
   }

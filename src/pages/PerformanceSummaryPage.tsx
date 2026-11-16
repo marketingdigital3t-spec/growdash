@@ -124,10 +124,21 @@ export default function PerformanceSummaryPage() {
 
   const activeScopedFunnelIds = useMemo(() => new Set(scopedRDfunnelIds), [scopedRDfunnelIds]);
   const { data: scopedFunnelStages = [] } = useFunnelStagesForIds(scopedRDfunnelIds);
-  const stageNameById = useMemo(
-    () => new Map(scopedFunnelStages.map((stage) => [stage.rd_stage_id, stage.name])),
+  // A tabela oficial de etapas usa a chave (rd_funnel_id, rd_stage_id).
+  // Indexar apenas por rd_stage_id mistura etapas homônimas de funis
+  // diferentes (ex.: "Lead Novo" da Aluna vs. Paciente Modelo) e classifica
+  // cada negócio pela etapa do funil errado.
+  const stageNameByFunnelAndId = useMemo(
+    () => new Map(scopedFunnelStages.map((stage) => [`${stage.rd_funnel_id}:${stage.rd_stage_id}`, stage.name])),
     [scopedFunnelStages],
   );
+  const stageNameById = useMemo(() => {
+    const fallback = new Map<string, string>();
+    for (const stage of scopedFunnelStages) {
+      if (!fallback.has(stage.rd_stage_id)) fallback.set(stage.rd_stage_id, stage.name);
+    }
+    return fallback;
+  }, [scopedFunnelStages]);
   const canonicalUnitSales = useMemo(
     () =>
       dedupeCanonicalSales(
@@ -145,14 +156,18 @@ export default function PerformanceSummaryPage() {
     () => operationalRDDeals
       .filter((deal) => !!deal.rd_funnel_id && activeScopedFunnelIds.has(deal.rd_funnel_id))
       .map((deal) => {
+        const scopedStageName = deal.rd_stage_id && deal.rd_funnel_id
+          ? stageNameByFunnelAndId.get(`${deal.rd_funnel_id}:${deal.rd_stage_id}`)
+          : null;
         const canonicalName = deal.rd_stage_name
+          || scopedStageName
           || (deal.rd_stage_id ? stageNameById.get(deal.rd_stage_id) : null)
           || null;
         return canonicalName && canonicalName !== deal.rd_stage_name
           ? { ...deal, rd_stage_name: canonicalName }
           : deal;
       }),
-    [activeScopedFunnelIds, operationalRDDeals, stageNameById],
+    [activeScopedFunnelIds, operationalRDDeals, stageNameByFunnelAndId, stageNameById],
   );
 
   const dashboardRevenueDeals = useMemo(

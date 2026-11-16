@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_LINKED_RD_FUNNEL_SCOPE_ID, dedupeActiveRDFunnels, resolveLinkedRDFunnelIds, resolveScopedRDFunnelIds } from "./rdAccountScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID, dedupeActiveRDFunnels, expertSignature, resolveLinkedRDFunnelIds, resolveScopedRDFunnelIds } from "./rdAccountScope";
 
 const accounts = [
   { id: "meta-ca02", account_id: "act_1064564169282353" },
@@ -66,6 +66,27 @@ describe("resolveLinkedRDFunnelIds", () => {
       "ranniely-paciente",
       "ste-aluna",
     ]);
+  });
+
+  it("não mistura funis de outro titular que compartilha palavras do nome", () => {
+    const namedAccounts = [
+      { id: "ca02-ranniely", name: "CA02 - DRA RANNIELY SILVA [GRUPO ZNTT]", account_id: "act_1064564169282353" },
+    ];
+    const namedFunnels = [
+      { id: "ranniely-aluna", name: "Dra. Ranniely Silva - Aluna", expert_name: "Dra. Ranniely Silva", rd_connection_id: null, rd_funnel_id: "f-1", is_active: true },
+      { id: "ranniely-paciente", name: "Dra. Ranniely Silva - Paciente Modelo", expert_name: "Dra. Ranniely Silva", rd_connection_id: null, rd_funnel_id: "f-2", is_active: true },
+      { id: "ranniely-expansao", name: "[Expansão] Dra. Ranniely Silva", expert_name: "Dra. Ranniely Silva", rd_connection_id: null, rd_funnel_id: "f-3", is_active: true },
+      { id: "otra-expert", name: "Dra. Ranniely Souza - Aluna", expert_name: "Dra. Ranniely Souza", rd_connection_id: null, rd_funnel_id: "f-4", is_active: true },
+    ];
+    // O funil de outra titular não pode entrar no escopo da conta selecionada.
+    expect(resolveLinkedRDFunnelIds(["ca02-ranniely"], namedAccounts, [], namedFunnels)).not.toContain("otra-expert");
+  });
+
+  it("extrai a titularidade completa, sem palavras soltas", () => {
+    expect(expertSignature("CA02 - DRA RANNIELY SILVA [GRUPO ZNTT]")).toBe("ranniely silva");
+    expect(expertSignature("Dra. Ranniely Silva - Aluna")).toBe("ranniely silva");
+    expect(expertSignature("Dra. Ranniely Souza - Aluna")).toBe("ranniely souza");
+    expect(expertSignature("CA02 - DRA NATÁLIA BARRAGÃO [GRUPO ZNTT]")).toBe("natalia barragao");
   });
 });
 

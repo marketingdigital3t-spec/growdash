@@ -6,7 +6,7 @@ import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
-import { backgroundSyncStatus, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
+import { backgroundSyncStatus, closeLiveInvalidationWindow, createLiveInvalidationGate, deferLiveInvalidation, shouldApplyLiveInvalidationNow, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
 
 // Realtime database writes keep visible data current. The external Meta/RD
@@ -88,7 +88,18 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const refreshRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
   const previousContext = useRef<SyncContext | null>(null);
 
+  // Realtime fires once per written row. A full RD reconciliation persists
+  // hundreds of rows in micro-batches, so invalidating on every event makes
+  // the UI refetch and repaint the numbers several times per second. Pending
+  // invalidations are therefore coalesced and only applied once the running
+  // sync has settled.
+  const invalidationGate = useRef(createLiveInvalidationGate());
+
   const invalidateLiveQueries = useCallback(() => {
+    if (!shouldApplyLiveInvalidationNow(invalidationGate.current)) {
+      deferLiveInvalidation(invalidationGate.current);
+      return;
+    }
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
     invalidateTimer.current = window.setTimeout(() => {
       // Only queries derived from realtime tables become stale. This preserves
@@ -117,6 +128,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     recordBackgroundSyncAttempt(storage, storageKey);
 
     const task = withInFlightScope(inFlight.current, scope, async () => {
+      invalidationGate.current.syncInFlight = true;
       try {
         if (isCurrentScope()) setState("refreshing");
         // Refresh only the selected scope's recent provider window. The
@@ -290,6 +302,13 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message });
           setSyncError(failure.message);
           setState(failure.state);
+        }
+      } finally {
+        // As gravações do sync chegaram enquanto ele rodava. Uma única
+        // invalidação agora evita que a tela repinte os números a cada
+        // micro-lote persistido.
+        if (closeLiveInvalidationWindow(invalidationGate.current)) {
+          invalidateLiveQueries();
         }
       }
     });
