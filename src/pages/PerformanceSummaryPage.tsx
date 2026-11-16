@@ -213,14 +213,24 @@ export default function PerformanceSummaryPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [syncingRD, setSyncingRD] = useState(false);
+  const [rdSyncStatus, setRdSyncStatus] = useState<"idle" | "success" | "partial" | "error">("idle");
+  const [rdSyncSummary, setRdSyncSummary] = useState<{ deals?: number; created?: number; updated?: number; error?: string } | null>(null);
 
   async function syncRD() {
     if (syncingRD) return;
     setSyncingRD(true);
+    setRdSyncStatus("idle");
+    setRdSyncSummary(null);
     try {
       const targetFunnels = rdFunnels.filter((f) => f.is_active && scopedRDfunnelIds.includes(f.id));
+      let hasPartial = false;
+      let hasError = false;
+      let totalDeals = 0;
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      let lastError: string | null = null;
       for (const funnel of targetFunnels) {
-        await supabase.functions.invoke("rd-sync-deals", {
+        const response = await supabase.functions.invoke("rd-sync-deals", {
           body: {
             funnel_id: funnel.id,
             analytics_mode: true,
@@ -228,6 +238,16 @@ export default function PerformanceSummaryPage() {
             trigger_source: "summary_refresh",
           },
         });
+        const data = (response as any)?.data || {};
+        if (data.error || response.error) {
+          hasError = true;
+          lastError = String(data.error || response.error || "Erro desconhecido ao sincronizar.");
+        } else if (data.partial) {
+          hasPartial = true;
+        }
+        totalDeals += Number(data.deals || 0);
+        totalCreated += Number(data.created || 0);
+        totalUpdated += Number(data.updated || 0);
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
@@ -235,8 +255,20 @@ export default function PerformanceSummaryPage() {
         queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
         queryClient.invalidateQueries({ queryKey: ["sales"] }),
       ]);
-      toast({ title: "RD Station atualizado", description: "Os dados do funil e negociações foram sincronizados." });
+      setRdSyncSummary({ deals: totalDeals, created: totalCreated, updated: totalUpdated, error: lastError || undefined });
+      if (hasError) {
+        setRdSyncStatus("error");
+        toast({ title: "Falha ao sincronizar RD", description: lastError || "Ocorreu um erro ao sincronizar o RD Station.", variant: "destructive" });
+      } else if (hasPartial) {
+        setRdSyncStatus("partial");
+        toast({ title: "RD Station sincronizado parcialmente", description: `${totalDeals} negócios processados (${totalCreated} novos, ${totalUpdated} atualizados). Alguns dados podem ficar para a próxima execução.`, variant: "default" });
+      } else {
+        setRdSyncStatus("success");
+        toast({ title: "RD Station atualizado", description: `${totalDeals} negócios sincronizados (${totalCreated} novos, ${totalUpdated} atualizados).` });
+      }
     } catch (err) {
+      setRdSyncStatus("error");
+      setRdSyncSummary({ error: err instanceof Error ? err.message : "Não foi possível sincronizar o RD." });
       toast({ title: "Erro ao atualizar RD", description: err instanceof Error ? err.message : "Não foi possível sincronizar o RD.", variant: "destructive" });
     } finally {
       setSyncingRD(false);
@@ -256,6 +288,8 @@ export default function PerformanceSummaryPage() {
           deals={dashboardDeals}
           onSyncRD={syncRD}
           syncingRD={syncingRD}
+          rdSyncStatus={rdSyncStatus}
+          rdSyncSummary={rdSyncSummary}
         />
       </MotionItem>
     </MotionPage>

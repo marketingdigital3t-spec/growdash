@@ -1,0 +1,1 @@
+- [master-prompt-integracao-rd-crm](master-prompt-integracao-rd-crm.md) — Prompt mestre para correção completa das integrações Meta Ads e RD Station CRM na Growdash.
