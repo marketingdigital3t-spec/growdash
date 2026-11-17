@@ -1406,6 +1406,13 @@ html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
 .brand-shell[data-space-phase] :is(.gd-fuel-fill, .gd-label, .text-primary-neon) {
   color: var(--phase-accent-bright) !important;
 }
+
+/* The phase bright accent is tuned for the dark reading mode. On light
+   surfaces it drops to roughly 1.23:1, so the readable variant takes over.
+   The topbar keeps the neon because it always paints on a dark strip. */
+html:not(.dark) .brand-shell .growdash-main .text-primary-neon {
+  color: var(--gd-accent-readable) !important;
+}
 .brand-shell[data-space-phase] .gd-fuel-fill {
   background: linear-gradient(90deg, rgba(var(--phase-accent), 0.55), var(--phase-accent-bright)) !important;
   box-shadow: 0 0 12px rgba(var(--phase-accent), 0.55) !important;

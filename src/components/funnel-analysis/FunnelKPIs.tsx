@@ -35,8 +35,10 @@ type KpiTone = "neutral" | "positive" | "negative";
 
 const toneClasses: Record<KpiTone, { text: string; border: string; icon: string }> = {
   neutral: { text: "text-foreground", border: "border-l-border", icon: "text-muted-foreground" },
-  positive: { text: "text-emerald-600 dark:text-emerald-400", border: "border-l-emerald-500", icon: "text-emerald-600 dark:text-emerald-400" },
-  negative: { text: "text-red-600 dark:text-red-400", border: "border-l-red-500", icon: "text-red-600 dark:text-red-400" },
+  // emerald-600 reaches only 3.3:1 on white, below the WCAG AA minimum for
+  // normal text. emerald-700 keeps the semantic meaning and passes AA.
+  positive: { text: "text-emerald-700 dark:text-emerald-400", border: "border-l-emerald-500", icon: "text-emerald-700 dark:text-emerald-400" },
+  negative: { text: "text-red-700 dark:text-red-400", border: "border-l-red-500", icon: "text-red-700 dark:text-red-400" },
 };
 
 export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, metaLeads, metaLeadsAvailable = false, metaLeadsLoading = false, trafficReason, cpl, rdCpl, cac, roas, salesConversionRate, previousAvgDaysToConvert, metaAvailability, rdAvailability }: Props) {
