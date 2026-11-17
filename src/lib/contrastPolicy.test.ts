@@ -126,3 +126,30 @@ describe("GRO-A11Y-001 — o neon da fase reprova no tema claro", () => {
     expect(contrastRatio("#0b6a9e", "#ffffff")!).toBeGreaterThan(contrastRatio("#00d2ff", "#ffffff")!);
   });
 });
+
+describe("GRO-A11Y-001 — tokens semânticos legíveis no tema claro", () => {
+  const surfaces = ["#ffffff", "#f1f1ef", "#f7f7f5", "#f4f8f6"];
+
+  it("o verde de sucesso padrão reprovava e o token novo passa", () => {
+    // text-emerald-600 padrão (#16a34a) ficava em 3.3:1 no branco.
+    expect(meetsWcagAA("#16a34a", "#ffffff")).toBe(false);
+    for (const surface of surfaces) {
+      expect(meetsWcagAA("#167a43", surface)).toBe(true);
+    }
+  });
+
+  it("o âmbar de atenção padrão reprovava e o token novo passa", () => {
+    // text-amber-500 padrão (#f39c12) ficava em 3.19:1 no branco.
+    expect(meetsWcagAA("#f39c12", "#ffffff")).toBe(false);
+    for (const surface of surfaces) {
+      expect(meetsWcagAA("#9a5b00", surface)).toBe(true);
+    }
+  });
+
+  it("o texto primário suave herda o cinza claro e reprova", () => {
+    expect(meetsWcagAA("#e2e8f0", "#ffffff")).toBe(false);
+    for (const surface of surfaces) {
+      expect(meetsWcagAA("#4d6b5f", surface)).toBe(true);
+    }
+  });
+});

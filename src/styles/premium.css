@@ -667,6 +667,11 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
   color: var(--gd-status-attention) !important;
 }
 
+/* On light surfaces the attention amber is unreadable at 3.19:1. */
+html:not(.dark) .brand-shell :is(.text-amber-500, .text-amber-600, .text-orange-500) {
+  color: var(--gd-attention-readable) !important;
+}
+
 .brand-shell :is(.text-rose-500, .text-red-500, .text-red-600) {
   color: var(--gd-status-critical) !important;
 }
@@ -1352,12 +1357,31 @@ html[data-space-phase="galaxia"],
    src/lib/contrastPolicy.test.ts. */
 html:not(.dark) .brand-shell {
   --gd-accent-readable: #0b6a9e;
+  --gd-success-readable: #167a43;
+  /* The attention amber (#f39c12) reaches 3.19:1 on white. The darker
+     variant keeps the semantic meaning and passes WCAG AA. */
+  --gd-attention-readable: #9a5b00;
+}
+
+/* `text-primary-soft` is not a Tailwind utility, so it never had a color of
+   its own and the elements inherited whatever the parent happened to use.
+   On light surfaces that landed on the pale slate (1.23:1). The token now
+   always resolves to a readable muted value. */
+.brand-shell .text-primary-soft {
+  color: var(--gd-content-muted);
 }
 
 html:not(.dark) .brand-shell
   :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
-  :is(.text-emerald-400, .text-emerald-500, .text-emerald-600, .text-primary, [class*="text-primary"]) {
+  :is(.text-emerald-400, .text-emerald-500, .text-primary, [class*="text-primary"]) {
   color: var(--gd-accent-readable) !important;
+}
+
+/* `text-emerald-600` is the semantic success color. Its default value
+   (#16a34a) reaches only 3.3:1 on white, so the light theme keeps the
+   darker variant that the rest of the surface already uses. */
+html:not(.dark) .brand-shell .growdash-main .text-emerald-600 {
+  color: var(--gd-success-readable) !important;
 }
 
 /* Cards follow the phase instead of the fixed emerald. */
