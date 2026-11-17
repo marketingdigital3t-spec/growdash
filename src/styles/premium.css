@@ -1363,6 +1363,17 @@ html:not(.dark) .brand-shell {
   --gd-attention-readable: #9a5b00;
 }
 
+/* Semantic tones for the funnel KPIs. They are deliberately not Tailwind
+   color utilities: the platform's generic accent selectors capture
+   `text-emerald-*` / `text-red-*` and repaint them with the phase neon, which
+   measures 3.3:1 on light surfaces. These classes keep the semantic meaning
+   and pass WCAG AA in both reading modes. */
+.brand-shell .gd-tone-positive { color: #4ade80; }
+.brand-shell .gd-tone-negative { color: #f87171; }
+
+html:not(.dark) .brand-shell .gd-tone-positive { color: var(--gd-success-readable); }
+html:not(.dark) .brand-shell .gd-tone-negative { color: #b42318; }
+
 /* `text-primary-soft` is not a Tailwind utility, so it never had a color of
    its own and the elements inherited whatever the parent happened to use.
    On light surfaces that landed on the pale slate (1.23:1). The token now
