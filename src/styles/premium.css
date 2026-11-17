@@ -1340,9 +1340,28 @@ html[data-space-phase="galaxia"],
   --card-glow-color: 168, 85, 247 !important;
 }
 
-/* Cards follow the phase instead of the fixed emerald. */
-html.gd-premium.dark .brand-shell[data-space-phase]
+/* Light-theme accent readability (GRO-A11Y-001) ---------------------------
+   The phase accent (for example #00d2ff in Terra) is tuned for the dark
+   reading mode. On light surfaces that same neon drops to roughly 1.45:1
+   against a pale accent chip, far below the WCAG 2.2 AA minimum of 4.5:1 for
+   normal text. Small badges inherit the same rule because they carry the
+   `text-emerald-*` utility.
+
+   The fix keeps the neon where it is legible (dark surfaces) and restores a
+   darkened accent for light surfaces. The contrast is verified by
+   src/lib/contrastPolicy.test.ts. */
+html:not(.dark) .brand-shell {
+  --gd-accent-readable: #0b6a9e;
+}
+
+html:not(.dark) .brand-shell
   :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.text-emerald-400, .text-emerald-500, .text-emerald-600, .text-primary, [class*="text-primary"]) {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* Cards follow the phase instead of the fixed emerald. */
+html.gd-premium.dark .brand-shell[data-space-phase]  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
       .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
       .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,

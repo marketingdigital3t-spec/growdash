@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
+import { IS_MASTER_TIMEOUT_MS } from "@/lib/workspaceBootstrapPolicy";
 
 export function useIsMaster() {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export function useIsMaster() {
           supabase.rpc("is_master", {
             _user_id: user!.id,
           }),
+          IS_MASTER_TIMEOUT_MS,
         );
         if (error) throw error;
         return data === true;
