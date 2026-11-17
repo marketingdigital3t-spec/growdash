@@ -11561,6 +11561,20 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-icon { color: #dc2626 !important; }
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-value,
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon { color: #16a34a !important; }
+
+/* The success green (#16a34a) measures only 3.3:1 on the light surface, below
+   the WCAG AA minimum of 4.5:1 for normal text. The light theme uses the
+   darker semantic success color; the dark theme keeps the original.
+   Callers: src/components/funnel-analysis/FunnelKPIs.tsx renders the
+   `data-kpi-tone` attribute on the funnel KPI cards. */
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-value,
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon {
+  color: #167a43 !important;
+}
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-value,
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-icon {
+  color: #b42318 !important;
+}
 .brand-shell .gd-funnel-analysis .gd-aligned-grid { gap: 16px !important; }
 @media (min-width: 1280px) {
   .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
