@@ -1473,12 +1473,14 @@ Deno.serve(async (req) => {
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
       const hasFinancialData = amountTotal !== null || netRevenue !== null || taxAmount > 0;
 
-      // A won RD deal is canonical for counting conversions, but it is not
-      // proof of a payment. Do not create a zero-value financial sale when RD
-      // provides neither an amount nor a payment method. The rd_deals row
-      // above remains available for CRM/KPI counts and reconciliation.
-      if (!existing && !hasFinancialData) return;
-      if (existing && !hasFinancialData) return;
+      // Um negócio ganho no RD representa uma venda. Mesmo quando o RD não
+      // informa valor, a venda deve existir no Growdash para que a contagem
+      // de conversão e o funil de vendas reflitam a realidade do CRM.
+      if (!existing && !hasFinancialData) {
+        // Cria venda com valor zero: não é pagamento confirmado, é apenas
+        // o registro da conversão. O usuário pode preencher o valor manualmente
+        // posteriormente no dashboard de vendas.
+      } else if (!hasFinancialData) return;
 
       // Constrói payload preservando valores manuais já preenchidos.
       // Regra: campos vindos do RD só são gravados quando o registro existente
