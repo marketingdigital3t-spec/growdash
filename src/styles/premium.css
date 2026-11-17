@@ -1384,6 +1384,13 @@ html:not(.dark) .brand-shell .growdash-main .text-emerald-600 {
   color: var(--gd-success-readable) !important;
 }
 
+/* `text-emerald-700` is not covered by the accent rule above, so it fell
+   back to the shared `--accent-primary` green, which measures 3.3:1 on
+   white. Pin it to the readable success color in the light theme. */
+html:not(.dark) .brand-shell .growdash-main .text-emerald-700 {
+  color: var(--gd-success-readable) !important;
+}
+
 /* Cards follow the phase instead of the fixed emerald. */
 html.gd-premium.dark .brand-shell[data-space-phase]  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
@@ -1411,6 +1418,14 @@ html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
    surfaces it drops to roughly 1.23:1, so the readable variant takes over.
    The topbar keeps the neon because it always paints on a dark strip. */
 html:not(.dark) .brand-shell .growdash-main .text-primary-neon {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* SVG map labels inherit the `text-primary` utility through `fill`. On the
+   light theme the phase palette resolves it to the pale slate (1.23:1), so
+   the readable accent takes over wherever the phase forces a fixed color. */
+html:not(.dark) .brand-shell .growdash-main :is(text, tspan).text-primary {
+  fill: var(--gd-accent-readable) !important;
   color: var(--gd-accent-readable) !important;
 }
 .brand-shell[data-space-phase] .gd-fuel-fill {
