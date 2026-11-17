@@ -6,6 +6,7 @@ import {
   extractPhoneVariants,
   phonesMatch,
 } from "./metaDeliveryNormalization.ts";
+import { extractMetaFormAnswers } from "../../../src/lib/metaFormAnswers.ts";
 
 type AdminClient = any;
 
@@ -28,6 +29,8 @@ type MetaLead = {
   full_name?: string | null;
   created_time: string;
   raw: Record<string, unknown> | null;
+  /** Respostas do questionário do formulário nativo, já extraídas. */
+  form_answers?: Record<string, string> | null;
 };
 
 type RdDeal = {
