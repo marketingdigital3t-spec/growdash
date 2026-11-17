@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
+import { extractCorrelationId, structuredLog } from "../../../src/lib/observability.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
 import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
@@ -497,6 +498,9 @@ async function fetchWithRetry(url: string, attempts = RD_REQUEST_ATTEMPTS, deadl
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const correlationId = extractCorrelationId(req.headers);
+  structuredLog({ level: "info", message: "rd-sync-deals invoked", correlationId });
 
   const startedAt = Date.now();
   metrics.retries = 0;
