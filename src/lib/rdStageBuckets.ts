@@ -71,12 +71,14 @@ export function bucketRDStage({
 
   if (!name) return { bucket: "etapa-propria", label: BUCKET_LABELS["etapa-propria"] };
 
-  // Vendas ganhas: rótulo terminal tem precedência.
+  // Vendas ganhas: rótulo terminal tem precedência. Se o RD diz que o negócio
+  // foi ganho (won=true), conta como venda mesmo que o nome da etapa esteja
+  // desatualizado no snapshot local.
   if (won || /^(venda|vendas|sale|sales)$/.test(name) || /\b(vendid[oa]s?|vendas? realizadas?|vendas? concluidas?|vendas? ganhas?|fechado ganho|ganho|won|cliente)\b/.test(name)) {
     return { bucket: "vendas", label: BUCKET_LABELS.vendas };
   }
 
-  // Perdidas.
+  // Perdida.
   if (lost || /\b(perdid[oa]s?|perda|lost|desqualificad[oa]s?)\b/.test(name)) {
     return { bucket: "perdidas", label: BUCKET_LABELS.perdidas };
   }
@@ -88,7 +90,7 @@ export function bucketRDStage({
   }
 
   // Novo Lead.
-  if (/\b(lead novo|novo lead)\b/.test(name) || /\bnovo\b/.test(name)) {
+  if (/\b(lead novo|novo lead)\b/.test(name) || /\bnovo[s]?\b/.test(name)) {
     return { bucket: "novo-lead", label: BUCKET_LABELS["novo-lead"] };
   }
 
