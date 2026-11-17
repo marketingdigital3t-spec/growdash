@@ -212,8 +212,8 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         return rows;
       };
       const all = [
-        ...(await fetchRange((query) => query.gte("lead_created_at", rangeStart).lte("lead_created_at", rangeEnd))),
-        ...(await fetchRange((query) => query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd))),
+        ...(await fetchRange((query) => query.eq("win", false).gte("lead_created_at", rangeStart).lte("lead_created_at", rangeEnd))),
+        ...(await fetchRange((query) => query.eq("win", true).gte("closed_at", rangeStart).lte("closed_at", rangeEnd))),
         ...(await fetchRange((query) => query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd))),
       ];
       const scoped = all.filter((deal) => isRDDealInScopePeriod(deal, {
