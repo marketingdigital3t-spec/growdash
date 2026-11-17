@@ -25,9 +25,11 @@ describe("RD sync runtime budget", () => {
   });
 
   it("mantém uma requisição lógica dentro do budget mesmo com o timeout antigo de 30s", () => {
+    // Com os backoffs reduzidos (2s, 5s, 10s), o pior caso com timeout 30s
+    // é: 30s + 2s + 30s + 5s + 30s = 97s, ainda acima do budget de 90s.
     const worstCase = worstCaseRDRequestMs(30_000);
 
-    expect(worstCase).toBe(110_000);
+    expect(worstCase).toBe(97_000);
     expect(worstCase).toBeGreaterThan(RD_SYNC_RUNTIME_BUDGET_MS);
   });
 
@@ -40,5 +42,15 @@ describe("RD sync runtime budget", () => {
 
   it("mantém o timeout por tentativa acima de 1 segundo mesmo com budget apertado", () => {
     expect(safeRDRequestTimeoutMs(1_000)).toBeGreaterThanOrEqual(1_000);
+  });
+
+  it("deriva um timeout que deixa margem para múltiplas operações dentro do budget de 90s", () => {
+    const safeTimeoutMs = safeRDRequestTimeoutMs();
+    const worstCasePerRequest = worstCaseRDRequestMs(safeTimeoutMs);
+
+    // Uma requisição lógica sozinha não consome quase todo o budget: deixa
+    // pelo menos 40% de margem para upserts, writes de cursor e outras
+    // requisições de conexões RD sequenciais na mesma invocação.
+    expect(worstCasePerRequest).toBeLessThanOrEqual(Math.floor(RD_SYNC_RUNTIME_BUDGET_MS * 0.6));
   });
 });

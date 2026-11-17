@@ -15,8 +15,13 @@
 /** Total wall-clock budget available to one edge invocation. */
 export const RD_SYNC_RUNTIME_BUDGET_MS = 90_000;
 
-/** Backoff waits applied between provider attempts, in order. */
-export const RD_REQUEST_BACKOFFS_MS = [5_000, 15_000, 30_000, 60_000];
+/** Backoff waits applied between provider attempts, in order.
+ *
+ * Kept intentionally short so a single invocation can serve several RD
+ * connections sequentially without exhausting the 90s gateway budget and
+ * surfacing statement_timeout / partial status on the later connections.
+ */
+export const RD_REQUEST_BACKOFFS_MS = [2_000, 5_000, 10_000];
 
 /** How many times one provider request may be attempted. */
 export const RD_REQUEST_ATTEMPTS = 3;
@@ -39,10 +44,12 @@ export function worstCaseRDRequestMs(
 
 /**
  * Per-attempt timeout that guarantees one logical request — including every
- * backoff — finishes inside the invocation budget.
+ * backoff — finishes inside the invocation budget while reserving margin for
+ * additional requests and database operations in the same invocation.
  *
- * The provider timeout is capped by the remaining budget so a slow RD page can
- * never outlive the invocation and trigger a gateway timeout.
+ * Without this margin, a single slow RD request can consume nearly all 90s,
+ * leaving nothing for subsequent connections and surfacing statement_timeout
+ * / partial status on the later RD connections.
  */
 export function safeRDRequestTimeoutMs(
   budgetMs: number = RD_SYNC_RUNTIME_BUDGET_MS,
@@ -52,6 +59,9 @@ export function safeRDRequestTimeoutMs(
   const worstCaseBackoff = backoffsMs
     .slice(0, Math.max(0, attempts - 1))
     .reduce((sum, value) => sum + value, 0);
-  const available = budgetMs - worstCaseBackoff;
+  // Reserve ~40% of the budget for upserts, cursor writes, and subsequent
+  // provider requests within the same invocation.
+  const reserve = Math.floor(budgetMs * 0.4);
+  const available = Math.max(1_000, budgetMs - reserve - worstCaseBackoff);
   return Math.max(1_000, Math.floor(available / Math.max(1, attempts)));
 }
