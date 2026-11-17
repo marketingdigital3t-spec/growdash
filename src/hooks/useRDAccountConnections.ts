@@ -36,7 +36,10 @@ export function useRDAccountConnections(options?: { enabled?: boolean }) {
     enabled: (options?.enabled ?? true) && !!user && !workspaceLoading,
     retry: 1,
     retryDelay: 1_000,
-    refetchInterval: (query) => query.state.error ? 10_000 : false,
+    // Sem polling automático: a lista de conexões RD só é revalidada quando o
+    // usuário atualiza. O retry de 10s após erro mantinha o seletor de conta
+    // piscando "indisponível" durante a análise.
+    refetchInterval: false,
     refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedConnections)),
     refetchOnWindowFocus: false,
     staleTime: 2 * 60_000,

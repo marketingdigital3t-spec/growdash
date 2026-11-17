@@ -41,7 +41,11 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     refetchOnReconnect: true,
     refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedFunnels)),
     refetchOnWindowFocus: false,
-    refetchInterval: (query) => query.state.error ? 10_000 : false,
+    // Sem polling automático: o snapshot persistido continua válido e só é
+    // revalidado quando o usuário pede uma atualização explícita. Um retry
+    // automático a cada 10s mantinha a tela em "indisponível" e roubava a
+    // atenção da análise.
+    refetchInterval: false,
     staleTime: 2 * 60 * 1000,
     placeholderData: cachedFunnels,
     queryFn: async () => {

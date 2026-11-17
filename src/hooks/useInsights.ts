@@ -414,7 +414,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
     // Keep the previous result during the request so a pending Meta response
     // can never make the selected cards flash to zero.
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    // A métrica do provider só muda quando o usuário pede a atualização ou
+    // quando o ciclo de 15 minutos vence. Revalidar a cada minuto mantinha a
+    // tela piscando "indisponível" durante a análise.
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     gcTime: 24 * 60 * 60 * 1000,
     // A persisted snapshot already paints the selected scope. The global

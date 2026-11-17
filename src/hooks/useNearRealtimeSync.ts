@@ -8,6 +8,7 @@ import { withRequestTimeout } from "@/lib/resilience";
 import { describeSyncFailure } from "@/lib/syncStatus";
 import { backgroundSyncStatus, closeLiveInvalidationWindow, createLiveInvalidationGate, deferLiveInvalidation, shouldApplyLiveInvalidationNow, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
+import { canRunAutomaticSync, recordManualSync } from "@/lib/manualSyncPolicy";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -123,6 +124,11 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     const storageKey = `${STORAGE_PREFIX}:${scope}`;
     let storage: Storage | null = null;
     try { storage = window.localStorage; } catch { /* private mode can block storage access */ }
+    // Um clique manual bloqueia toda sincronização automática do mesmo
+    // escopo por 15 minutos. Só o próprio clique ou o fim dessa janela
+    // liberam uma nova rodada de Meta/RD.
+    if (!force && !canRunAutomaticSync(storage, scope)) return;
+    if (force) recordManualSync(storage, scope);
     const previousAttempt = readBackgroundSyncAttempt(storage, storageKey);
     if (!force && Date.now() - previousAttempt < LOCAL_DEDUP_WINDOW_MS) return;
     recordBackgroundSyncAttempt(storage, storageKey);

@@ -175,6 +175,10 @@ html:not(.dark) {
 
   --gd-surface-page: var(--bg-canvas);
   --gd-surface-card: var(--surface-card);
+  /* Cor sólida equivalente ao gradiente de `--gd-surface-card`. Usada como
+     `background-color` de fallback para os cards que precisam de uma cor
+     opaca atrás do `backdrop-filter`. */
+  --gd-surface-card-color: var(--surface-card-color, var(--surface-card));
   --gd-surface-raised: var(--surface-raised);
   --gd-surface-control: var(--surface-raised);
   --gd-border: var(--border-subtle);
@@ -385,8 +389,14 @@ html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashbo
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
   border: 1px solid var(--gd-border) !important;
   border-radius: var(--gd-radius-card) !important;
-  background-color: var(--gd-surface-card) !important;
+  /* `--gd-surface-card` pode ser um gradiente. Aplicá-lo em `background-color`
+     é inválido e o navegador IGNORA a declaração: o card fica sem fundo e o
+     `backdrop-filter` amostra o conteúdo que rola por trás, produzindo o
+     aspecto "lavado claro" durante o scroll. Use `background` (aceita
+     gradiente) e aponte a cor sólida no `background-color`. */
+  background-color: var(--gd-surface-card-color) !important;
   background-image:
+    var(--gd-surface-card),
     linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
     radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.09) 0%, transparent 15rem);
   color: var(--gd-content) !important;

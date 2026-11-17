@@ -15,8 +15,13 @@ describe("CRM board scope contract — espelho do RD Station", () => {
   });
 
   it("filters the board cards by the active period and the advanced filters", () => {
-    expect(crmPage).toContain("filterDealsByAdvancedCriteria(dealsInPipeline, boardScopeFilters)");
+    // O filtro de criação do calendário recorta apenas as negociações em
+    // aberto. As terminais (Venda Realizada e Perdido) usam a data de
+    // fechamento, como no RD Station.
+    expect(crmPage).toContain("filterDealsByAdvancedCriteria(dealsInPipeline, {");
     expect(crmPage).toContain("advancedFilters.createdAt ?? calendarPeriod");
+    expect(crmPage).toContain("dealBelongsToBoardPeriod(deal, startDate, endDate)");
+    expect(crmPage).toContain("isTerminalBoardDeal(deal)");
   });
 
   it("keeps every funnel stage visible even when the period empties a column", () => {
