@@ -13039,7 +13039,11 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 /* Monochrome control contract: switches must not reintroduce the legacy blue
-   accent into the black-and-white Growdash interface. */
+   accent into the black-and-white Growdash interface.
+
+   O trilho ativo é preto em ambos os modos (contrato monocromático), então a
+   bolinha precisa ser clara: branca no claro e no escuro. A regra antiga do
+   modo escuro pintava a bolinha de preto e ela sumia sobre o trilho. */
 .brand-shell [role="switch"][data-state="checked"] {
   border-color: #111111 !important;
   background: #111111 !important;
@@ -13053,7 +13057,7 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 .brand-shell [role="switch"] > span {
-  background: #ffffff !important;
+  background: var(--switch-thumb) !important;
   color: #111111 !important;
 }
 
@@ -13880,11 +13884,13 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 
 /* Active status switches keep a thumb that contrasts with the track, both in
    dark mode and in light mode. A black thumb on the dark track disappeared
-   completely, so the control looked off even when it was on. The Meta-style
-   campaign row toggle used a light track and still needs the dark thumb, so
-   it keeps its own rule below. */
-html.dark .brand-shell [role="switch"][data-state="checked"] > span,
-html.dark .brand-shell button[data-state="checked"] > span {
+   completely, so the control looked off even when it was on.
+
+   The rule is scoped to `[role="switch"]`: a generic `button[data-state]`
+   selector would also hit the Radix checkbox, whose tick has its own
+   colors. The Meta-style campaign row toggle used a light track and still
+   needs the dark thumb, so it keeps its own rule below. */
+html.dark .brand-shell [role="switch"][data-state="checked"] > span {
   background: var(--switch-thumb) !important;
 }
 

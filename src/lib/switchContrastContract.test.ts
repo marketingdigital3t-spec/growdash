@@ -57,6 +57,23 @@ describe("contraste do switch (toggle) nos dois modos de tema", () => {
     );
   });
 
+  it("mantém a bolinha clara no contrato monocromático dos dois modos", () => {
+    // O trilho ativo é preto em ambos os modos (contrato monocromático), então
+    // a bolinha tem de ser branca — no claro e no escuro.
+    expect(indexSource).toMatch(
+      /\.brand-shell \[role="switch"\] > span\s*\{[^}]*background:\s*var\(--switch-thumb\)\s*!important/,
+    );
+    expect(indexSource).not.toMatch(
+      /\.brand-shell \[role="switch"\] > span\s*\{[^}]*background:\s*#ffffff\s*!important/,
+    );
+  });
+
+  it("não aplica a regra do switch em outros controles com data-state", () => {
+    // `button[data-state="checked"]` também casaria com o Checkbox do Radix,
+    // que tem cores próprias.
+    expect(indexSource).not.toMatch(/button\[data-state="checked"\]\s*>\s*span\s*\{/);
+  });
+
   it("mantém a bolinha escura no toggle de campanha, que usa trilho claro", () => {
     // O toggle de campanha pinta o próprio trilho claro no modo escuro; a
     // bolinha escura continua sendo a que contrasta com ele.
