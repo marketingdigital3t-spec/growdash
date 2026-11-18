@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle, Facebook } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle, Facebook, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
+import { filterRDFunnelsBySearch } from "@/lib/rdFunnelSearch";
 
 interface RDPipeline { id: string; name: string }
 
@@ -362,8 +364,14 @@ export function RDFunnelsSection() {
   const { data: allFunnels = [] } = useRDFunnels(undefined, true);
   const { data: connections = [] } = useRDAccountConnections();
   const { data: adAccounts = [] } = useAdAccounts(true);
+  const [funnelSearch, setFunnelSearch] = useState("");
+  const isSearching = funnelSearch.trim().length > 0;
+  const filteredFunnels = filterRDFunnelsBySearch(allFunnels, funnelSearch);
   const listedConnectionIds = new Set(connections.map((connection) => connection.id));
-  const orphanFunnels = allFunnels.filter((funnel) => !funnel.rd_connection_id || !listedConnectionIds.has(funnel.rd_connection_id));
+  const orphanFunnels = filteredFunnels.filter((funnel) => !funnel.rd_connection_id || !listedConnectionIds.has(funnel.rd_connection_id));
+  // O bloqueio de ativação considera todos os funis da conta, não só os
+  // visíveis na busca: esconder um funil não pode liberar a ativação de um
+  // vínculo equivalente que continua ativo em outra conexão.
   const activePipelineIds = new Set(allFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.rd_funnel_id!));
 
   return (
@@ -377,10 +385,35 @@ export function RDFunnelsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {connections.length === 0 && !allFunnels.length ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
-          const connectionFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
-          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />;
-        })}
+        <div className="space-y-1.5">
+          <form role="search" autoComplete="off" onSubmit={(event) => event.preventDefault()} className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              aria-label="Buscar funil"
+              placeholder="Buscar funil pelo nome…"
+              value={funnelSearch}
+              onChange={(event) => setFunnelSearch(event.target.value)}
+              className="pl-9 text-sm"
+            />
+          </form>
+          <p className="text-[11px] text-muted-foreground" role="status" aria-live="polite">
+            {isSearching
+              ? `${filteredFunnels.length} de ${allFunnels.length} funil(is) encontrado(s).`
+              : `${allFunnels.length} funil(is) em ${connections.length} conexão(ões).`}
+          </p>
+        </div>
+        {isSearching && filteredFunnels.length === 0
+          ? <p className="text-sm text-muted-foreground">Nenhum funil corresponde à busca.</p>
+          : connections.length === 0 && !allFunnels.length
+            ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p>
+            : connections.map((connection) => {
+                const connectionFunnels = filteredFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
+                // Durante a busca só interessam os blocos com correspondência.
+                // Sem busca, todos os blocos continuam visíveis — é neles que
+                // ficam os botões de carregar e adicionar funil.
+                if (isSearching && !connectionFunnels.length) return null;
+                return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />;
+              })}
         {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />}
       </CardContent>
     </Card>
