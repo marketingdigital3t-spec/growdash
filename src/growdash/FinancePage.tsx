@@ -26,6 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
+import { WeeklyInvestmentPanel } from "@/components/finance/WeeklyInvestmentPanel";
+import { buildWeeklyInvestment, deriveWeeklyTarget } from "@/lib/weeklyTrafficInvestment";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
 import { buildTrafficFundingSummary, calculateTrafficFundsAdded, normalizeMetaPaymentMethod } from "@/lib/trafficFunding";
 import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
@@ -85,6 +87,35 @@ export default function FinancePage() {
   const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
   const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, accounts.length > 0);
+  // Meta de investimento do mês, usada para comparar cada semana com a
+  // cota planejada. `planned_monthly` vive em `traffic_investment_plans`.
+  const planMonthKey = format(startOfMonth(endDate), "yyyy-MM");
+  const { data: investmentPlans = [] } = useQuery({
+    queryKey: ["traffic-investment-plans-finance", workspace?.id, businessUnitId, planMonthKey],
+    enabled: !!workspace?.id && !!businessUnitId && accountIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("traffic_investment_plans")
+        .select("ad_account_id,planned_monthly,meta_percentage")
+        .eq("workspace_id", workspace?.id)
+        .eq("business_unit_id", businessUnitId)
+        .eq("plan_month", planMonthKey);
+      if (error) {
+        if (error.code === "42P01" || /traffic_investment_plans|schema cache/i.test(error.message)) return [];
+        throw error;
+      }
+      return data ?? [];
+    },
+  });
+  const plannedMonthlyInvestment = useMemo(() => {
+    const scoped = (investmentPlans as Array<{ ad_account_id?: string | null; planned_monthly?: number | null; meta_percentage?: number | null }>)
+      .filter((plan) => !plan.ad_account_id || accountIds.includes(plan.ad_account_id));
+    return scoped.reduce((sum, plan) => {
+      const planned = Number(plan.planned_monthly || 0);
+      const share = Number(plan.meta_percentage ?? 100) / 100;
+      return sum + planned * share;
+    }, 0);
+  }, [accountIds, investmentPlans]);
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate, endDate });
   // Historical charts are secondary content. Start them only after the
   // current-period facts are ready so the finance route can paint its primary
@@ -324,13 +355,47 @@ export default function FinancePage() {
   const dreMargin = grossRevenue > 0 ? dreResult / grossRevenue : 0;
   const weeklyInvestment = useMemo(() => {
     const groups = new Map<string, number>();
+    const rawGroups = new Map<string, number>();
     for (const item of historicalInsights.filter((row) => unitAccountIds.has(row.ad_account_id))) {
       const day = new Date(`${item.date}T12:00:00`);
       const key = format(startOfWeek(day, { weekStartsOn: 1 }), "dd/MM");
-      groups.set(key, (groups.get(key) ?? 0) + Number(item.spend || 0) * (includeMetaTax ? 1 + metaTaxRate : 1));
+      const spend = Number(item.spend || 0);
+      rawGroups.set(key, (rawGroups.get(key) ?? 0) + spend);
+      groups.set(key, (groups.get(key) ?? 0) + spend * (includeMetaTax ? 1 + metaTaxRate : 1));
     }
-    return Array.from(groups, ([label, investment]) => ({ label, investment })).slice(-16);
-  }, [historicalInsights, includeMetaTax, unitAccountIds]);
+    // Aportes confirmados e pendentes por semana: "quanto foi colocado" ao
+    // lado de "quanto foi investido".
+    const depositedGroups = new Map<string, { paid: number; pending: number }>();
+    for (const transaction of fundingTransactions) {
+      if (!transaction.time) continue;
+      if (!unitAccountIds.has(transaction.ad_account_id)) continue;
+      const key = format(startOfWeek(new Date(`${transaction.time.slice(0, 10)}T12:00:00`), { weekStartsOn: 1 }), "dd/MM");
+      const amount = Number(transaction.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const status = String(transaction.status || "").toLowerCase();
+      const current = depositedGroups.get(key) ?? { paid: 0, pending: 0 };
+      if (status === "pending" || status === "processing") current.pending += amount;
+      else if (status === "paid" || status === "success" || status === "completed") current.paid += amount;
+      depositedGroups.set(key, current);
+    }
+    return Array.from(groups, ([label, investment]) => ({
+      label,
+      investment,
+      invested: investment,
+      investedRaw: rawGroups.get(label) ?? 0,
+      deposited: depositedGroups.get(label)?.paid ?? 0,
+      depositedPending: depositedGroups.get(label)?.pending ?? 0,
+    })).slice(-16);
+  }, [historicalInsights, includeMetaTax, unitAccountIds, fundingTransactions]);
+
+  // Meta semanal: a cota planejada do mês dividida pelas semanas cobertas.
+  const weeklyInvestmentRows = useMemo(
+    () => buildWeeklyInvestment(
+      weeklyInvestment,
+      deriveWeeklyTarget(plannedMonthlyInvestment, weeklyInvestment.length),
+    ),
+    [plannedMonthlyInvestment, weeklyInvestment],
+  );
 
   function exportCsv() { const header = ["Conta", "ID Meta", "Investimento", "Leads", "Vendas", "Faturamento líquido", "ROAS"]; const data = rows.map((row) => [row.account.name, row.account.account_id, row.spend, row.leads, row.sales, row.revenue, row.roas]); downloadCsv(`growdash-financeiro-${businessDateKey(startDate)}-${businessDateKey(endDate)}.csv`, [header, ...data]); }
 
@@ -382,7 +447,7 @@ export default function FinancePage() {
 
         <TabsContent value="accounts" className="space-y-4"><AccountTable rows={rows} loading={isLoading} /><section className="gd-panel p-5"><div className="flex items-center gap-3"><WalletCards className="h-5 w-5 text-primary" /><div><h2 className="font-black">Saldo e autonomia</h2><p className="text-xs text-muted-foreground">Saldo consolidado {brl.format(balance)}; valores informados por conta.</p></div></div><div className="mt-4 grid gap-3 md:grid-cols-3">{accounts.map((account) => { const daily = Number(account.daily_budget || 0); const remaining = Number(account.remaining_balance || 0); return <div key={account.id} className="rounded-xl border border-border p-4"><p className="truncate text-[10px] font-black">{account.name}</p><p className="mt-3 text-xl font-black">{brl.format(remaining)}</p><p className="text-[10px] text-muted-foreground">{daily > 0 ? `${Math.floor(remaining / daily)} dia(s) com orçamento atual` : "Orçamento diário não informado"}</p></div>; })}</div></section></TabsContent>
 
-        <TabsContent value="traffic" className="space-y-4"><TrafficInvestmentPlanner workspaceId={workspace?.id} businessUnitId={businessUnitId} accounts={accounts} /><section className="gd-panel overflow-hidden"><PanelTitle icon={<WalletCards />} title="Aportes e saldo da conta Meta" subtitle="Créditos confirmados, pendências e saldo disponível no período selecionado." /><FundingTable rows={fundingTransactions} accounts={accounts} /></section><ChartPanel title="Gasto real semanal sincronizado"><ResponsiveContainer width="100%" height={280}><BarChart data={weeklyInvestment}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" /><XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={compactCurrency} /><Tooltip formatter={currencyTooltip} /><Bar dataKey="investment" name="Gasto real" fill="hsl(var(--primary))" radius={[5,5,0,0]} /></BarChart></ResponsiveContainer></ChartPanel><section className="gd-panel overflow-hidden"><PanelTitle icon={<TrendingUp />} title="Gasto real mensal" subtitle={`${includeMetaTax ? "Inclui simulação de imposto Meta de 12,15%" : "Valores originais sincronizados da Meta"}.`} /><TrafficMonthlyTable rows={monthlyHistory} /></section></TabsContent>
+        <TabsContent value="traffic" className="space-y-4"><TrafficInvestmentPlanner workspaceId={workspace?.id} businessUnitId={businessUnitId} accounts={accounts} /><WeeklyInvestmentPanel rows={weeklyInvestmentRows} taxNote={`${includeMetaTax ? "Valor com simulação de imposto Meta de 12,15%; a coluna Bruto mostra o valor original." : "Valores originais sincronizados da Meta."}`} /><section className="gd-panel overflow-hidden"><PanelTitle icon={<WalletCards />} title="Aportes e saldo da conta Meta" subtitle="Créditos confirmados, pendências e saldo disponível no período selecionado." /><FundingTable rows={fundingTransactions} accounts={accounts} /></section><ChartPanel title="Gasto real semanal sincronizado"><ResponsiveContainer width="100%" height={280}><BarChart data={weeklyInvestment}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" /><XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={compactCurrency} /><Tooltip formatter={currencyTooltip} /><Bar dataKey="investment" name="Gasto real" fill="hsl(var(--primary))" radius={[5,5,0,0]} /></BarChart></ResponsiveContainer></ChartPanel><section className="gd-panel overflow-hidden"><PanelTitle icon={<TrendingUp />} title="Gasto real mensal" subtitle={`${includeMetaTax ? "Inclui simulação de imposto Meta de 12,15%" : "Valores originais sincronizados da Meta"}.`} /><TrafficMonthlyTable rows={monthlyHistory} /></section></TabsContent>
 
         <TabsContent value="entries"><section className="gd-panel overflow-hidden"><PanelTitle icon={<Landmark />} title="Lançamentos financeiros" subtitle="Registros manuais e aportes importados automaticamente da Meta." /><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[800px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Descrição", "Categoria", "Origem", "Status", "Forma", "Valor"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{entries.map((item) => <tr key={item.id}><td className="px-4 py-3">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")}</td><td className="px-4 py-3 font-bold">{item.description}</td><td className="px-4 py-3">{item.financial_categories?.name ?? "Sem categoria"}</td><td className="px-4 py-3">{isMetaFundingEntry(item) ? "Meta Ads" : "Manual"}</td><td className="px-4 py-3">{statusLabel(item.status)}</td><td className="px-4 py-3">{item.payment_method ? (item.payment_method === "pix" ? "Pix" : item.payment_method === "cartao" ? "Cartão" : item.payment_method === "boleto" ? "Boleto" : item.payment_method === "saldo_pre_pago" ? "Saldo pré-pago" : "Não informada") : "—"}</td><td className={`px-4 py-3 font-black ${item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}`}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</td></tr>)}</tbody></table></div><div className="divide-y divide-border md:hidden">{entries.map((item) => <div key={item.id} className="p-4"><div className="flex justify-between gap-3"><div><b className="text-sm">{item.description}</b><p className="text-[10px] text-muted-foreground">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")} · {isMetaFundingEntry(item) ? "Meta Ads" : "Manual"} · {statusLabel(item.status)}</p></div><b className={item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</b></div></div>)}</div>{!entries.length && !loadingEntries && <div className="p-10 text-center text-xs text-muted-foreground">Nenhum lançamento neste período. Use “Novo lançamento”.</div>}</section></TabsContent>
 

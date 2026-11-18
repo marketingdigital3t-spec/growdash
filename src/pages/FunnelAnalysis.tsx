@@ -9,6 +9,7 @@ import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { FunnelKPIs } from "@/components/funnel-analysis/FunnelKPIs";
+import { FunnelGrowthBlock } from "@/components/funnel-analysis/FunnelGrowthBlock";
 import { FunnelStageDistribution } from "@/components/funnel-analysis/FunnelStageDistribution";
 import { FunnelStageConversion } from "@/components/funnel-analysis/FunnelStageConversion";
 import { FunnelOrbitalInteractive } from "@/components/funnel-analysis/FunnelOrbitalInteractive";
@@ -923,6 +924,23 @@ export default function FunnelAnalysis() {
               previousAvgDaysToConvert={previousAvgDaysToConvert}
               metaAvailability={funnelAvailability.meta}
               rdAvailability={funnelAvailability.rd}
+            />
+          </MotionItem>
+
+          {/* Bloco de growth: leads Meta + RD no mesmo lugar e quantos leads
+              são necessários para 1 venda. */}
+          <MotionItem>
+            <FunnelGrowthBlock
+              input={{
+                rdLeads: periodAnalytics.totalLeads,
+                metaLeads: mediaMetrics.metaLeads,
+                metaLeadsAvailable,
+                sales: periodAnalytics.conversions,
+                dealsWithMetaAttribution: operationalPeriodFunnelDeals.filter(
+                  (deal) => Boolean((deal as { meta_lead_id?: string | null }).meta_lead_id),
+                ).length,
+                totalDeals: operationalPeriodFunnelDeals.length,
+              }}
             />
           </MotionItem>
 

@@ -3,6 +3,16 @@ import type { CSSProperties } from "react";
 import earthTexture from "@/assets/growth/earth-2k-web.jpg";
 import { SpaceRocket } from "./SpaceRocket";
 
+/**
+ * Textura do planeta Terra.
+ *
+ * A versao 8K 300 DPI (3,6 MB) nao entra no bundle JavaScript: ela e
+ * servida como asset estatico e o browser so a baixa quando a textura de
+ * alta resolucao faz sentido. A 2K (556 KB) fica no bundle como fallback
+ * imediato, entao o planeta nunca aparece vazio enquanto o 8K carrega.
+ */
+const EARTH_8K_TEXTURE = "/assets/growth/earth-8k-300dpi.jpg";
+
 export type SpacePhase = "terra" | "orbita" | "galaxia";
 
 const PHASE_COPY: Record<SpacePhase, { title: string; subtitle: string }> = {
@@ -15,16 +25,34 @@ function starCount(phase: SpacePhase) {
   return phase === "terra" ? 18 : phase === "orbita" ? 30 : 46;
 }
 
+/**
+ * Meteoros por fase. Terra tem poucos (a cena e mais calma), Orbita e
+ * Galaxia aceleram. Cada um tem posicao e duracao proprias no CSS, entao
+ * nunca caem em sincronia.
+ */
+function meteorCount(phase: SpacePhase) {
+  return phase === "terra" ? 6 : phase === "orbita" ? 10 : 14;
+}
+
 export function SpacePhaseBackground({ phase, dashboardScene = false }: { phase: SpacePhase; dashboardScene?: boolean }) {
   const copy = PHASE_COPY[phase];
   return (
-    <div className="space-phase-bg" data-phase={phase} data-dashboard-scene={dashboardScene || undefined} style={{ "--earth-texture": `url(${earthTexture})` } as CSSProperties} aria-hidden="true">
+    <div
+      className="space-phase-bg"
+      data-phase={phase}
+      data-dashboard-scene={dashboardScene || undefined}
+      style={{
+        "--earth-texture": `url(${earthTexture})`,
+        "--earth-texture-hd": `url(${EARTH_8K_TEXTURE})`,
+      } as CSSProperties}
+      aria-hidden="true"
+    >
       <div className="space-phase-nebula" />
       <div className="space-phase-stars">{Array.from({ length: starCount(phase) }, (_, index) => <i key={index} style={{ "--star-x": `${(index * 47) % 100}%`, "--star-y": `${(index * 71) % 100}%`, "--star-delay": `${(index % 9) * 0.45}s` } as CSSProperties} />)}</div>
       {(dashboardScene || phase !== "terra") && <div className="space-phase-meteors">
-        <i className="space-phase-meteor-a" />
-        <i className="space-phase-meteor-b" />
-        {phase !== "terra" && <><i className="space-phase-meteor-c" /><i className="space-phase-meteor-d" /></>}
+        {Array.from({ length: meteorCount(phase) }, (_, index) => (
+          <i key={index} />
+        ))}
       </div>}
       <div className="space-phase-planet"><span className="space-phase-atmosphere" /><span className="space-phase-rings" /></div>
       <div className="space-phase-orbit-map" aria-hidden="true">
