@@ -142,6 +142,9 @@ html:not(.dark) {
   --input: 146 16% 82%;
   --ring: 161 94% 30%;
   --radius: 0.875rem;
+  /* Bolinha do switch (toggle). No claro ela é branca sobre o trilho verde;
+     no escuro precisa ser clara sobre o trilho escuro, senão some. */
+  --switch-thumb: 0 0% 100%;
 
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 160 41% 12%;
@@ -235,6 +238,9 @@ html.dark {
   --input: 215 25% 14%;
   --ring: 199 89% 58%;
   --radius: 0.875rem;
+  /* Bolinha do switch no escuro: um branco puro sobre o trilho escuro. Com
+     `--background` (quase preto) a bolinha some e não dá para ler o estado. */
+  --switch-thumb: 0 0% 100%;
 
   --sidebar-background: 222 40% 4%;
   --sidebar-foreground: 215 20% 85%;
