@@ -54,7 +54,11 @@ describe("contrato do rebranding e do growth intelligence", () => {
   it("a textura 8K da Terra e usada com fallback 2K", () => {
     expect(phaseBackgroundSource).toContain("earth-8k-300dpi.jpg");
     expect(phaseBackgroundSource).toContain("earth-2k-web.jpg");
-    expect(indexCss).toContain("--earth-texture-hd");
+    // O `image-set` nao aceita `var()` dentro do `url()`, entao o caminho
+    // do asset 8K aparece literal no CSS.
+    expect(indexCss).toContain('image-set(url("/assets/growth/earth-8k-300dpi.jpg")');
+    // A 2K segue como base da regra principal.
+    expect(indexCss).toContain("var(--earth-texture)");
   });
 
   it("a troca de fase e animada, nao um corte", () => {

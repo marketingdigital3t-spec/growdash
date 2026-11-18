@@ -29,8 +29,12 @@ type MetaLead = {
   full_name?: string | null;
   created_time: string;
   raw: Record<string, unknown> | null;
-  /** Respostas do questionário do formulário nativo, já extraídas. */
-  form_answers?: Record<string, string> | null;
+  /** Respostas do questionário do formulário nativo, extraídas do field_data. */
+  lead_situacao_profissional?: string | null;
+  lead_especialidade?: string | null;
+  lead_faturamento?: string | null;
+  lead_urgencia?: string | null;
+  lead_objetivo?: string | null;
 };
 
 type RdDeal = {
@@ -68,6 +72,7 @@ type TrackingResult = {
   reason?: string;
   note?: "written" | "skipped";
   custom_fields?: "written" | "skipped";
+  form_answer_unmapped?: string[];
   verified?: boolean;
   error?: string;
 };
@@ -389,6 +394,7 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
     });
     result.note = noteWrite.skipped ? "skipped" : "written";
 
+    // 1. Custom fields de rastreamento (campanha/conjunto/anúncio/formulário/plataforma/posicionamento)
     if (patchedFields) {
       const fieldCorrelation = await stableUuid(`meta-rd-fields:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
       const fieldWrite = await executeRDWrite({
@@ -408,7 +414,46 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
       result.custom_fields = fieldWrite.skipped ? "skipped" : "written";
     }
 
-    result.verified = await providerDealReadback(String(connection.api_token), deal.rd_deal_id, patchedFields, deadlineAt);
+    // 2. Respostas do questionário do formulário nativo (situação profissional, especialidade,
+    //    faturamento, urgência, objetivo). Só escreve se houver resposta preenchida e um campo
+    //    customizado do RD mapeado via rd_field_configs.
+    const formAnswers: Record<string, string> = {};
+    for (const key of ["lead_situacao_profissional", "lead_especialidade", "lead_faturamento", "lead_urgencia", "lead_objetivo"]) {
+      const value = clean(lead[key]);
+      if (value) formAnswers[key] = value;
+    }
+    let formAnswerWriteSkipped = false;
+    if (Object.keys(formAnswers).length) {
+      const formCorrelation = await stableUuid(`meta-rd-form-answers:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
+      const formPatch = formAnswerFieldPatch(deal.raw, configs || [], formAnswers);
+      if (formPatch.fields) {
+        const formFieldWrite = await executeRDWrite({
+          admin,
+          userId: connection.user_id,
+          connectionId: connection.id,
+          action: "update_deal",
+          target: { rd_deal_id: deal.rd_deal_id, meta_lead_id: lead.meta_lead_id },
+          before: { deal_custom_fields: deal.raw?.deal_custom_fields || [] },
+          after: { deal_custom_fields: formPatch.fields, fingerprint },
+          correlationId: formCorrelation,
+          method: "PUT",
+          path: `/deals/${encodeURIComponent(deal.rd_deal_id)}`,
+          body: { deal: { deal_custom_fields: formPatch.fields } },
+          deadlineAt,
+        });
+        formAnswerWriteSkipped = formFieldWrite.skipped;
+        if (!formFieldWrite.skipped && formPatch.fields !== patchedFields) {
+          // Se o rastreamento já escreveu, o form patch deve ser aplicado sobre o resultado do rastreamento,
+          // não sobre o campo original. A leitura abaixo é best-effort: se não houver patchedFields,
+          // o formWrite já escreveu sozinho.
+          result.custom_fields = result.custom_fields || "written";
+        }
+      }
+      result.form_answer_unmapped = formPatch.unmapped;
+    }
+
+    const fieldsForReadback = formPatch?.fields ?? patchedFields;
+    result.verified = await providerDealReadback(String(connection.api_token), deal.rd_deal_id, fieldsForReadback, deadlineAt);
     if (!result.verified) {
       result.status = "failed";
       result.error = "RD readback did not confirm the tracking update";
@@ -422,7 +467,7 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
 async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLead | null> {
   const { data, error } = await admin
     .from("meta_leads")
-    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw")
+    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw,lead_situacao_profissional,lead_especialidade,lead_faturamento,lead_urgencia,lead_objetivo")
     .eq("meta_lead_id", metaLeadId)
     .maybeSingle();
   if (error) throw error;

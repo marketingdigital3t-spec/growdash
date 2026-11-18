@@ -12000,6 +12000,13 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 .campaigns-workspace .campaign-app-header {
   gap: 12px !important;
   padding-inline: 16px !important;
+  /* O header pode quebrar em duas linhas quando os controles nao cabem.
+     Com altura travada e `shrink-0` nos filhos, os botoes da direita
+     transbordavam para fora da tela e ficavam inalcancaveis. */
+  height: auto !important;
+  min-height: 56px !important;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 .campaigns-workspace :is(.campaign-account-pill, .campaign-opportunity-pill, .campaign-date-pill, .campaign-header-icon, .campaign-publish-button, .campaign-action-button, .campaign-action-select, .campaign-columns-control > button) {
