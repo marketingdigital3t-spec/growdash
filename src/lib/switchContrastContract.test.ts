@@ -18,7 +18,7 @@ describe("contraste do switch (toggle) nos dois modos de tema", () => {
   it("não usa a cor do fundo para a bolinha", () => {
     // `--background` é quase preto no modo escuro: com ele, a bolinha some
     // sobre o trilho e o estado do controle fica ilegível.
-    expect(switchSource).toContain("bg-[hsl(var(--switch-thumb))]");
+    expect(switchSource).toContain("bg-[var(--switch-thumb)]");
     expect(switchSource).not.toContain("bg-background");
   });
 
@@ -36,8 +36,10 @@ describe("contraste do switch (toggle) nos dois modos de tema", () => {
 
     // Branco puro nos dois: é a única cor que contrasta com o trilho tanto
     // no verde-claro do modo claro quanto no cinza-azulado do modo escuro.
-    expect(light).toBe("0 0% 100%");
-    expect(dark).toBe("0 0% 100%");
+    // Hex completo: o shorthand `background` recusa HSL sem tipo de cor e
+    // zera a propriedade, deixando a bolinha invisível.
+    expect(light).toBe("#FFFFFF");
+    expect(dark).toBe("#FFFFFF");
   });
 
   it("não força mais uma bolinha preta nos switches do modo escuro", () => {

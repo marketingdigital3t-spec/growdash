@@ -143,8 +143,10 @@ html:not(.dark) {
   --ring: 161 94% 30%;
   --radius: 0.875rem;
   /* Bolinha do switch (toggle). No claro ela é branca sobre o trilho verde;
-     no escuro precisa ser clara sobre o trilho escuro, senão some. */
-  --switch-thumb: 0 0% 100%;
+     no escuro precisa ser clara sobre o trilho escuro, senão some.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
 
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 160 41% 12%;
@@ -239,8 +241,10 @@ html.dark {
   --ring: 199 89% 58%;
   --radius: 0.875rem;
   /* Bolinha do switch no escuro: um branco puro sobre o trilho escuro. Com
-     `--background` (quase preto) a bolinha some e não dá para ler o estado. */
-  --switch-thumb: 0 0% 100%;
+     `--background` (quase preto) a bolinha some e não dá para ler o estado.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
 
   --sidebar-background: 222 40% 4%;
   --sidebar-foreground: 215 20% 85%;
