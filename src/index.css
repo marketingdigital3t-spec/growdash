@@ -15977,9 +15977,13 @@ html[data-space-phase="terra"],
   /* A arte cobre a viewport inteira: nenhuma faixa preta nas laterais.
      Em janelas 16:9 a arte é mais alta que a tela e o crop central cortaria
      o topo da nave. O deslocamento vertical mantém a nave e a frase da
-     missão sempre visíveis juntas. */
+     missão sempre visíveis juntas.
+
+     O deslocamentoempurra a arte para baixo: em tela cheia a nave ficava
+     colada no topo, com a base e a frase da missão espremidas no rodapé.
+     38% sobe a composição no quadro e devolve respiro ao topo. */
   background-size: cover;
-  background-position: center 44%;
+  background-position: center 38%;
   background-repeat: no-repeat;
   perspective: 1200px;
   padding: 0;
@@ -16162,7 +16166,11 @@ html[data-space-phase="terra"],
 @media (min-width: 981px) {
   .auth-cosmic-right-panel {
     position: absolute;
-    top: 20.3%;
+    /* O card fica centralizado na vertical da tela. Com `top` fixo em
+       porcentagem o login acompanhava a altura do card artificialmente e
+       subia ou descia conforme a resolução. */
+    top: 50%;
+    transform: translateY(-50%);
     left: 63.7%;
     width: 26.7%;
   }

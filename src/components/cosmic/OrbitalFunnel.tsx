@@ -146,40 +146,40 @@ export function OrbitalFunnel({
         </div>
       </div>
 
-      {/* Grade de 4 metricas de suporte abaixo do funil */}
-      <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 border-t border-card-border/60 pt-4">
-        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-3">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-            <TrendingUp className="h-3 w-3 text-primary-neon" /> Taxa conv. total
+      {/* Grade de 4 metricas de suporte abaixo do funil — sempre em uma linha */}
+      <div className="mt-4 grid grid-cols-4 gap-2.5 sm:gap-3 border-t border-card-border/60 pt-4">
+        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-2.5 sm:p-3">
+          <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted sm:text-[10px]">
+            <TrendingUp className="h-3 w-3 shrink-0 text-primary-neon" /> <span className="truncate">Taxa conv. total</span>
           </span>
-          <b className="font-display mt-1 block text-sm font-bold text-text-primary tabular-nums sm:text-base">
+          <b className="font-display mt-1 block text-xs font-bold text-text-primary tabular-nums sm:text-base">
             {totalConversionRate.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}%
           </b>
         </div>
 
-        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-3">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-            <Clock className="h-3 w-3 text-primary-soft" /> Ciclo médio
+        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-2.5 sm:p-3">
+          <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted sm:text-[10px]">
+            <Clock className="h-3 w-3 shrink-0 text-primary-soft" /> <span className="truncate">Ciclo médio</span>
           </span>
-          <b className="font-display mt-1 block text-sm font-bold text-text-primary tabular-nums sm:text-base">
+          <b className="font-display mt-1 block text-xs font-bold text-text-primary tabular-nums sm:text-base">
             {averageCycleDays} dias
           </b>
         </div>
 
-        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-3">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-            <DollarSign className="h-3 w-3 text-primary-neon" /> Ticket médio
+        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-2.5 sm:p-3">
+          <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted sm:text-[10px]">
+            <DollarSign className="h-3 w-3 shrink-0 text-primary-neon" /> <span className="truncate">Ticket médio</span>
           </span>
-          <b className="font-display mt-1 block text-sm font-bold text-text-primary tabular-nums sm:text-base">
+          <b className="font-display mt-1 block text-xs font-bold text-text-primary tabular-nums sm:text-base">
             {formatCurrency(averageTicket)}
           </b>
         </div>
 
-        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-3">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-            <Sparkles className="h-3 w-3 text-primary-neon" /> Faturamento mês
+        <div className="rounded-xl border border-card-border/70 bg-bg-elevated/60 p-2.5 sm:p-3">
+          <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted sm:text-[10px]">
+            <Sparkles className="h-3 w-3 shrink-0 text-primary-neon" /> <span className="truncate">Faturamento mês</span>
           </span>
-          <b className="font-display mt-1 block text-sm font-bold text-text-primary tabular-nums sm:text-base">
+          <b className="font-display mt-1 block text-xs font-bold text-text-primary tabular-nums sm:text-base">
             {formatCurrency(monthlyRevenue)}
           </b>
         </div>

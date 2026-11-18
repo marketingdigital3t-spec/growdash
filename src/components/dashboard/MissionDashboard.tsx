@@ -182,7 +182,21 @@ const safeMetrics = {
 
         {/* Radar de Anomalias em 1/3 da largura (4 colunas) */}
         <div className="lg:col-span-4">
-          <AnomalyRadar />
+          <AnomalyRadar
+            metrics={{
+              spend: safeMetrics.spend,
+              leads: safeMetrics.leads,
+              cpl: safeMetrics.cpl,
+              sales: safeMetrics.sales,
+              revenue: safeMetrics.revenue,
+              impressions: visitors,
+              clicks,
+              opportunities,
+              spendChange: safeMetrics.spendChange,
+              leadsChange: safeMetrics.leadsChange,
+              cplChange: safeMetrics.cplChange,
+            }}
+          />
         </div>
       </div>
     </div>
