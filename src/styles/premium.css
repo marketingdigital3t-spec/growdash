@@ -288,7 +288,9 @@ html.dark {
   --gd-content-surface: var(--surface-card);
   --gd-content-panel: var(--surface-raised);
   --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --gd-control-active-thumb: #05070C;
+  /* Bolinha de controle ativo: branca no escuro. Uma bolinha preta sumia
+     sobre o trilho escuro e o estado do toggle ficava ilegível. */
+  --gd-control-active-thumb: #FFFFFF;
 
   --gd-status-critical: #F87171;
   --gd-status-attention: #FBBF24;
@@ -889,7 +891,7 @@ html.gd-premium .brand-shell {
   --gd-border-subtle: var(--border-subtle) !important;
   --gd-content-border: var(--border-subtle) !important;
   --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-  --gd-control-active-thumb: #05070C !important;
+  --gd-control-active-thumb: #FFFFFF !important;
 }
 
 html.gd-premium:not(.dark) .brand-shell {

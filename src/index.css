@@ -13878,12 +13878,20 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   color: hsl(var(--primary)) !important;
 }
 
-/* Active status switches use a black thumb in dark mode, including the
-   Meta-style campaign table switch and Radix switches used in settings. */
-html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] > span,
+/* Active status switches keep a thumb that contrasts with the track, both in
+   dark mode and in light mode. A black thumb on the dark track disappeared
+   completely, so the control looked off even when it was on. The Meta-style
+   campaign row toggle used a light track and still needs the dark thumb, so
+   it keeps its own rule below. */
 html.dark .brand-shell [role="switch"][data-state="checked"] > span,
 html.dark .brand-shell button[data-state="checked"] > span {
-  background: var(--gd-control-active-thumb) !important;
+  background: var(--switch-thumb) !important;
+}
+
+/* The campaign row toggle paints its own light track in dark mode, so its
+   thumb stays dark to remain visible against that track. */
+html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] > span {
+  background: #090909 !important;
 }
 
 html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] {
