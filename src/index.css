@@ -2105,7 +2105,7 @@ html:not(.dark) .commercial-ranking-shell option {
   color: var(--campaign-text) !important;
 }
 .campaigns-workspace .campaign-manager-top { background: var(--campaign-surface) !important; border-color: var(--campaign-border) !important; }
-.campaigns-workspace .campaign-app-header { height: 56px; background: #fff; }
+.campaigns-workspace .campaign-app-header { height: auto; min-height: 56px; flex-wrap: wrap; row-gap: 8px; background: #fff; }
 .campaigns-workspace .campaign-app-logo { object-fit: contain; }
 .campaigns-workspace .campaign-app-title { color: var(--campaign-text) !important; }
 .campaigns-workspace .campaign-opportunity-pill { color: var(--campaign-text); background: #fff; }
@@ -11444,7 +11444,7 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 .campaigns-workspace .campaign-filters-row,
 .campaigns-workspace .campaign-tabs-header,
 .campaigns-workspace .campaign-actions-toolbar { background: #fff !important; }
-.campaigns-workspace .campaign-app-header { height: 56px !important; min-height: 56px !important; }
+.campaigns-workspace .campaign-app-header { height: auto !important; min-height: 56px !important; flex-wrap: wrap; row-gap: 8px; }
 .campaigns-workspace .campaign-table-frame { margin: 24px !important; border: 1px solid #e4e7ec !important; border-radius: 8px !important; background: #fff !important; }
 .campaigns-workspace .campaign-metric-header > th { height: 40px !important; padding-inline: 12px !important; background: #f7f8fa !important; color: #606770 !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
 .campaigns-workspace [data-campaign-table-scroll] tbody tr { height: 52px !important; background: #fff !important; }
@@ -13166,8 +13166,10 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   }
 
   .campaigns-workspace .campaign-app-header {
-    height: 56px !important;
+    height: auto !important;
     min-height: 56px !important;
+    flex-wrap: wrap;
+    row-gap: 8px;
     padding-inline: 16px !important;
     border-bottom: 1px solid #eef1f4 !important;
   }
