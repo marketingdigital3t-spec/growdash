@@ -311,12 +311,14 @@ function RDConnectionFunnelsBlock({
   connectionId,
   accountName,
   funnels,
+  totalFunnels,
   activePipelineIds,
   adAccounts = [],
 }: {
   connectionId: string;
   accountName: string;
   funnels: RDFunnel[];
+  totalFunnels: number;
   activePipelineIds: Set<string>;
   adAccounts?: Array<{ id: string; name: string; account_id?: string | null }>;
 }) {
@@ -324,7 +326,7 @@ function RDConnectionFunnelsBlock({
   const { data: pipelines = [], isLoading, error } = useRDApiFunnels(true, connectionId);
   const importFunnels = useImportRDFunnels();
   const { toast } = useToast();
-  const importedCount = funnels.length;
+  const importedCount = totalFunnels;
   return <div className="rounded-lg border p-3 space-y-3">
     <div className="flex items-center justify-between gap-2 flex-wrap">
       <div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">{importedCount} funil(is) carregado(s) · vincule cada um à conta de anúncio correspondente</p></div>
@@ -408,11 +410,12 @@ export function RDFunnelsSection() {
             ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p>
             : connections.map((connection) => {
                 const connectionFunnels = filteredFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
+                const totalForConnection = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id).length;
                 // Durante a busca só interessam os blocos com correspondência.
                 // Sem busca, todos os blocos continuam visíveis — é neles que
                 // ficam os botões de carregar e adicionar funil.
                 if (isSearching && !connectionFunnels.length) return null;
-                return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />;
+                return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} totalFunnels={totalForConnection} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />;
               })}
         {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} activePipelineIds={activePipelineIds} adAccounts={adAccounts} />}
       </CardContent>

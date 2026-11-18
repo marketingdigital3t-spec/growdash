@@ -134,4 +134,18 @@ describe("RDFunnelsSection — busca de funis", () => {
       expect(screen.getByText("Nenhum funil corresponde à busca.")).toBeTruthy();
     });
   });
+
+  it("mantém o total de funis da conexão durante a busca", async () => {
+    renderSection();
+
+    // O cabeçalho do bloco informa quantos funis a conexão tem, não quantos
+    // restaram visíveis: a busca não pode reescrever o inventário.
+    expect(screen.getByText("3 funil(is) carregado(s) · vincule cada um à conta de anúncio correspondente")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Buscar funil"), { target: { value: "palazzo" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("3 funil(is) carregado(s) · vincule cada um à conta de anúncio correspondente")).toBeTruthy();
+    });
+  });
 });
