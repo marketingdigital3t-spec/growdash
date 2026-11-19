@@ -781,7 +781,18 @@ Deno.serve(async (req) => {
       }).in("id", staleIds).eq("status", "running");
     }
     const activeRun = (runningRows || []).find((row: any) => !staleIds.includes(row.id));
-    if (activeRun) {
+    // Um run marcado como running há mais de 2 minutos é considerado abandonado:
+    // o gateway pode tê-lo encerrado sem atualizar o banco, ou o navegador do
+    // usuário pode ter fechado antes da resposta. Libera o funil para uma nova
+    // sincronização em vez de bloquear indefinidamente com HTTP 409.
+    const staleRunBefore = new Date(Date.now() - 2 * 60_000).toISOString();
+    if (activeRun && String(activeRun.started_at || "") < staleRunBefore) {
+      await admin.from("sync_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_message: "run órfão encerrado antes de uma nova sincronização",
+      }).eq("id", activeRun.id).eq("status", "running");
+    } else if (activeRun) {
       return new Response(JSON.stringify({
         ok: false,
         status: "already_running",
