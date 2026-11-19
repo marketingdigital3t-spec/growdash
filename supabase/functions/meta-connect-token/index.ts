@@ -78,11 +78,25 @@ Deno.serve(async (req) => {
       return json({ error: "A Meta devolveu uma conta diferente do ID informado." }, 400);
     }
 
+    // Resolve o workspace ativo do usuário para evitar escrita cross-tenant:
+    // a assinatura Meta→workspace deve ser feita com workspace_id, não apenas user_id.
+    // Call sites: src/components/settings/MetaManualConnectionCard.tsx invoca esta Edge Function.
+    // Schemas lidos: workspace_members(workspace_id, user_id, active); ad_accounts(workspace_id, account_id, ...).
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: membership, error: membershipError } = await admin
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+    if (!membership) return json({ error: "Usuário não pertence a nenhum workspace ativo." }, 403);
+    const workspaceId = membership.workspace_id;
+
     const { data: existingRows, error: existingError } = await admin
       .from("ad_accounts")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("workspace_id", workspaceId)
       .in("account_id", [accountId, numericAccountId])
       .order("updated_at", { ascending: false });
     if (existingError) throw existingError;

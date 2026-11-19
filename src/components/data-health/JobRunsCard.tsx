@@ -39,7 +39,7 @@ export function JobRunsCard() {
   const runNow = async () => {
     setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("daily-reconciliation", { body: {} });
+      const { data, error } = await supabase.functions.invoke("trigger-rd-sync", { body: {} });
       if (error) throw error;
       toast({ title: "Reconciliação iniciada", description: "Resultados aparecerão abaixo em instantes." });
       setTimeout(() => refetch(), 2000);

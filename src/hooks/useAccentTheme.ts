@@ -94,7 +94,24 @@ export function useAccentTheme() {
   });
 
   useEffect(() => {
-    applyAccent(accent);
+    // A paleta é derivada do faturamento real (PhaseProvider escreve
+    // `data-phase`). O localStorage guarda apenas uma preferência manual
+    // explícita; sem ela, nunca sobrescreve a fase calculada — antes isso
+    // travava a plataforma em "terra" mesmo acima de R$ 50 mil.
+    const hasManualPreference = (() => {
+      try {
+        const saved = window.localStorage.getItem(PLATFORM_THEME_STORAGE_KEY);
+        return saved === "orbita" || saved === "galaxia" || saved === "terra";
+      } catch {
+        return false;
+      }
+    })();
+    if (hasManualPreference) {
+      applyAccent(accent);
+      return;
+    }
+    // Sem preferência manual: respeita a fase do faturamento.
+    applyAccent(undefined);
   }, [accent]);
 
   // Mirror next-themes' mode onto the document and keep local state in sync

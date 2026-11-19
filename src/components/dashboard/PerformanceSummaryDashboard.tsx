@@ -12,8 +12,9 @@ import {
   Filter,
   Coins,
 } from "lucide-react";
+import { CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react";
 import { formatCurrency, formatInteger } from "@/lib/format/formatPtBr";
-import { normalizedStageName } from "@/lib/crmPipelineStages";
+import { bucketRDStage, RDStageBucket } from "@/lib/rdStageBuckets";
 
 export interface PerformanceSummaryDashboardProps {
   accountTitle?: string;
@@ -30,6 +31,8 @@ export interface PerformanceSummaryDashboardProps {
   className?: string;
   onSyncRD?: () => void;
   syncingRD?: boolean;
+  rdSyncStatus?: "idle" | "success" | "partial" | "error";
+  rdSyncSummary?: { deals?: number; created?: number; updated?: number; error?: string } | null;
 }
 
 type PipelineStage = {
@@ -40,33 +43,58 @@ type PipelineStage = {
   className: string;
 };
 
+const STAGE_CONFIG: Record<RDStageBucket, { Icon: typeof UserPlus; className: string }> = {
+  "novo-lead": { Icon: UserPlus, className: "bg-[#0b2344] border-sky-500/35" },
+  "sem-conversa": { Icon: MessageSquareText, className: "bg-[#0d2d55] border-sky-500/40" },
+  conversa: { Icon: MessageCircle, className: "bg-[#103c70] border-sky-400/45" },
+  oportunidade: { Icon: Handshake, className: "bg-[#154e82] border-cyan-400/50" },
+  vendas: { Icon: ShoppingCart, className: "bg-[#185c91] border-cyan-300/55" },
+  perdidas: { Icon: XCircle, className: "bg-[#203b5d] border-slate-400/35" },
+  "etapa-propria": { Icon: Filter, className: "bg-[#2a4a6e] border-emerald-500/35" },
+};
+
+const BUCKET_LABELS: Record<RDStageBucket, string> = {
+  "novo-lead": "Novo Lead",
+  "sem-conversa": "Sem Conversa",
+  conversa: "Conversa",
+  oportunidade: "Oportunidade",
+  vendas: "Vendas",
+  perdidas: "Perdidas",
+  "etapa-propria": "Etapa própria",
+};
+
+const ORDER: RDStageBucket[] = [
+  "novo-lead",
+  "sem-conversa",
+  "conversa",
+  "oportunidade",
+  "vendas",
+  "perdidas",
+  "etapa-propria",
+];
+
 function getPipelineStages(deals: PerformanceSummaryDashboardProps["deals"], salesCount: number): PipelineStage[] {
-  const counts = { novo: 0, semConversa: 0, conversa: 0, oportunidade: 0, vendas: 0, perdidas: 0 };
+  const counts: Record<string, number> = {};
 
   for (const deal of deals || []) {
-    if (deal.win) {
-      counts.vendas += 1;
-      continue;
-    }
-    const stage = normalizedStageName(deal.rd_stage_name || deal.stage_bucket || "");
-    if (/perdid|lost|desqualif/.test(stage) || deal.lost_reason) counts.perdidas += 1;
-    else if (/oportun/.test(stage)) counts.oportunidade += 1;
-    else if (/sem contato|sem conversa|nao atendeu|no show|sem resposta|tentativa|stand by|espera/.test(stage)) counts.semConversa += 1;
-    else if (/conversa|atendimento|whatsapp/.test(stage) || (stage.includes("contato") && !stage.includes("sem"))) counts.conversa += 1;
-    else if (/\b(lead novo|novo lead|novo|novos|entrada|inici\w*)\b/.test(stage)) counts.novo += 1;
-    else counts.semConversa += 1;
+    const { bucket, label } = bucketRDStage({
+      stageName: deal.rd_stage_name || deal.stage_bucket || "",
+      won: Boolean(deal.win),
+      lost: Boolean(deal.lost_reason),
+    });
+    counts[label] = (counts[label] || 0) + 1;
   }
 
-  if (!deals?.length) counts.vendas = salesCount;
+  if (!deals?.length) {
+    counts[BUCKET_LABELS.vendas] = (counts[BUCKET_LABELS.vendas] || 0) + salesCount;
+  }
 
-  return [
-    { id: "novo", label: "Novo Lead", count: counts.novo, Icon: UserPlus, className: "bg-[#0b2344] border-sky-500/35" },
-    { id: "sem-conversa", label: "Sem Conversa", count: counts.semConversa, Icon: MessageSquareText, className: "bg-[#0d2d55] border-sky-500/40" },
-    { id: "conversa", label: "Conversa", count: counts.conversa, Icon: MessageCircle, className: "bg-[#103c70] border-sky-400/45" },
-    { id: "oportunidade", label: "Oportunidade", count: counts.oportunidade, Icon: Handshake, className: "bg-[#154e82] border-cyan-400/50" },
-    { id: "vendas", label: "Vendas", count: counts.vendas, Icon: ShoppingCart, className: "bg-[#185c91] border-cyan-300/55" },
-    { id: "perdidas", label: "Perdidas", count: counts.perdidas, Icon: XCircle, className: "bg-[#203b5d] border-slate-400/35" },
-  ];
+  return ORDER.map((bucket) => {
+    const label = BUCKET_LABELS[bucket];
+    const count = counts[label] || 0;
+    const config = STAGE_CONFIG[bucket];
+    return { id: bucket, label, count, Icon: config?.Icon ?? UserPlus, className: config?.className ?? "border-primary/20" };
+  });
 }
 
 export function PerformanceSummaryDashboard({
@@ -78,6 +106,8 @@ export function PerformanceSummaryDashboard({
   className = "",
   onSyncRD,
   syncingRD = false,
+  rdSyncStatus = "idle",
+  rdSyncSummary = null,
 }: PerformanceSummaryDashboardProps) {
   const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
   const cac = salesCount > 0 ? totalSpend / salesCount : 0;
@@ -118,6 +148,22 @@ export function PerformanceSummaryDashboard({
               <Coins className={`h-3.5 w-3.5 ${syncingRD ? "animate-spin text-sky-400" : "text-sky-400"}`} />
               {syncingRD ? "Sincronizando RD…" : "Atualizar RD"}
             </button>
+          )}
+          {rdSyncStatus !== "idle" && (
+            <span className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-tighter ${
+              rdSyncStatus === "success"
+                ? "border-emerald-500/35 bg-emerald-950/40 text-emerald-300"
+                : rdSyncStatus === "partial"
+                ? "border-amber-500/35 bg-amber-950/40 text-amber-300"
+                : "border-rose-500/35 bg-rose-950/40 text-rose-300"
+            }`}>
+              {rdSyncStatus === "success" ? <CheckCircle2 className="h-3 w-3" /> : rdSyncStatus === "partial" ? <AlertTriangle className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+              {rdSyncStatus === "success"
+                ? `Sincronizado: ${rdSyncSummary?.deals ?? 0} negócios`
+                : rdSyncStatus === "partial"
+                ? `Sincronização parcial: ${rdSyncSummary?.deals ?? 0} negócios`
+                : `Falha ao sincronizar: ${rdSyncSummary?.error || "erro desconhecido"}`}
+            </span>
           )}
         </header>
 

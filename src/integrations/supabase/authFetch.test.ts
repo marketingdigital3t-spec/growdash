@@ -4,8 +4,8 @@ import { AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS, fetchAuthWithRetry, isPasswordGrantRe
 const response = (status: number) => new Response(null, { status });
 
 describe("Supabase password authentication transport", () => {
-  it("keeps a bounded 30-second window for slow GoTrue verification", () => {
-    expect(AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS).toBe(30_000);
+  it("keeps a bounded 60-second window for slow GoTrue verification", () => {
+    expect(AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS).toBe(60_000);
   });
 
   it("allows the project password verification window to complete", async () => {

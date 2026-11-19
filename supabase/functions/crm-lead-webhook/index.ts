@@ -88,6 +88,10 @@ Deno.serve(async (req) => {
     const tracking = extractCrmLeadTracking(payload);
     const statusCandidate = (nested(payload, ["status", "stage", "deal.stage"]) || "new").toLowerCase();
     const status = ["new", "contacted", "qualified", "opportunity", "won", "lost", "archived"].includes(statusCandidate) ? statusCandidate : "new";
+    // GRO-SEC-003: rejeitar ad_account_id que não pertença ao workspace do endpoint,
+    // evitando que um lead seja gravado em workspace divergente via webhook.
+    // Call sites: esta função é invocada por webhooks externos de CRM.
+    // Schemas: ad_accounts(workspace_id, account_id, id); crm_leads(workspace_id, ...).
     let adAccountId: string | null = null;
     const requestedAccountId = nested(payload, ["ad_account_id"]);
     if (requestedAccountId) {
@@ -95,7 +99,8 @@ Deno.serve(async (req) => {
       const { data: account } = await (String(requestedAccountId).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
         ? accountQuery.eq("id", requestedAccountId)
         : accountQuery.eq("account_id", requestedAccountId)).maybeSingle();
-      adAccountId = account?.id ?? null;
+      if (!account) return json({ error: "Conta de anúncio não encontrada ou não pertence ao workspace deste endpoint." }, 403);
+      adAccountId = account.id;
     }
     const receivedAt = new Date().toISOString();
     const identity = { workspace_id: endpoint.workspace_id, source_provider: sourceProvider, external_id: externalId };

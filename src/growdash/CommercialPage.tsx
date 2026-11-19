@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PageHeading } from "./shared";
 import { CrewRanking } from "@/components/dashboard/CrewRanking";
+import { SellerPerformancePanel } from "@/components/commercial/SellerPerformancePanel";
 import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking, resolveCommercialSaleAttribution, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
 import { getExpertAccountIds, validateSellerAvatarFile, type CommercialExpertAccountLink } from "@/lib/commercialFilters";
 
@@ -277,6 +278,19 @@ export default function CommercialPage() {
           <p className="mt-1 text-sm text-amber-100/80">Não foi possível consultar as vendas deste período. Nenhum zero foi inferido; tente novamente quando a fonte estiver disponível.</p>
         </section>
       ) : <>
+        {/* Painel de performance por vendedor: a primeira coisa que a página
+            mostra. O rank da tripulação fica logo abaixo dele. */}
+        <SellerPerformancePanel
+          sellers={rankedSellers.map((seller) => ({
+            seller: seller.seller,
+            salesCount: seller.count,
+            revenue: seller.revenue,
+            performance: seller.performance,
+          }))}
+          accountTotalRevenue={selectedRevenue}
+          accountTarget={selectedTarget}
+        />
+
         {/* Ranking da Tripulação no formato de missão (ETAPA 7) */}
         <CrewRanking
           members={rankedSellers.map((seller, index) => ({

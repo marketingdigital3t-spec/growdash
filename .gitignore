@@ -57,3 +57,6 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 
 .auth/
 .pnpm-store/
+
+# Scratch de trabalho do superpowers (ledger de planos)
+.superpowers/

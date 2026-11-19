@@ -142,6 +142,11 @@ html:not(.dark) {
   --input: 146 16% 82%;
   --ring: 161 94% 30%;
   --radius: 0.875rem;
+  /* Bolinha do switch (toggle). No claro ela é branca sobre o trilho verde;
+     no escuro precisa ser clara sobre o trilho escuro, senão some.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
 
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 160 41% 12%;
@@ -175,6 +180,10 @@ html:not(.dark) {
 
   --gd-surface-page: var(--bg-canvas);
   --gd-surface-card: var(--surface-card);
+  /* Cor sólida equivalente ao gradiente de `--gd-surface-card`. Usada como
+     `background-color` de fallback para os cards que precisam de uma cor
+     opaca atrás do `backdrop-filter`. */
+  --gd-surface-card-color: var(--surface-card-color, var(--surface-card));
   --gd-surface-raised: var(--surface-raised);
   --gd-surface-control: var(--surface-raised);
   --gd-border: var(--border-subtle);
@@ -231,6 +240,11 @@ html.dark {
   --input: 215 25% 14%;
   --ring: 199 89% 58%;
   --radius: 0.875rem;
+  /* Bolinha do switch no escuro: um branco puro sobre o trilho escuro. Com
+     `--background` (quase preto) a bolinha some e não dá para ler o estado.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
 
   --sidebar-background: 222 40% 4%;
   --sidebar-foreground: 215 20% 85%;
@@ -278,7 +292,9 @@ html.dark {
   --gd-content-surface: var(--surface-card);
   --gd-content-panel: var(--surface-raised);
   --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --gd-control-active-thumb: #05070C;
+  /* Bolinha de controle ativo: branca no escuro. Uma bolinha preta sumia
+     sobre o trilho escuro e o estado do toggle ficava ilegível. */
+  --gd-control-active-thumb: #FFFFFF;
 
   --gd-status-critical: #F87171;
   --gd-status-attention: #FBBF24;
@@ -385,8 +401,14 @@ html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashbo
     .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
   border: 1px solid var(--gd-border) !important;
   border-radius: var(--gd-radius-card) !important;
-  background-color: var(--gd-surface-card) !important;
+  /* `--gd-surface-card` pode ser um gradiente. Aplicá-lo em `background-color`
+     é inválido e o navegador IGNORA a declaração: o card fica sem fundo e o
+     `backdrop-filter` amostra o conteúdo que rola por trás, produzindo o
+     aspecto "lavado claro" durante o scroll. Use `background` (aceita
+     gradiente) e aponte a cor sólida no `background-color`. */
+  background-color: var(--gd-surface-card-color) !important;
   background-image:
+    var(--gd-surface-card),
     linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
     radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.09) 0%, transparent 15rem);
   color: var(--gd-content) !important;
@@ -667,6 +689,11 @@ html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
   color: var(--gd-status-attention) !important;
 }
 
+/* On light surfaces the attention amber is unreadable at 3.19:1. */
+html:not(.dark) .brand-shell :is(.text-amber-500, .text-amber-600, .text-orange-500) {
+  color: var(--gd-attention-readable) !important;
+}
+
 .brand-shell :is(.text-rose-500, .text-red-500, .text-red-600) {
   color: var(--gd-status-critical) !important;
 }
@@ -868,7 +895,7 @@ html.gd-premium .brand-shell {
   --gd-border-subtle: var(--border-subtle) !important;
   --gd-content-border: var(--border-subtle) !important;
   --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-  --gd-control-active-thumb: #05070C !important;
+  --gd-control-active-thumb: #FFFFFF !important;
 }
 
 html.gd-premium:not(.dark) .brand-shell {
@@ -1340,9 +1367,67 @@ html[data-space-phase="galaxia"],
   --card-glow-color: 168, 85, 247 !important;
 }
 
-/* Cards follow the phase instead of the fixed emerald. */
-html.gd-premium.dark .brand-shell[data-space-phase]
+/* Light-theme accent readability (GRO-A11Y-001) ---------------------------
+   The phase accent (for example #00d2ff in Terra) is tuned for the dark
+   reading mode. On light surfaces that same neon drops to roughly 1.45:1
+   against a pale accent chip, far below the WCAG 2.2 AA minimum of 4.5:1 for
+   normal text. Small badges inherit the same rule because they carry the
+   `text-emerald-*` utility.
+
+   The fix keeps the neon where it is legible (dark surfaces) and restores a
+   darkened accent for light surfaces. The contrast is verified by
+   src/lib/contrastPolicy.test.ts. */
+html:not(.dark) .brand-shell {
+  --gd-accent-readable: #0b6a9e;
+  --gd-success-readable: #167a43;
+  /* The attention amber (#f39c12) reaches 3.19:1 on white. The darker
+     variant keeps the semantic meaning and passes WCAG AA. */
+  --gd-attention-readable: #9a5b00;
+}
+
+/* Semantic tones for the funnel KPIs. They are deliberately not Tailwind
+   color utilities: the platform's generic accent selectors capture
+   `text-emerald-*` / `text-red-*` and repaint them with the phase neon, which
+   measures 3.3:1 on light surfaces. These classes keep the semantic meaning
+   and pass WCAG AA in both reading modes. */
+.brand-shell .gd-tone-positive { color: #4ade80; }
+.brand-shell .gd-tone-negative { color: #f87171; }
+
+html:not(.dark) .brand-shell .gd-tone-positive { color: var(--gd-success-readable); }
+html:not(.dark) .brand-shell .gd-tone-negative { color: #b42318; }
+
+/* `text-primary-soft` is not a Tailwind utility, so it never had a color of
+   its own and the elements inherited whatever the parent happened to use.
+   On light surfaces that landed on the pale slate (1.23:1). The token now
+   always resolves to a readable muted value. */
+.brand-shell .text-primary-soft {
+  color: var(--gd-content-muted);
+}
+
+html:not(.dark) .brand-shell
   :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.text-emerald-400, .text-emerald-500, .text-primary, [class*="text-primary"]) {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* `text-emerald-600` is the semantic success color. Its default value
+   (#16a34a) reaches only 3.3:1 on white, so the light theme keeps the
+   darker variant that the rest of the surface already uses. */
+html:not(.dark) .brand-shell .growdash-main .text-emerald-600 {
+  color: var(--gd-success-readable) !important;
+}
+
+/* `text-emerald-700` is not covered by the accent rule above, so it fell
+   back to the shared `--accent-primary` green, which measures 3.3:1 on
+   white. Pin it to the readable success color in the light theme.
+   The `dark:` variant in the same class list re-enabled the neon, so the
+   light-theme rule must come after it. */
+html:not(.dark) .brand-shell .growdash-main :is(.text-emerald-700, .text-emerald-600) {
+  color: var(--gd-success-readable) !important;
+}
+
+/* Cards follow the phase instead of the fixed emerald. */
+html.gd-premium.dark .brand-shell[data-space-phase]  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
   :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
       .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
       .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
@@ -1362,6 +1447,21 @@ html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
 /* The mission fuel bar, KPI cards and radar glow in the phase accent. */
 .brand-shell[data-space-phase] :is(.gd-fuel-fill, .gd-label, .text-primary-neon) {
   color: var(--phase-accent-bright) !important;
+}
+
+/* The phase bright accent is tuned for the dark reading mode. On light
+   surfaces it drops to roughly 1.23:1, so the readable variant takes over.
+   The topbar keeps the neon because it always paints on a dark strip. */
+html:not(.dark) .brand-shell .growdash-main .text-primary-neon {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* SVG map labels inherit the `text-primary` utility through `fill`. On the
+   light theme the phase palette resolves it to the pale slate (1.23:1), so
+   the readable accent takes over wherever the phase forces a fixed color. */
+html:not(.dark) .brand-shell .growdash-main :is(text, tspan).text-primary {
+  fill: var(--gd-accent-readable) !important;
+  color: var(--gd-accent-readable) !important;
 }
 .brand-shell[data-space-phase] .gd-fuel-fill {
   background: linear-gradient(90deg, rgba(var(--phase-accent), 0.55), var(--phase-accent-bright)) !important;

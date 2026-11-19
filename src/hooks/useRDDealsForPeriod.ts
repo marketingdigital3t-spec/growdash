@@ -212,9 +212,22 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         return rows;
       };
       const all = [
-        ...(await fetchRange((query) => query.gte("lead_created_at", rangeStart).lte("lead_created_at", rangeEnd))),
-        ...(await fetchRange((query) => query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd))),
-        ...(await fetchRange((query) => query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd))),
+        ...(await fetchRange((query) => query.eq("win", false).gte("lead_created_at", rangeStart).lte("lead_created_at", rangeEnd))),
+        ...(await fetchRange((query) => query.eq("win", true).gte("closed_at", rangeStart).lte("closed_at", rangeEnd))),
+        // A terceira query cobre apenas as negociações que a primeira não
+        // trouxe: as criadas ANTES do período que tiveram movimentação de
+        // etapa dentro dele. Sem essa exclusão, todo negócio aberto criado
+        // dentro do período volta duas vezes (pelo lead_created_at e pelo
+        // stage_updated_at) e o pipeline do CRM conta negociações que não
+        // existem no RD Station.
+        ...(await fetchRange((query) =>
+          query
+            .eq("win", false)
+            .is("closed_at", null)
+            .lt("lead_created_at", rangeStart)
+            .gte("stage_updated_at", rangeStart)
+            .lte("stage_updated_at", rangeEnd),
+        )),
       ];
       const scoped = all.filter((deal) => isRDDealInScopePeriod(deal, {
         accountIds: [],

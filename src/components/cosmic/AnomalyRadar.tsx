@@ -1,57 +1,22 @@
 import { NavLink } from "react-router-dom";
-import { ChevronRight, Info, Radar, ShieldAlert, Sparkles } from "lucide-react";
+import { ChevronRight, Info, Radar } from "lucide-react";
+import {
+  deriveMissionAnomalies,
+  type MissionAnomaly,
+  type MissionAnomalyInput,
+  type MissionAnomalySeverity,
+} from "@/lib/missionAnomalies";
 
-export type AnomalySeverity = "alta" | "media" | "ok";
-
-export interface AnomalyItem {
-  id: string;
-  title: string;
-  context: string;
-  metric: string;
-  severity: AnomalySeverity;
-  /** Posição relativa no radar para plotar o blip: x(-1 a 1), y(-1 a 1) */
-  blip?: { x: number; y: number };
-}
+export type AnomalySeverity = MissionAnomalySeverity;
+export type AnomalyItem = MissionAnomaly;
 
 interface AnomalyRadarProps {
+  /** Métricas reais da missão. Sem elas, o radar deriva um estado neutro. */
+  metrics?: MissionAnomalyInput;
   items?: AnomalyItem[];
   lastUpdatedText?: string;
   className?: string;
 }
-
-const DEFAULT_ANOMALIES: AnomalyItem[] = [
-  {
-    id: "1",
-    title: "CPL acima do esperado",
-    context: "Campanha: Black Premium",
-    metric: "CPL atual: R$ 38,45",
-    severity: "alta",
-    blip: { x: 0.45, y: -0.38 },
-  },
-  {
-    id: "2",
-    title: "Queda de conversão",
-    context: "Etapa: Página de Vendas",
-    metric: "Taxa atual: 7,11%",
-    severity: "media",
-    blip: { x: -0.52, y: 0.22 },
-  },
-  {
-    id: "3",
-    title: "Gasto acelerado",
-    context: "Campanha: Lançamento 6.0",
-    metric: "Gasto hoje: R$ 12.450",
-    severity: "media",
-    blip: { x: 0.28, y: 0.58 },
-  },
-  {
-    id: "4",
-    title: "Tudo sob controle",
-    context: "Monitoramento geral estável",
-    metric: "Sem anomalias críticas",
-    severity: "ok",
-  },
-];
 
 const SEVERITY_CONFIG: Record<
   AnomalySeverity,
@@ -89,12 +54,18 @@ const SEVERITY_CONFIG: Record<
  * - Blips piscantes nas posicoes correspondentes aos alertas
  * - Lista de anomalias com pills de severidade (ALTA / MEDIA / OK)
  * - Link de acesso rapido "VER TODOS OS ALERTAS >"
+ *
+ * Os alertas sao derivados das metricas reais recebidas em `metrics`. Nao
+ * existe mais uma lista fixa de campanhas e valores: quando o dado nao
+ * sustenta um desvio, o radar informa o estado real do funil.
  */
 export function AnomalyRadar({
-  items = DEFAULT_ANOMALIES,
+  metrics,
+  items,
   lastUpdatedText = "ATUALIZADO AGORA",
   className = "",
 }: AnomalyRadarProps) {
+  const anomalies = items ?? deriveMissionAnomalies(metrics ?? {});
   return (
     <section
       aria-labelledby="anomaly-radar-title"
@@ -154,7 +125,7 @@ export function AnomalyRadar({
           />
 
           {/* Blips das anomalias plotados nas coordenadas */}
-          {items
+          {anomalies
             .filter((item) => item.blip)
             .map((item) => {
               const config = SEVERITY_CONFIG[item.severity];
@@ -176,7 +147,7 @@ export function AnomalyRadar({
 
       {/* Lista de alertas com pills de severidade */}
       <div className="space-y-2 border-t border-card-border/60 pt-3">
-        {items.map((item) => {
+        {anomalies.map((item) => {
           const config = SEVERITY_CONFIG[item.severity];
           return (
             <div

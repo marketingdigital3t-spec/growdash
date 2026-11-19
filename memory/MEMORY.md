@@ -1,0 +1,4 @@
+- [master-prompt-integracao-rd-crm](master-prompt-integracao-rd-crm.md) — Prompt mestre para correção completa das integrações Meta Ads e RD Station CRM na Growdash.
+- [plano-ataque-auditoria-growdash](plano-ataque-auditoria-growdash.md) — Plano de ataque detalhado: 10 ataques sequenciais para corrigir todos os problemas da auditoria ao vivo de growdash.com.br.
+- [master-prompt-correcao-final-growdash](master-prompt-correcao-final-growdash.md) — Prompt mestre final: 10 itens restantes (jobs, sync RD, bundles, LP config, claims, observabilidade), com diagnóstico, ações, testes e aceite de cada um. SUPERSDEDIDO por master-prompt-auditoria-completa-growdash.
+- [master-prompt-auditoria-completa-growdash](master-prompt-auditoria-completa-growdash.md) — Prompt mestre unificado: 10 itens originais + 3 itens adicionais (funis RD, Instagram expirado, reconciliação Meta↔RD), com diagnóstico, ações, testes e aceite de cada um.

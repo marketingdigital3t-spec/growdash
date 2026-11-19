@@ -40,6 +40,7 @@ import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
+import { dealBelongsToBoardPeriod, isTerminalBoardDeal } from "@/lib/crmBoardDateScope";
 import { useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -591,8 +592,31 @@ export default function CrmPage() {
     createdAt: advancedFilters.createdAt ?? calendarPeriod,
   }), [advancedFilters, calendarPeriod]);
   const deals = useMemo(() => {
-    const scoped = filterDealsByAdvancedCriteria(dealsInPipeline, boardScopeFilters);
-    return scoped.filter((deal) => {
+    // O recorte de data do pipeline segue o RD Station: negócios terminais
+    // (Venda Realizada e Perdido) pertencem ao período pela data de
+    // fechamento; os em aberto, pela data de criação. Aplicar o filtro de
+    // criação a todas as colunas escondia vendas fechadas no período mas
+    // criadas antes dele.
+    const scoped = filterDealsByAdvancedCriteria(dealsInPipeline, {
+      ...boardScopeFilters,
+      createdAt: null,
+    });
+    const periodScoped = preset === "max"
+      ? scoped
+      : scoped.filter((deal) => dealBelongsToBoardPeriod(deal, startDate, endDate));
+    const createdScoped = boardScopeFilters.createdAt
+      ? periodScoped.filter((deal) => {
+          if (isTerminalBoardDeal(deal)) return true;
+          const created = deal.lead_created_at;
+          if (!created) return false;
+          const day = created.slice(0, 10);
+          const filter = boardScopeFilters.createdAt!;
+          if (filter.start && day < filter.start) return false;
+          if (filter.end && day > filter.end) return false;
+          return true;
+        })
+      : periodScoped;
+    return createdScoped.filter((deal) => {
       const bucket = classifyLead(deal);
       if (status === "open" && !["open", "qualified"].includes(bucket)) return false;
       if (status === "won" && bucket !== "won") return false;
@@ -612,7 +636,7 @@ export default function CrmPage() {
         deal.lead_state,
       ].filter(Boolean).join(" ")).includes(normalizedQuery);
     });
-  }, [boardScopeFilters, dealsInPipeline, normalizedQuery, owner, status]);
+  }, [boardScopeFilters, dealsInPipeline, endDate, normalizedQuery, owner, preset, startDate, status]);
 
   const stats = useMemo(() => {
     // KPIs describe the selected account/date scope, never a transient board

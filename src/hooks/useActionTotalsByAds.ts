@@ -307,7 +307,9 @@ export function useActionTotalsByAds(
     staleTime: 60_000,
     gcTime: 15 * 60_000,
     placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : persistedSnapshot,
-    refetchInterval: 60_000,
+    // Sem polling de 60s: as ações do provider acompanham o ciclo de 15
+    // minutos ou o clique explícito em "Atualizar".
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
     refetchOnWindowFocus: false,

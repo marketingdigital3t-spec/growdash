@@ -2105,7 +2105,7 @@ html:not(.dark) .commercial-ranking-shell option {
   color: var(--campaign-text) !important;
 }
 .campaigns-workspace .campaign-manager-top { background: var(--campaign-surface) !important; border-color: var(--campaign-border) !important; }
-.campaigns-workspace .campaign-app-header { height: 56px; background: #fff; }
+.campaigns-workspace .campaign-app-header { height: auto; min-height: 56px; flex-wrap: wrap; row-gap: 8px; background: #fff; }
 .campaigns-workspace .campaign-app-logo { object-fit: contain; }
 .campaigns-workspace .campaign-app-title { color: var(--campaign-text) !important; }
 .campaigns-workspace .campaign-opportunity-pill { color: var(--campaign-text); background: #fff; }
@@ -2485,16 +2485,104 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 }
 
 /* Spatial phase shell: decorative only, keeping all content and controls above it. */
-.space-phase-bg { --phase-color: #2e86de; --phase-glow: rgba(0,212,255,.18); position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #050505; opacity: .92; transition: background-color .8s ease; }
+/* --- Transicao de fase ---------------------------------------------------
+   Registrar a cor como `@property` e o que faz o CSS conseguir interpolar
+   entre a cor da Terra, da Orbita e da Galaxia. Sem isso a troca de fase e
+   um corte seco: a plataforma muda de identidade sem mostrar a viagem.
+
+   A transicao dura 1.4s e roda em tres eixos ao mesmo tempo: a cor da
+   paleta, a nebulosa ao fundo e a geometria do planeta/anel/galaxia. */
+@property --phase-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e86de;
+}
+
+@property --phase-glow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 212, 255, 0.18);
+}
+
+.space-phase-bg {
+  --phase-color: #2e86de;
+  --phase-glow: rgba(0,212,255,.18);
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #050505;
+  opacity: .92;
+  transition:
+    background-color .8s ease,
+    --phase-color 1.4s cubic-bezier(.22, 1, .36, 1),
+    --phase-glow 1.4s cubic-bezier(.22, 1, .36, 1);
+}
 .space-phase-bg[data-phase="orbita"] { --phase-color: #ffc107; --phase-glow: rgba(255,193,7,.2); }
 .space-phase-bg[data-phase="galaxia"] { --phase-color: #a855f7; --phase-glow: rgba(142,68,173,.24); }
+
+/* A nebulosa entra com desfoque e dissolve: e o "flash" da virada de fase. */
+.space-phase-nebula {
+  transition:
+    opacity 1.4s cubic-bezier(.22, 1, .36, 1),
+    filter 1.4s cubic-bezier(.22, 1, .36, 1),
+    background 1.4s cubic-bezier(.22, 1, .36, 1);
+}
+
+/* A geometria do ceu e a unica coisa que conta a historia da fase:
+   Terra (planeta) -> Orbita (anel girando) -> Galaxia (expansao radial). */
+.space-phase-planet,
+.space-phase-orbit-map,
+.space-phase-rings {
+  transition:
+    transform 1.4s cubic-bezier(.22, 1, .36, 1),
+    opacity 1.4s cubic-bezier(.22, 1, .36, 1),
+    border-color 1.4s cubic-bezier(.22, 1, .36, 1);
+}
 .space-phase-nebula { position: absolute; inset: -20%; background: radial-gradient(ellipse at 22% 50%, var(--phase-glow), transparent 36%), radial-gradient(ellipse at 80% 18%, color-mix(in srgb, var(--phase-color) 16%, transparent), transparent 32%); opacity: .8; }
 .space-phase-bg[data-phase="galaxia"] .space-phase-nebula { background: radial-gradient(ellipse at 28% 48%, rgba(142,68,173,.32), transparent 34%), radial-gradient(ellipse at 78% 25%, rgba(108,52,131,.24), transparent 36%), radial-gradient(ellipse at 64% 82%, rgba(125,60,152,.18), transparent 32%); }
 .space-phase-stars { position: absolute; inset: 0; }
 .space-phase-stars i { position: absolute; left: var(--star-x); top: var(--star-y); width: 2px; height: 2px; border-radius: 50%; background: rgba(255,255,255,.72); opacity: .35; }
 .space-phase-bg[data-phase="galaxia"] .space-phase-stars i { animation: phase-star-pulse 3.8s ease-in-out var(--star-delay) infinite; }
 .space-phase-planet { position: absolute; right: 8vw; top: 8vh; width: min(46vw, 620px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #4eb5ff, #2e86de 38%, #1a5276 72%, #09111f 100%); opacity: .48; filter: blur(.2px); box-shadow: 0 0 100px 24px var(--phase-glow); }
+
+/* Geometria por fase. A viagem fica visivel: o planeta da Terra recua e
+   perde peso, o anel orbital da Orbita se abre e gira, e a Galaxia cresce
+   ate virar o proprio ceu. */
+.space-phase-bg[data-phase="orbita"] .space-phase-planet {
+  transform: scale(.62) translate(-14%, 8%);
+  opacity: .3;
+}
+.space-phase-bg[data-phase="galaxia"] .space-phase-planet {
+  transform: scale(.34) translate(-34%, 18%);
+  opacity: .18;
+}
+.space-phase-bg[data-phase="orbita"] .space-phase-orbit-map {
+  transform: rotate(28deg) scale(1.08);
+  opacity: .5;
+}
+.space-phase-bg[data-phase="galaxia"] .space-phase-orbit-map {
+  transform: rotate(74deg) scale(1.32);
+  opacity: .34;
+}
+.space-phase-bg[data-phase="galaxia"] .space-phase-nebula {
+  opacity: 1;
+  filter: saturate(1.25);
+}
 .space-phase-bg[data-phase="terra"][data-dashboard-scene="true"] .space-phase-planet { right: clamp(2rem, 8vw, 10rem); top: 5rem; width: min(68vw, 980px); opacity: .78; filter: brightness(1) saturate(1.4) contrast(1.18); background-color: #0b315b; background-image: linear-gradient(132deg, rgba(0,8,18,.08) 10%, transparent 38%, rgba(0,14,30,.28) 100%), var(--earth-texture); background-position: 50% 42%; background-repeat: no-repeat; background-size: cover; box-shadow: 0 0 32px 4px rgba(0,210,255,.9), 0 0 140px 36px rgba(0,134,255,.45), inset -48px -32px 72px rgba(0,0,0,.52); }
+
+/* Upgrade para a textura 8K 300 DPI: o `image-set` escolhe a maior resolucao
+   que o dispositivo suporta. A 2K do bundle continua como base, entao o
+   planeta nunca fica vazio enquanto o 8K carrega.
+
+   O caminho do asset e literal (e nao `var()`) porque `image-set` nao aceita
+   `var()` dentro do `url()`. */
+@supports (background-image: image-set(url("a.jpg") 1x, url("b.jpg") 2x)) {
+  .space-phase-bg[data-phase="terra"][data-dashboard-scene="true"] .space-phase-planet {
+    background-image: linear-gradient(132deg, rgba(0,8,18,.08) 10%, transparent 38%, rgba(0,14,30,.28) 100%), image-set(url("/assets/growth/earth-8k-300dpi.jpg") 1x, url("/assets/growth/earth-8k-300dpi.jpg") 2x);
+  }
+}
 .brand-shell[data-space-phase="terra"] .space-phase-planet { opacity: .78 !important; }
 .space-phase-bg[data-phase="terra"][data-dashboard-scene="true"] .space-phase-planet::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(3,10,20,.78) 0%, rgba(3,10,20,.16) 17%, transparent 35%, transparent 70%, rgba(3,8,16,.42) 100%); pointer-events: none; }
 .space-phase-bg[data-phase="terra"][data-dashboard-scene="true"] .space-phase-atmosphere { inset: -3.5%; border-color: rgba(86,205,255,.78); box-shadow: 0 0 22px rgba(83,193,255,.95), 0 0 72px rgba(0,134,255,.54), inset 0 0 24px rgba(78,181,255,.38); }
@@ -2519,13 +2607,70 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 .space-phase-bg[data-phase="galaxia"] .space-phase-radar, .space-phase-bg[data-phase="galaxia"] .space-phase-orbit-map { opacity: .34; }
 @keyframes phase-rocket-rise { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 .space-phase-rocket { animation: phase-rocket-rise 5s ease-in-out infinite; }
-.space-phase-meteors i { position: absolute; width: 90px; height: 1px; background: linear-gradient(90deg, transparent, var(--phase-color), transparent); opacity: 0; transform: rotate(-28deg); animation: phase-meteor 9s linear infinite; }
-.space-phase-meteors i:nth-child(1) { left: 18%; top: 22%; animation-delay: 2s; }.space-phase-meteors i:nth-child(2) { left: 65%; top: 35%; animation-delay: 6s; }.space-phase-meteors i:nth-child(3) { left: 78%; top: 68%; animation-delay: 1s; }.space-phase-meteors i:nth-child(4) { left: 42%; top: 15%; animation-delay: 4s; }
+/* Meteoros: cada um e um corpo luminoso com cauda propria, nao um risco.
+   A cabeca e um gradiente radial com desfoque; a cauda e um rastro que
+   afina e some; a cor vem da fase (o `grayscale` que existia antes matava
+   exatamente isso). */
+.space-phase-meteors i {
+  position: absolute;
+  width: 160px;
+  height: 3px;
+  border-radius: 999px;
+  opacity: 0;
+  transform: rotate(-28deg);
+  transform-origin: right center;
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--phase-color) 18%, transparent) 46%, color-mix(in srgb, var(--phase-color) 72%, transparent) 88%, color-mix(in srgb, white 92%, var(--phase-color)) 100%);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--phase-color) 55%, transparent));
+  animation: phase-meteor 9s linear infinite;
+}
+.space-phase-meteors i::before {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, color-mix(in srgb, var(--phase-color) 85%, white) 38%, transparent 72%);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--phase-color) 70%, transparent);
+}
+.space-phase-meteors i::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 220px;
+  height: 1px;
+  margin-top: -0.5px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--phase-color) 26%, transparent) 70%, color-mix(in srgb, var(--phase-color) 55%, transparent));
+  filter: blur(0.4px);
+}
+.space-phase-meteors i:nth-child(1) { left: 14%; top: 18%; animation-delay: 1.4s; animation-duration: 9s; }
+.space-phase-meteors i:nth-child(2) { left: 58%; top: 31%; animation-delay: 5.1s; animation-duration: 11s; }
+.space-phase-meteors i:nth-child(3) { left: 74%; top: 62%; animation-delay: 0.6s; animation-duration: 8s; }
+.space-phase-meteors i:nth-child(4) { left: 38%; top: 12%; animation-delay: 3.4s; animation-duration: 12s; }
+.space-phase-meteors i:nth-child(5) { left: 22%; top: 47%; animation-delay: 7.2s; animation-duration: 10s; }
+.space-phase-meteors i:nth-child(6) { left: 68%; top: 8%; animation-delay: 2.6s; animation-duration: 9.5s; }
+.space-phase-meteors i:nth-child(7) { left: 48%; top: 72%; animation-delay: 6.3s; animation-duration: 11.5s; }
+.space-phase-meteors i:nth-child(8) { left: 86%; top: 44%; animation-delay: 4.2s; animation-duration: 8.5s; }
+.space-phase-meteors i:nth-child(9) { left: 8%; top: 66%; animation-delay: 8.1s; animation-duration: 12.5s; }
+.space-phase-meteors i:nth-child(10) { left: 56%; top: 52%; animation-delay: 3.9s; animation-duration: 10.5s; }
+.space-phase-meteors i:nth-child(11) { left: 30%; top: 26%; animation-delay: 9.2s; animation-duration: 11.8s; }
+.space-phase-meteors i:nth-child(12) { left: 78%; top: 78%; animation-delay: 5.8s; animation-duration: 9.2s; }
+.space-phase-meteors i:nth-child(13) { left: 44%; top: 60%; animation-delay: 1.9s; animation-duration: 12.2s; }
+.space-phase-meteors i:nth-child(14) { left: 18%; top: 82%; animation-delay: 7.7s; animation-duration: 10.8s; }
 .space-phase-badge { position: absolute; right: 3vw; top: 50px; display: flex; align-items: center; gap: 9px; color: color-mix(in srgb, var(--phase-color) 78%, white); opacity: .9; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .space-phase-badge svg { width: 16px; height: 16px; }.space-phase-badge span { display: grid; gap: 2px; }.space-phase-badge b { font-size: 10px; }.space-phase-badge small { color: rgba(255,255,255,.58); font-size: 8px; letter-spacing: .04em; text-transform: none; }.space-phase-badge em { display: inline-flex; align-items: center; gap: 4px; border: 1px solid color-mix(in srgb, var(--phase-color) 48%, transparent); border-radius: 999px; padding: 4px 7px; font-style: normal; font-weight: 800; }.space-phase-badge em svg { width: 11px; height: 11px; }
 @keyframes phase-star-pulse { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: .9; transform: scale(1.5); } }
 @keyframes phase-meteor { 0% { opacity: 0; transform: translate3d(-30px,-30px,-0px) rotate(-28deg); } 12%,25% { opacity: .8; } 45%,100% { opacity: 0; transform: translate3d(180px,180px,0) rotate(-28deg); } }
 @media (prefers-reduced-motion: reduce) { .space-phase-bg, .space-phase-stars i, .space-phase-meteors i, .space-phase-rocket { animation: none !important; transition: none !important; }.space-phase-meteors { display: none; } }
+/* A chama do foguete congela com a cena: sem pulso, mas a chama continua
+   visivel — e ela que da a identidade da nave. */
+@media (prefers-reduced-motion: reduce) {
+  .space-rocket-flame animate { display: none; }
+  .space-rocket-flame { opacity: .9; }
+}
 @media (max-width: 800px) { .space-phase-badge { right: 14px; top: 58px; }.space-phase-badge span { display: none; }.space-phase-planet { right: -12vw; bottom: 10vh; width: 55vw; }.space-phase-rocket { left: 12%; }.space-phase-orbit-map { left: 22vw; bottom: 16vh; width: 58vw; opacity: .18; }.space-phase-radar { right: 5vw; bottom: 16vh; width: 78px; } }
 
 /* Reference composition tuning: the phase owns the shell accent while all
@@ -2743,8 +2888,10 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
   box-shadow: 0 0 14px rgba(255,255,255,.28);
 }
 .brand-shell[data-space-phase] .space-phase-planet,
-.brand-shell[data-space-phase] .space-phase-stars,
-.brand-shell[data-space-phase] .space-phase-meteors { filter: grayscale(1); }
+.brand-shell[data-space-phase] .space-phase-stars { filter: grayscale(1); }
+/* Os meteoros mantem a cor da fase: o filtro cinza que existia antes os
+   transformava em riscos sem brilho, sem cauda e sem identidade. */
+.brand-shell[data-space-phase] .space-phase-meteors { filter: none; }
 .brand-shell[data-space-phase] .space-phase-planet { opacity: .14; }
 .brand-shell[data-space-phase] .text-primary { color: #ffffff; }
 .brand-shell[data-space-phase] .border-primary,
@@ -9411,10 +9558,12 @@ html:not(.dark) .dashboard-scope-sync {
   transform-origin: right center;
 }
 
-.brand-shell[data-dashboard-scene="true"] .space-phase-meteor-a { left: 10%; top: 21%; animation: dashboard-meteor-earth-a 10s linear 1.4s infinite; }
-.brand-shell[data-dashboard-scene="true"] .space-phase-meteor-b { left: 40%; top: 7%; animation: dashboard-meteor-earth-b 12s linear 5.2s infinite; }
-.brand-shell[data-dashboard-scene="true"] .space-phase-meteor-c { left: 72%; top: 20%; animation: dashboard-meteor-earth-c 13s linear 2.8s infinite; }
-.brand-shell[data-dashboard-scene="true"] .space-phase-meteor-d { left: 58%; top: 58%; animation: dashboard-meteor-earth-d 14s linear 8s infinite; }
+/* No dashboard os meteoros descem da direita para a esquerda, como no
+   referencia da cena da Terra. O indices seguem a ordem dos elementos. */
+.brand-shell[data-dashboard-scene="true"] .space-phase-meteors i:nth-child(1) { left: 10%; top: 21%; animation: dashboard-meteor-earth-a 10s linear 1.4s infinite; }
+.brand-shell[data-dashboard-scene="true"] .space-phase-meteors i:nth-child(2) { left: 40%; top: 7%; animation: dashboard-meteor-earth-b 12s linear 5.2s infinite; }
+.brand-shell[data-dashboard-scene="true"] .space-phase-meteors i:nth-child(3) { left: 72%; top: 20%; animation: dashboard-meteor-earth-c 13s linear 2.8s infinite; }
+.brand-shell[data-dashboard-scene="true"] .space-phase-meteors i:nth-child(4) { left: 58%; top: 58%; animation: dashboard-meteor-earth-d 14s linear 8s infinite; }
 
 @keyframes dashboard-meteor-earth-a {
   0%, 8% { opacity: 0; transform: translate3d(-40px, -28px, 0) rotate(28deg); }
@@ -11295,7 +11444,7 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 .campaigns-workspace .campaign-filters-row,
 .campaigns-workspace .campaign-tabs-header,
 .campaigns-workspace .campaign-actions-toolbar { background: #fff !important; }
-.campaigns-workspace .campaign-app-header { height: 56px !important; min-height: 56px !important; }
+.campaigns-workspace .campaign-app-header { height: auto !important; min-height: 56px !important; flex-wrap: wrap; row-gap: 8px; }
 .campaigns-workspace .campaign-table-frame { margin: 24px !important; border: 1px solid #e4e7ec !important; border-radius: 8px !important; background: #fff !important; }
 .campaigns-workspace .campaign-metric-header > th { height: 40px !important; padding-inline: 12px !important; background: #f7f8fa !important; color: #606770 !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
 .campaigns-workspace [data-campaign-table-scroll] tbody tr { height: 52px !important; background: #fff !important; }
@@ -11561,6 +11710,20 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-icon { color: #dc2626 !important; }
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-value,
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon { color: #16a34a !important; }
+
+/* The success green (#16a34a) measures only 3.3:1 on the light surface, below
+   the WCAG AA minimum of 4.5:1 for normal text. The light theme uses the
+   darker semantic success color; the dark theme keeps the original.
+   Callers: src/components/funnel-analysis/FunnelKPIs.tsx renders the
+   `data-kpi-tone` attribute on the funnel KPI cards. */
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-value,
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon {
+  color: #167a43 !important;
+}
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-value,
+html:not(.dark) .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-icon {
+  color: #b42318 !important;
+}
 .brand-shell .gd-funnel-analysis .gd-aligned-grid { gap: 16px !important; }
 @media (min-width: 1280px) {
   .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
@@ -11837,6 +12000,13 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 .campaigns-workspace .campaign-app-header {
   gap: 12px !important;
   padding-inline: 16px !important;
+  /* O header pode quebrar em duas linhas quando os controles nao cabem.
+     Com altura travada e `shrink-0` nos filhos, os botoes da direita
+     transbordavam para fora da tela e ficavam inalcancaveis. */
+  height: auto !important;
+  min-height: 56px !important;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 .campaigns-workspace :is(.campaign-account-pill, .campaign-opportunity-pill, .campaign-date-pill, .campaign-header-icon, .campaign-publish-button, .campaign-action-button, .campaign-action-select, .campaign-columns-control > button) {
@@ -12996,8 +13166,10 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   }
 
   .campaigns-workspace .campaign-app-header {
-    height: 56px !important;
+    height: auto !important;
     min-height: 56px !important;
+    flex-wrap: wrap;
+    row-gap: 8px;
     padding-inline: 16px !important;
     border-bottom: 1px solid #eef1f4 !important;
   }
@@ -13025,7 +13197,11 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 /* Monochrome control contract: switches must not reintroduce the legacy blue
-   accent into the black-and-white Growdash interface. */
+   accent into the black-and-white Growdash interface.
+
+   O trilho ativo é preto em ambos os modos (contrato monocromático), então a
+   bolinha precisa ser clara: branca no claro e no escuro. A regra antiga do
+   modo escuro pintava a bolinha de preto e ela sumia sobre o trilho. */
 .brand-shell [role="switch"][data-state="checked"] {
   border-color: #111111 !important;
   background: #111111 !important;
@@ -13039,7 +13215,7 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 .brand-shell [role="switch"] > span {
-  background: #ffffff !important;
+  background: var(--switch-thumb) !important;
   color: #111111 !important;
 }
 
@@ -13864,12 +14040,22 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   color: hsl(var(--primary)) !important;
 }
 
-/* Active status switches use a black thumb in dark mode, including the
-   Meta-style campaign table switch and Radix switches used in settings. */
-html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] > span,
-html.dark .brand-shell [role="switch"][data-state="checked"] > span,
-html.dark .brand-shell button[data-state="checked"] > span {
-  background: var(--gd-control-active-thumb) !important;
+/* Active status switches keep a thumb that contrasts with the track, both in
+   dark mode and in light mode. A black thumb on the dark track disappeared
+   completely, so the control looked off even when it was on.
+
+   The rule is scoped to `[role="switch"]`: a generic `button[data-state]`
+   selector would also hit the Radix checkbox, whose tick has its own
+   colors. The Meta-style campaign row toggle used a light track and still
+   needs the dark thumb, so it keeps its own rule below. */
+html.dark .brand-shell [role="switch"][data-state="checked"] > span {
+  background: var(--switch-thumb) !important;
+}
+
+/* The campaign row toggle paints its own light track in dark mode, so its
+   thumb stays dark to remain visible against that track. */
+html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] > span {
+  background: #090909 !important;
 }
 
 html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] {
@@ -15949,9 +16135,13 @@ html[data-space-phase="terra"],
   /* A arte cobre a viewport inteira: nenhuma faixa preta nas laterais.
      Em janelas 16:9 a arte é mais alta que a tela e o crop central cortaria
      o topo da nave. O deslocamento vertical mantém a nave e a frase da
-     missão sempre visíveis juntas. */
+     missão sempre visíveis juntas.
+
+     O deslocamentoempurra a arte para baixo: em tela cheia a nave ficava
+     colada no topo, com a base e a frase da missão espremidas no rodapé.
+     38% sobe a composição no quadro e devolve respiro ao topo. */
   background-size: cover;
-  background-position: center 44%;
+  background-position: center 38%;
   background-repeat: no-repeat;
   perspective: 1200px;
   padding: 0;
@@ -16134,7 +16324,11 @@ html[data-space-phase="terra"],
 @media (min-width: 981px) {
   .auth-cosmic-right-panel {
     position: absolute;
-    top: 20.3%;
+    /* O card fica centralizado na vertical da tela. Com `top` fixo em
+       porcentagem o login acompanhava a altura do card artificialmente e
+       subia ou descia conforme a resolução. */
+    top: 50%;
+    transform: translateY(-50%);
     left: 63.7%;
     width: 26.7%;
   }

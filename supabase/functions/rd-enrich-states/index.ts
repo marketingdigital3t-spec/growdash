@@ -104,6 +104,8 @@ Deno.serve(async (req) => {
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
     const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
     const isInternal = bearer === serviceKey || (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+    const limit = Math.min(Math.max(Number(body?.limit ?? 200), 1), 1000);
+    const offset = Math.max(Number(body?.offset ?? 0), 0);
     let userId: string;
     if (isInternal) {
       userId = typeof body?.service_user_id === "string" ? body.service_user_id.trim() : "";
@@ -120,13 +122,13 @@ Deno.serve(async (req) => {
     const tokenByConnection = new Map<string, string>();
     for (const connection of connections) if (connection.api_token) tokenByConnection.set(connection.id, connection.api_token);
 
-    // Fetch up to 800 deals missing state (multiple runs if needed for larger backlogs)
-    const { data: deals, error } = await admin
+    // Fetch up to `limit` deals missing state, starting at `offset` (multiple runs if needed for larger backlogs)
+    const { data: deals, error, count } = await admin
       .from("rd_deals")
-      .select("id, rd_deal_id, rd_connection_id, raw")
+      .select("id, rd_deal_id, rd_connection_id, raw", { count: "exact" })
       .eq("user_id", userId)
       .is("lead_state", null)
-      .limit(800);
+      .range(offset, offset + limit - 1);
     if (error) throw error;
 
     let enriched = 0;
@@ -204,7 +206,8 @@ Deno.serve(async (req) => {
       await sleep(120);
     }
 
-    return new Response(JSON.stringify({ ok: true, processed: deals?.length || 0, enriched, skipped, viaDDD, viaApi }), {
+    const totalRemaining = Number(count ?? 0) - offset - (deals?.length || 0);
+    return new Response(JSON.stringify({ ok: true, processed: deals?.length || 0, enriched, skipped, viaDDD, viaApi, limit, offset, totalRemaining, hasMore: totalRemaining > 0 }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -4,6 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+import {
+  decideWorkspaceBootstrapFallback,
+  isWorkspaceTimeoutError,
+  WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+  WORKSPACE_BOOTSTRAP_TOTAL_TIMEOUT_MS,
+} from "@/lib/workspaceBootstrapPolicy";
 
 const fallbackPlans = [
   {
@@ -131,7 +137,7 @@ export function useWorkspace() {
       try {
         const { data: workspaceId, error: bootstrapError } = await withRequestTimeout(
           (supabase as any).rpc("ensure_current_workspace"),
-          15_000,
+          WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
         );
         if (bootstrapError) {
           throw bootstrapError;
@@ -147,7 +153,7 @@ export function useWorkspace() {
               .select("id, name, currency, timezone")
               .eq("id", workspaceId)
               .single(),
-            15_000,
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
           ),
           withRequestTimeout(
             (supabase as any)
@@ -156,7 +162,7 @@ export function useWorkspace() {
               .eq("workspace_id", workspaceId)
               .eq("user_id", user!.id)
               .single(),
-            15_000,
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
           ),
           withRequestTimeout(
             (supabase as any)
@@ -165,7 +171,7 @@ export function useWorkspace() {
               .eq("workspace_id", workspaceId)
               .eq("is_active", true)
               .order("kind"),
-            15_000,
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
           ),
         ]);
 
@@ -183,10 +189,16 @@ export function useWorkspace() {
         // the last successful value itself; otherwise surface the failure.
         console.warn("Workspace bootstrap failed:", err);
         const previous = cached();
-        if (previous) return previous;
+        const decision = decideWorkspaceBootstrapFallback({
+          timedOut: isWorkspaceTimeoutError(err),
+          hasCache: Boolean(previous),
+        });
+        // A cached foundation is a confirmed past state, not a fabricated
+        // authorization. It keeps the shell usable while the provider recovers.
+        if (decision.action === "use-cache" && previous) return previous;
         throw err;
       }
-    })(), 20_000),
+    })(), WORKSPACE_BOOTSTRAP_TOTAL_TIMEOUT_MS),
   });
 }
 

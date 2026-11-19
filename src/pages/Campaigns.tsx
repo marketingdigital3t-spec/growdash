@@ -1231,7 +1231,7 @@ export default function Campaigns() {
       data-scroll-mode={analysisMode ? "content" : "locked"}
     >
       <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card">
-        <header className="campaign-app-header flex min-w-0 items-center gap-3 border-b border-border px-4">
+        <header className="campaign-app-header flex min-w-0 flex-wrap items-center gap-3 border-b border-border px-4">
           <BrandLogo eager className="campaign-app-logo h-7 w-[104px] shrink-0" />
           <h1 className="campaign-app-title shrink-0 text-base font-semibold">Campanhas</h1>
           <AccountMultiSelect
@@ -1245,7 +1245,10 @@ export default function Campaigns() {
             <span className="campaign-opportunity-score grid h-5 w-5 place-items-center rounded-full border text-[10px] font-bold">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
             <span>Pontuação de oportunidade</span><ChevronDown className="h-3.5 w-3.5" />
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          {/* Os controles da direita quebram em linha quando nao cabem. Com
+              `shrink-0` eles transbordavam para fora da tela e ficavam
+              inalcancaveis — o layout do topo era a causa do "quebrado". */}
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
             <MetaDateRangePicker
               preset={preset}
               onPresetChange={setPreset}
