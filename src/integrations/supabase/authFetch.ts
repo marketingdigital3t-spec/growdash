@@ -1,10 +1,11 @@
 const RETRYABLE_AUTH_STATUS = new Set([500, 501, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530]);
 
-// GoTrue password verification in this project has reached ~22s under load.
-// Keep the browser from converting a real Auth response into a fake outage,
-// while retaining a finite deadline and a bounded retry.
-export const AUTH_PASSWORD_ATTEMPTS = 2;
-export const AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS = 30_000;
+// GoTrue password verification in this project has reached ~22s under load,
+// and occasional network spikes between Brazil and the Supabase region push
+// password grants past the previous 30s deadline. Raise the deadline and add
+// one more retry so a slow-but-valid login does not surface as a fake outage.
+export const AUTH_PASSWORD_ATTEMPTS = 3;
+export const AUTH_PASSWORD_ATTEMPT_TIMEOUT_MS = 60_000;
 export const SUPABASE_FUNCTION_TIMEOUT_MS = 120_000;
 export const SUPABASE_DATA_TIMEOUT_MS = 30_000;
 
