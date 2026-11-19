@@ -19,18 +19,18 @@ import {
  */
 describe("RD sync runtime budget", () => {
   it("expõe o budget e o número de tentativas usados pela edge function", () => {
-    expect(RD_SYNC_RUNTIME_BUDGET_MS).toBe(90_000);
+    expect(RD_SYNC_RUNTIME_BUDGET_MS).toBe(300_000);
     expect(RD_REQUEST_ATTEMPTS).toBe(3);
     expect(RD_REQUEST_BACKOFFS_MS.length).toBeGreaterThanOrEqual(RD_REQUEST_ATTEMPTS - 1);
   });
 
-  it("mantém uma requisição lógica dentro do budget mesmo com o timeout antigo de 30s", () => {
+  it("mantém uma requisição lógica de 30s dentro do budget ampliado de 300s", () => {
     // Com os backoffs reduzidos (2s, 5s, 10s), o pior caso com timeout 30s
-    // é: 30s + 2s + 30s + 5s + 30s = 97s, ainda acima do budget de 90s.
+    // é: 30s + 2s + 30s + 5s + 30s = 97s, bem abaixo do budget de 300s.
     const worstCase = worstCaseRDRequestMs(30_000);
 
     expect(worstCase).toBe(97_000);
-    expect(worstCase).toBeGreaterThan(RD_SYNC_RUNTIME_BUDGET_MS);
+    expect(worstCase).toBeLessThan(RD_SYNC_RUNTIME_BUDGET_MS);
   });
 
   it("deriva um timeout por tentativa que nunca ultrapassa o budget do runtime", () => {

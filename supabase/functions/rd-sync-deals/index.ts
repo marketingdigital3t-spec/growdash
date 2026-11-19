@@ -1807,8 +1807,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const BATCH_SIZE = 2;
-    const BATCH_PAUSE_MS = 400;
+    const BATCH_SIZE = 10;
+    const BATCH_PAUSE_MS = 200;
 
     if (isReprocess) {
       // Buscar diretamente cada deal informado

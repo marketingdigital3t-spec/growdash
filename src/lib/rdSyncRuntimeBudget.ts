@@ -13,7 +13,7 @@
  */
 
 /** Total wall-clock budget available to one edge invocation. */
-export const RD_SYNC_RUNTIME_BUDGET_MS = 90_000;
+export const RD_SYNC_RUNTIME_BUDGET_MS = 300_000;
 
 /** Backoff waits applied between provider attempts, in order.
  *
