@@ -8,16 +8,37 @@ import { fetchAuthWithRetry } from './authFetch';
 // Cloudflare's Git builds provide them as VITE_* variables, but a manual Pages
 // deploy does not inherit build variables. Keeping a safe fallback prevents a
 // malformed manual build from crashing before React can render.
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cixnvosxqlacjbpymjha.supabase.co";
+//
+// A placeholder must never win over the real fallback: `your-project-ref` and
+// `sb_publishable_placeholder_do_not_use` are not recoverable at runtime. The
+// browser would hit a non-existent host on every auth request and the user
+// would only see "authentication service temporarily unavailable".
+function isPlaceholder(value: string | undefined | null) {
+  if (!value) return true;
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized.includes("your-project-ref") ||
+    normalized.includes("placeholder") ||
+    normalized.includes("your-supabase") ||
+    normalized.includes("your-")
+  );
+}
+
+const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const SUPABASE_URL = isPlaceholder(envSupabaseUrl)
+  ? "https://cixnvosxqlacjbpymjha.supabase.co"
+  : envSupabaseUrl;
 // Supabase rotated this project's legacy JWT anon key. The current
 // publishable key is the supported browser credential for Auth and PostgREST.
 // Keep a publishable fallback so manual and CI builds remain usable even when
 // no VITE_* variables are injected. Never use a service-role/secret key here.
-export const SUPABASE_PUBLIC_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-  || (import.meta.env.VITE_SUPABASE_ANON_KEY?.startsWith("sb_publishable_")
-    ? import.meta.env.VITE_SUPABASE_ANON_KEY
-    : undefined)
-  || "sb_publishable_z8AGO0BnFocDtOVyaYMbNQ_JiEYpPIY";
+const envPublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const envAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const SUPABASE_PUBLIC_KEY = !isPlaceholder(envPublishableKey)
+  ? envPublishableKey
+  : !isPlaceholder(envAnonKey) && envAnonKey?.startsWith("sb_publishable_")
+    ? envAnonKey
+    : "sb_publishable_z8AGO0BnFocDtOVyaYMbNQ_JiEYpPIY";
 
 const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
 const authStorageKey = `sb-${projectRef}-auth-token`;
