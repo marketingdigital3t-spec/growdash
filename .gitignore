@@ -67,3 +67,12 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 
 # Scratch de trabalho do superpowers (ledger de planos)
 .superpowers/
+
+# Cópias de backup que o Claude Sonnet 5 Code cria ao editar ("arquivo 2.tsx").
+# Nenhuma é importada pelo projeto; versioná-las polui o lint, o TypeScript
+# e a revisão de diff.
+* 2.ts
+* 2.tsx
+* 2.json
+* 2.md
+* 2.jpg
