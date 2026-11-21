@@ -2059,6 +2059,11 @@ html:not(.dark) .commercial-ranking-shell option {
   display: flex !important;
   flex-direction: column;
   gap: 16px !important;
+  /* A barra lateral esquerda é `fixed inset-y-0`: a barra de áreas precisa
+     cobrir exatamente a mesma faixa vertical, começando no topo e com o
+     mesmo respiro lateral, para que os dois trilhos leiam como um só. */
+  height: 100% !important;
+  align-content: start !important;
   padding: 16px 8px !important;
   overflow: visible !important;
 }
@@ -2076,7 +2081,10 @@ html:not(.dark) .commercial-ranking-shell option {
 }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item:hover,
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item:focus-visible { background: #f2f4f7 !important; color: #1c1e21 !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { color: #0866ff !important; background: #eaf2ff !important; }
+/* O trilho de áreas segue a identidade da fase: azul na Terra, dourado na
+   Órbita e roxo na Galáxia. `var(--brand-gold)` já resolve para a cor da
+   fase ativa porque o brand-shell redefine a variável por data-space-phase. */
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { color: var(--brand-gold) !important; background: color-mix(in srgb, var(--brand-gold) 12%, transparent) !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before {
   display: block !important;
   position: absolute;
@@ -2085,7 +2093,7 @@ html:not(.dark) .commercial-ranking-shell option {
   left: -8px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: #0866ff;
+  background: var(--brand-gold);
   content: "";
 }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-label { display: none !important; }
@@ -3929,21 +3937,23 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 }
 
 /* Legacy accent preferences are retained for storage compatibility only.
-   The active platform accent is emerald; metallic-gold remains opt-in. */
+   The platform follows the phase identity: blue on Terra, gold on Orbit and
+   purple on Galaxy. Green is not part of the identity, so the legacy
+   "emerald" preference resolves to the Terra accent instead of esmerald green. */
 html[data-accent="emerald"],
 html[data-accent="monochrome"] {
-  --primary: 160 84% 39% !important;
-  --primary-foreground: 160 42% 7% !important;
-  --ring: 158 64% 52% !important;
-  --accent: 158 38% 16% !important;
-  --accent-foreground: 151 78% 88% !important;
-  --sidebar-primary: 160 84% 39% !important;
-  --sidebar-icon-active: 158 64% 52% !important;
-  --sidebar-ring: 158 64% 52% !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --ring: 199 89% 58% !important;
+  --accent: 199 80% 14% !important;
+  --accent-foreground: 199 89% 94% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-icon-active: 199 89% 58% !important;
+  --sidebar-ring: 199 89% 58% !important;
   --brand-gold: #00a8ff !important;
-  --brand-gold-light: #7dd3fc !important;
+  --brand-gold-light: #38bdf8 !important;
   --brand-bronze: #0284c7 !important;
-  --brand-accent-rgb: 16, 185, 129 !important;
+  --brand-accent-rgb: 0, 168, 255 !important;
 }
 
 .dark {
@@ -11427,17 +11437,25 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 .brand-shell:has(.traffic-page-shell) .growdash-content-frame,
 .brand-shell:has(.traffic-page-shell) .gd-page-transition { height: 100% !important; min-height: 0 !important; max-width: none !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-page-shell { display: block !important; width: 100% !important; max-width: none !important; height: 100% !important; min-height: 0 !important; padding: 0 !important; background: #f2f4f7 !important; color: #1c1e21 !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-page-content { width: calc(100% - 56px) !important; max-width: none !important; min-height: 100% !important; margin: 0 0 0 56px !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-nav-rail { position: fixed !important; inset: 48px auto 0 220px !important; z-index: 40 !important; width: 56px !important; min-width: 56px !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-right: 1px solid #e4e7ec !important; border-radius: 0 !important; background: #fff !important; color: #606770 !important; }
+/* O conteúdo começa depois da sidebar (64px) e do trilho de áreas (56px),
+   para que os dois trilhos fiquem encostados e alinhados no topo. */
+.brand-shell:has(.traffic-page-shell) .traffic-page-content { width: calc(100% - 120px) !important; max-width: none !important; min-height: 100% !important; margin: 0 0 0 120px !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail { position: fixed !important; inset: 0 auto 0 220px !important; z-index: 40 !important; width: 56px !important; min-width: 56px !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-right: 1px solid #e4e7ec !important; border-radius: 0 !important; background: #fff !important; color: #606770 !important; }
 .brand-shell:has(.traffic-page-shell):has(.brand-sidebar.w-16) .traffic-nav-rail { left: 64px !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-rail-header { display: none !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-nav-items { display: flex !important; flex-direction: column !important; gap: 16px !important; padding: 16px 8px !important; overflow: visible !important; }
+/* O trilho de áreas alinha os primeiros ícones com os da barra lateral
+   esquerda: a sidebar tem a marca (40px) + o nav com padding de 16px, e o
+   primeiro ícone do nav cai em 88px. O trilho começa na mesma cota. */
+.brand-shell:has(.traffic-page-shell) .traffic-nav-items { display: flex !important; flex-direction: column !important; gap: 16px !important; height: 100% !important; align-content: start !important; padding: 88px 8px 16px !important; overflow: visible !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item,
 .brand-shell:has(.traffic-page-shell) .traffic-nav-rail[data-expanded="false"] .traffic-nav-item { position: relative !important; display: flex !important; width: 40px !important; min-height: 40px !important; align-items: center !important; justify-content: center !important; padding: 0 !important; border: 0 !important; border-radius: 6px !important; background: transparent !important; color: #606770 !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item:hover,
 .brand-shell:has(.traffic-page-shell) .traffic-nav-item:focus-visible { background: #f2f4f7 !important; color: #1c1e21 !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { background: #eaf2ff !important; color: #0866ff !important; }
-.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before { position: absolute !important; top: 8px !important; bottom: 8px !important; left: -8px !important; display: block !important; width: 3px !important; border-radius: 0 2px 2px 0 !important; background: #0866ff !important; content: "" !important; }
+/* O trilho de áreas segue a identidade cromática da fase ativa: azul na Terra,
+   dourado na Órbita e roxo na Galáxia. `var(--brand-gold)` já resolve para a
+   cor da fase porque o brand-shell redefine a variável por data-space-phase. */
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { background: color-mix(in srgb, var(--brand-gold) 12%, transparent) !important; color: var(--brand-gold) !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before { position: absolute !important; top: 8px !important; bottom: 8px !important; left: -8px !important; display: block !important; width: 3px !important; border-radius: 0 2px 2px 0 !important; background: var(--brand-gold) !important; content: "" !important; }
 .brand-shell:has(.traffic-page-shell) .traffic-nav-label { display: none !important; }
 .campaigns-workspace .campaign-manager-top,
 .campaigns-workspace .campaign-app-header,
@@ -14942,29 +14960,31 @@ html:not(.dark) body .brand-shell .finance-page .finance-tab[role="tab"][data-st
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
 }
 
-/* Platform-wide emerald accent normalization. Legacy lime/green utility
-   classes are presentation aliases only; semantic red and amber states stay
-   untouched. */
+/* Platform accent normalization. The legacy lime/green utility classes are
+   presentation aliases only; semantic red and amber states stay untouched.
+   Green is NOT part of the Growdash identity: the accent follows the phase
+   (blue on Terra, gold on Orbit, purple on Galaxy), and the brand-shell
+   rules further down redefine these variables per data-space-phase. */
 html,
 html[data-accent],
 html[data-accent="monochrome"],
 html[data-accent="metallic-gold"] {
-  --growdash-green: #10B981 !important;
-  --brand-accent-rgb: 16, 185, 129 !important;
-  --brand-gold: #10B981 !important;
-  --brand-gold-light: #34D399 !important;
+  --growdash-green: #00a8ff !important;
+  --brand-accent-rgb: 0, 168, 255 !important;
+  --brand-gold: #00a8ff !important;
+  --brand-gold-light: #38bdf8 !important;
   --brand-bronze: #0284c7 !important;
-  --color-accent: #10B981 !important;
-  --color-accent-hover: #34D399 !important;
-  --color-focus: #10B981 !important;
-  --primary: 160 84% 39% !important;
-  --primary-foreground: 160 42% 7% !important;
-  --primary-soft: 152 76% 90% !important;
-  --ring: 158 64% 52% !important;
-  --sidebar-primary: 160 84% 39% !important;
-  --sidebar-primary-foreground: 160 42% 7% !important;
-  --sidebar-icon-active: 158 64% 52% !important;
-  --sidebar-ring: 158 64% 52% !important;
+  --color-accent: #00a8ff !important;
+  --color-accent-hover: #38bdf8 !important;
+  --color-focus: #00a8ff !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --primary-soft: 199 80% 92% !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-primary-foreground: 0 0% 100% !important;
+  --sidebar-icon-active: 199 89% 58% !important;
+  --sidebar-ring: 199 89% 58% !important;
 }
 .brand-shell,
 .brand-shell .growdash-main,
@@ -14976,9 +14996,9 @@ html[data-accent="metallic-gold"] {
   --gd-semantic-primary: var(--gd-accent) !important;
   --gd-semantic-primary-foreground: #040810 !important;
   --gd-content-selection: var(--gd-accent) !important;
-  --primary: 160 84% 39% !important;
-  --primary-foreground: 160 42% 7% !important;
-  --ring: 158 64% 52% !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --ring: 199 89% 58% !important;
 }
 .brand-shell :is(
   [class*="text-lime"], [class*="text-green-400"], [class*="text-green-500"], [class*="text-green-600"],
@@ -14990,6 +15010,87 @@ html[data-accent="metallic-gold"] {
 .brand-shell :is(
   [class*="bg-lime"], [class*="bg-green"], [class*="bg-emerald"]
 ) { background-color: var(--gd-accent-soft) !important; }
+
+/* Authoritative phase palette. This block lives AFTER the platform-wide
+   normalization above so the phase wins on equal specificity, and it is
+   scoped to the brand-shell so it never leaks to the public pages.
+
+   TERRA  -> azul cósmico   (#00a8ff / #38bdf8)
+   ÓRBITA -> dourado solar  (#ffc107 / #ffe082)
+   GALÁXIA -> púrpura neon  (#a855f7 / #d8b4fe)
+
+   Green is not part of the identity. The old emerald tokens are remapped to
+   the Terra accent so nothing renders neon green, and every surface that used
+   to inherit the emerald tokens now follows the active phase instead. */
+.brand-shell[data-space-phase="terra"] {
+  --brand-accent-rgb: 0, 168, 255 !important;
+  --brand-gold: #00a8ff !important;
+  --brand-gold-light: #38bdf8 !important;
+  --brand-bronze: #0284c7 !important;
+  --growdash-green: #00a8ff !important;
+  --color-accent: #00a8ff !important;
+  --color-accent-hover: #38bdf8 !important;
+  --color-focus: #00a8ff !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --primary-soft: 199 80% 92% !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-primary-foreground: 0 0% 100% !important;
+  --sidebar-icon-active: 199 89% 58% !important;
+  --sidebar-ring: 199 89% 58% !important;
+  --gd-accent: #00a8ff !important;
+  --gd-accent-bright: #38bdf8 !important;
+  --gd-accent-soft: rgba(0, 168, 255, 0.14) !important;
+  --gd-accent-border: rgba(0, 168, 255, 0.35) !important;
+  --gd-semantic-primary: #00a8ff !important;
+}
+.brand-shell[data-space-phase="orbita"] {
+  --brand-accent-rgb: 255, 193, 7 !important;
+  --brand-gold: #ffc107 !important;
+  --brand-gold-light: #ffe082 !important;
+  --brand-bronze: #a66b00 !important;
+  --growdash-green: #ffc107 !important;
+  --color-accent: #ffc107 !important;
+  --color-accent-hover: #ffe082 !important;
+  --color-focus: #ffc107 !important;
+  --primary: 45 100% 50% !important;
+  --primary-foreground: 45 40% 8% !important;
+  --primary-soft: 45 80% 92% !important;
+  --ring: 45 100% 58% !important;
+  --sidebar-primary: 45 100% 50% !important;
+  --sidebar-primary-foreground: 45 40% 8% !important;
+  --sidebar-icon-active: 45 100% 58% !important;
+  --sidebar-ring: 45 100% 58% !important;
+  --gd-accent: #ffc107 !important;
+  --gd-accent-bright: #ffe082 !important;
+  --gd-accent-soft: rgba(255, 193, 7, 0.14) !important;
+  --gd-accent-border: rgba(255, 193, 7, 0.35) !important;
+  --gd-semantic-primary: #ffc107 !important;
+}
+.brand-shell[data-space-phase="galaxia"] {
+  --brand-accent-rgb: 168, 85, 247 !important;
+  --brand-gold: #a855f7 !important;
+  --brand-gold-light: #d8b4fe !important;
+  --brand-bronze: #6c3483 !important;
+  --growdash-green: #a855f7 !important;
+  --color-accent: #a855f7 !important;
+  --color-accent-hover: #d8b4fe !important;
+  --color-focus: #a855f7 !important;
+  --primary: 271 91% 65% !important;
+  --primary-foreground: 271 40% 8% !important;
+  --primary-soft: 271 80% 92% !important;
+  --ring: 271 91% 68% !important;
+  --sidebar-primary: 271 91% 65% !important;
+  --sidebar-primary-foreground: 271 40% 8% !important;
+  --sidebar-icon-active: 271 91% 68% !important;
+  --sidebar-ring: 271 91% 68% !important;
+  --gd-accent: #a855f7 !important;
+  --gd-accent-bright: #d8b4fe !important;
+  --gd-accent-soft: rgba(168, 85, 247, 0.16) !important;
+  --gd-accent-border: rgba(168, 85, 247, 0.4) !important;
+  --gd-semantic-primary: #a855f7 !important;
+}
 .brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]) {
   background: var(--gd-accent) !important;
   border-color: var(--gd-accent) !important;
