@@ -1,0 +1,8 @@
+# DECISIONS — Auditoria Growdash
+
+| Timestamp | Decisão | Alternativas consideradas | Motivo | Reversível? |
+|---|---|---|---|---|
+| 2026-11-21T00:05:00-03:00 | Timeout padrão de 15s para chamadas a provedores externos nas Edge Functions | (a) 10s; (b) 15s; (c) 30s | O `validate-meta-totals` já usa 15s e o `sync-meta-insights` usa timeout via AbortController. 15s equilibra latência e tolerância a RD/Meta sob carga. | Sim |
+| 2026-11-21T00:05:00-03:00 | Reaproveitar `fetchWithTimeout` de `src/lib/syncReliabilityPolicy.ts` em vez de criar helper novo | (a) novo helper `externalFetch`; (b) reusar `fetchWithTimeout` | `fetchWithTimeout` já implementa AbortController + cleanup de timer e é importável tanto por Edge Function quanto por código Deno. Evitar helper duplicado reduz superfície de manutenção. | Sim |
+| 2026-11-21T00:05:00-03:00 | Substituir `===` por `secretsMatch` (comparação em tempo constante) nas Edge Functions de cron | (a) manter `===`; (b) usar `secretsMatch` de `_shared/secretsMatch.ts` | O padrão de tempo constante já existe no repositório (`_shared/secretsMatch.ts`, `sales-webhook`, `daily-reconciliation`) e é a prática correta para comparação de segredo. `===` vaza informação por timing. | Sim |
+| 2026-11-21T00:05:00-03:00 | Não tocar em migrations de produção neste ciclo; correções de RLS/timeout ficam no código das Edge Functions | (a) escrever migration nova; (b) corrigir apenas o código | O prompt mestre proíbe rodar migration contra banco que não seja de teste. As migrations em `supabase/migrations/` continuam sendo escritas e revisadas, mas a aplicação em produção fica registrada como BLOQUEADO. | Sim |

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,8 +43,10 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const r = await fetch(
+    const r = await fetchWithTimeout(
       `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(connection.api_token!)}&limit=200`,
+      {},
+      15_000,
     );
     if (!r.ok) {
       const txt = await r.text();
