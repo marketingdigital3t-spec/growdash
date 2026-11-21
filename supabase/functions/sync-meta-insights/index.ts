@@ -5,6 +5,7 @@ import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
     // Cron-only path: pg_cron invokes with the service role key. Client-controlled
     // body flags are NOT trusted for skipping auth.
-    const isCron = bearer.length > 0 && bearer === supabaseServiceKey;
+    const isCron = bearer.length > 0 && secretsMatch(bearer, supabaseServiceKey);
 
     let userId: string | null = null;
     if (!isCron) {

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -23,7 +24,7 @@ Deno.serve(async (req) => {
     if (!integration) return json({ error: "Conecte uma conta Google antes de enviar e-mails." }, 409);
     let token = (await getFreshGoogleToken(admin, integration)).accessToken;
     const raw = [`To: ${to}`, `Subject: ${subject}`, "MIME-Version: 1.0", "Content-Type: text/html; charset=UTF-8", "", html].join("\r\n");
-    const request = () => fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: b64url(raw) }) });
+    const request = () => fetchWithTimeout("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: b64url(raw) }) }, 15_000);
     let response = await request();
     if (response.status === 401) { token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken; response = await request(); }
     const payload = await response.json().catch(() => ({}));
