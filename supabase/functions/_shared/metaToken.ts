@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "../../src/lib/syncReliabilityPolicy.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 export type MetaTokenInspection = {
   isValid: boolean;
   expiresAt: string | null;

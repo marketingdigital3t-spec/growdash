@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "../../src/lib/syncReliabilityPolicy.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 
 export type GoogleTokenStatus = "healthy" | "expiring" | "error" | "reauthorization_required";
