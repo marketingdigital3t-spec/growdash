@@ -28,6 +28,13 @@ describe("resilience helpers", () => {
     clearRecoveryAttempts("chunk:traffic");
   });
 
+  it("blocks the second automatic chunk recovery", () => {
+    clearRecoveryAttempts("chunk-reload");
+    expect(consumeRecoveryAttempt("chunk-reload", 120_000, 1).blocked).toBe(false);
+    expect(consumeRecoveryAttempt("chunk-reload", 120_000, 1).blocked).toBe(true);
+    clearRecoveryAttempts("chunk-reload");
+  });
+
   it("keeps a recovery budget when sessionStorage is unavailable", () => {
     const storage = globalThis.sessionStorage;
     vi.stubGlobal("sessionStorage", undefined);
