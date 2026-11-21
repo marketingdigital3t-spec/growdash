@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,15 +52,14 @@ Deno.serve(async (req) => {
     const accountId = `act_${numericAccountId}`;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
     const fields = "id,account_id,name,currency,timezone_name,timezone_offset_hours_utc";
-    const metaResponse = await fetch(
+    const metaResponse = await fetchWithTimeout(
       `https://graph.facebook.com/${graphVersion}/${accountId}?fields=${encodeURIComponent(fields)}`,
       {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${rawToken}`,
         },
-      },
-    );
+      }, 15_000);
     const meta = await metaResponse.json().catch(() => ({})) as MetaAccount;
 
     if (!metaResponse.ok || meta.error) {

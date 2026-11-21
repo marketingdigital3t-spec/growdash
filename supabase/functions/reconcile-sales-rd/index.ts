@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +68,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchJson(url: string): Promise<any | null> {
   try {
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url, 15_000);
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; }

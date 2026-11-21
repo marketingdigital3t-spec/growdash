@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,10 +73,9 @@ Deno.serve(async (req) => {
 
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch(
+      response = await fetchWithTimeout(
         `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(token)}&limit=1`,
-        { headers: { Accept: "application/json" } },
-      );
+        { headers: { Accept: "application/json" } }, 15_000);
       if (response.status !== 429) break;
       await response.text();
       await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
@@ -154,10 +154,9 @@ Deno.serve(async (req) => {
 
 async function ensureRDWebhooks(token: string, secret: string) {
   const callbackUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/sync-rd-crm`;
-  const listResponse = await fetch(
+  const listResponse = await fetchWithTimeout(
     `https://crm.rdstation.com/api/v1/webhooks?token=${encodeURIComponent(token)}`,
-    { headers: { Accept: "application/json" } },
-  );
+    { headers: { Accept: "application/json" } }, 15_000);
   const listPayload = listResponse.ok ? await listResponse.json().catch(() => ({})) : {};
   const existing = Array.isArray(listPayload)
     ? listPayload
@@ -172,7 +171,7 @@ async function ensureRDWebhooks(token: string, secret: string) {
     const endpoint = webhookId
       ? `https://crm.rdstation.com/api/v1/webhooks/${encodeURIComponent(String(webhookId))}?token=${encodeURIComponent(token)}`
       : `https://crm.rdstation.com/api/v1/webhooks?token=${encodeURIComponent(token)}`;
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       endpoint,
       {
         method: webhookId ? "PUT" : "POST",
@@ -184,8 +183,7 @@ async function ensureRDWebhooks(token: string, secret: string) {
           auth_header: "x-webhook-secret",
           auth_key: secret,
         }),
-      },
-    );
+      }, 15_000);
     if (!response.ok) {
       await response.text().catch(() => "");
       throw new Error(`Não foi possível configurar o webhook ${eventType} no RD Station (HTTP ${response.status}).`);

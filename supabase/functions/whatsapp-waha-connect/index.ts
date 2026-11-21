@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -38,12 +39,12 @@ Deno.serve(async (req) => {
   if (existing.data?.id) {
     await admin.from("whatsapp_numbers").update({ provider: "waha", waha_session_name: sessionName, status: "disconnected", last_error: null, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
   }
-  const create = await fetch(`${config.base}/api/sessions`, { method: "POST", headers, body: JSON.stringify({ name: sessionName, config: { metadata: { workspace_id: workspaceId, ad_account_id: adAccountId }, webhooks: [{ url: `${supabaseUrl}/functions/v1/whatsapp-waha-webhook`, events: ["message", "message.any", "session.status"] }] } }) });
+  const create = await fetchWithTimeout(`${config.base}/api/sessions`, { method: "POST", headers, body: JSON.stringify({ name: sessionName, config: { metadata: { workspace_id: workspaceId, ad_account_id: adAccountId }, webhooks: [{ url: `${supabaseUrl}/functions/v1/whatsapp-waha-webhook`, events: ["message", "message.any", "session.status"] }] } }) }, 15_000);
   const createPayload = await create.json().catch(() => ({}));
   if (!create.ok && create.status !== 422) return json({ error: createPayload?.message || createPayload?.error || "WAHA recusou a criação da sessão." }, 400);
   const upsert = await admin.from("whatsapp_numbers").upsert({ workspace_id: workspaceId, created_by: user.id, ad_account_id: adAccountId, provider: "waha", waha_session_name: sessionName, phone_number_id: sessionName, waba_id: "waha", display_phone_number: null, verified_name: account.name || null, access_token: "waha-managed", status: "disconnected", mode: "human", provider_metadata: { account_name: account.name } }, { onConflict: "workspace_id,phone_number_id" }).select("id,workspace_id,ad_account_id,provider,waha_session_name,status,mode,display_phone_number,verified_name").single();
   if (upsert.error) return json({ error: upsert.error.message }, 400);
-  const start = await fetch(`${config.base}/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: "POST", headers });
+  const start = await fetchWithTimeout(`${config.base}/api/sessions/${encodeURIComponent(sessionName)}/start`, { method: "POST", headers }, 15_000);
   if (!start.ok && start.status !== 422) return json({ error: "Sessão criada, mas não foi possível iniciá-la no WAHA.", number: upsert.data }, 502);
   return json({ number: upsert.data, session_name: sessionName, qr_required: true });
 });

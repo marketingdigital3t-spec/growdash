@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-cron-secret, apikey, content-type" };
 
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
     const snapshot = snapshots.data;
     const message = snapshot?.executive_summary || "Growdash: ainda não há resumo consolidado para esta conta. Verifique a sincronização das fontes.";
     try {
-      const response = await fetch(webhook, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: schedule.phone_e164, message, metadata: { schedule_id: schedule.id, metrics: snapshot?.unified_metrics || {}, anomalies: snapshot?.anomalies || [] } }) });
+      const response = await fetchWithTimeout(webhook, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: schedule.phone_e164, message, metadata: { schedule_id: schedule.id, metrics: snapshot?.unified_metrics || {}, anomalies: snapshot?.anomalies || [] } }) }, 15_000);
       if (!response.ok) throw new Error(`Webhook ${response.status}`);
       const next = new Date(Date.now() + 86_400_000).toISOString();
       await admin.from("whatsapp_report_schedules").update({ last_sent_at: new Date().toISOString(), next_run_at: next, last_status: "sent", last_error: null }).eq("id", schedule.id);

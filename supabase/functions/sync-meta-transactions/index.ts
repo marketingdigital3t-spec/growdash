@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,7 +57,7 @@ async function fetchTransactions(metaAccountId: string, token: string, sinceUnix
     `&since=${sinceUnix}&limit=200`;
   let pages = 0;
   while (url && pages < MAX_TRANSACTION_PAGES) {
-    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res: Response = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } }, 15_000);
     const json: any = await res.json();
     if (json.error) throw new Error(json.error.message || "Meta API error");
     if (Array.isArray(json.data)) all.push(...json.data);

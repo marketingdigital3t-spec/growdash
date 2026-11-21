@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,14 +21,14 @@ async function userFor(req: Request) {
 
 async function meta(token: string, id: string, fields: Record<string, string>) {
   const query = new URLSearchParams({ access_token: token, ...fields });
-  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${id}?${query}`);
+  const response = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${id}?${query}`, {}, 15_000);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.error) throw new Error(String(data?.error?.message || `META_HTTP_${response.status}`));
   return data;
 }
 
 async function mutate(token: string, id: string, fields: Record<string, string>) {
-  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${id}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ access_token: token, ...fields }) });
+  const response = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${id}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ access_token: token, ...fields }) }, 15_000);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.error) throw new Error(String(data?.error?.message || `META_HTTP_${response.status}`));
   return data;

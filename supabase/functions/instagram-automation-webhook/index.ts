@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-hub-signature-256", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
             if (triggerEvent !== (event.type === "instagram_message" ? "message" : "comment")) continue;
             const keyword = String(trigger.parameters?.keyword || "").trim().toLocaleLowerCase("pt-BR");
             if (keyword && !String(event.text ?? "").toLocaleLowerCase("pt-BR").includes(keyword)) continue;
-            const response = await fetch(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { ...event, social_account_id: account.id, provider_account_id: providerAccountId }, idempotency_key: `instagram:${automation.id}:${event.id || crypto.randomUUID()}` }) });
+            const response = await fetchWithTimeout(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { ...event, social_account_id: account.id, provider_account_id: providerAccountId }, idempotency_key: `instagram:${automation.id}:${event.id || crypto.randomUUID()}` }) }, 15_000);
             const data = await response.json().catch(() => ({}));
             results.push({ automation_id: automation.id, automation_name: automation.name, event: event.type, status: response.ok ? data?.status || "processed" : "failed", detail: data?.error ?? null });
             continue;
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
           if (config.social_account_id && config.social_account_id !== account.id) continue;
           const keyword = String(config.keyword ?? "").trim().toLocaleLowerCase("pt-BR");
           if (keyword && !String(event.text ?? "").toLocaleLowerCase("pt-BR").includes(keyword)) continue;
-          const response = await fetch(runUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ automation_id: automation.id, trigger_event: { ...event, social_account_id: account.id, provider_account_id: providerAccountId }, dry_run: false }) });
+          const response = await fetchWithTimeout(runUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ automation_id: automation.id, trigger_event: { ...event, social_account_id: account.id, provider_account_id: providerAccountId }, dry_run: false }) }, 15_000);
           const data = await response.json().catch(() => ({}));
           results.push({ automation_id: automation.id, automation_name: automation.name, event: event.type, status: response.ok ? "processed" : "failed", detail: data?.error ?? null });
         }

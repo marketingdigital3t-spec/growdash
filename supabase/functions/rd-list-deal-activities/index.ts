@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
@@ -50,7 +51,7 @@ async function listActivities(token: string, dealId: string) {
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));
     url.searchParams.set("limit", String(pageSize));
-    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    const response = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 15_000);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(`RD activities HTTP ${response.status}`);
     const rows = activityList(payload);
