@@ -19,6 +19,13 @@ deploy/.env
 .vinxi
 .tanstack/**
 
+# Resíduo de build do Next.js. O projeto é Vite; um build do Next.js deixado
+# pela metade gerava `.next/types/*.ts` que o ESLint varriava, produzindo 71
+# erros falsos e travando o loop-engineering. Ignorar aqui evita que o
+# diretório volte ao status do Git.
+.next
+.next.residuo-nextjs-orfao
+
 # Perfil persistente do Playwright usado pelo traffic-agent. Os cookies e a
 # sessão do Ads Manager neste diretório equivalem a acesso total à conta de
 # anúncios: nunca devem entrar no histórico do Git.
@@ -60,3 +67,12 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 
 # Scratch de trabalho do superpowers (ledger de planos)
 .superpowers/
+
+# Cópias de backup que o Claude Sonnet 5 Code cria ao editar ("arquivo 2.tsx").
+# Nenhuma é importada pelo projeto; versioná-las polui o lint, o TypeScript
+# e a revisão de diff.
+* 2.ts
+* 2.tsx
+* 2.json
+* 2.md
+* 2.jpg
