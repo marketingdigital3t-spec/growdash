@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 
 export type GoogleTokenStatus = "healthy" | "expiring" | "error" | "reauthorization_required";
@@ -40,7 +41,7 @@ async function refreshGoogleToken(admin: any, integrationId: string, fallbackRef
     refresh_token: refreshToken,
     grant_type: "refresh_token",
   });
-  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+  const response = await fetchWithTimeout("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }, 15_000);
   const next = await response.json().catch(() => ({}));
   if (!response.ok || !next.access_token) {
     const code = String(next?.error || (response.status === 401 ? "invalid_grant" : "token_refresh_failed"));

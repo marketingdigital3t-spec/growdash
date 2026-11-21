@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -43,7 +44,9 @@ async function readAll(table: string, select: string, funnelId: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  if (!bearer || bearer !== serviceKey) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+  // resposta. O padrão do repositório é `secretsMatch`.
+  if (!secretsMatch(bearer, serviceKey)) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   try {
     const { data: funnels, error: funnelError } = await admin.from("rd_funnels").select("id,user_id,ad_account_id,name").eq("is_active", true).not("rd_funnel_id", "is", null);
     if (funnelError) throw funnelError;

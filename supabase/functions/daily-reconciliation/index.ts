@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { secretsMatch } from "../_shared/secretsMatch.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -8,7 +9,7 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 async function invokeFn(name: string, body: Record<string, unknown> = {}) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+  const res = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -16,7 +17,7 @@ async function invokeFn(name: string, body: Record<string, unknown> = {}) {
       apikey: SERVICE_ROLE,
     },
     body: JSON.stringify(body),
-  });
+  }, 15_000);
   const text = await res.text();
   let data: unknown = text;
   try { data = JSON.parse(text); } catch { /* keep text */ }

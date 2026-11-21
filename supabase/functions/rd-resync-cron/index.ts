@@ -6,6 +6,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -21,8 +23,11 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
   const cronSecret = Deno.env.get("RD_RESYNC_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-  const isService = Boolean(bearer && bearer === SERVICE_ROLE_KEY);
-  const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+  // resposta. O padrão do repositório é `secretsMatch` (usado por mais sete
+  // Edge Functions).
+  const isService = secretsMatch(bearer, SERVICE_ROLE_KEY);
+  const isCron = secretsMatch(req.headers.get("x-cron-secret"), cronSecret);
   if (!isService && !isCron) {
     console.warn("rd-resync-cron: unauthorized caller", {
       hasBearer: Boolean(bearer),
@@ -81,7 +86,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/rd-sync-deals`, {
+        const resp = await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/rd-sync-deals`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -94,7 +99,7 @@ Deno.serve(async (req) => {
             rd_connection_id: f.rd_connection_id,
             cron_trigger: true,
           }),
-        });
+        }, 15_000);
         const json = await resp.json().catch(() => ({}));
         summary.push({
           funnel_id: f.id,

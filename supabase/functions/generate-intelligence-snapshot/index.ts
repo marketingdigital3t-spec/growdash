@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { canonicalMetaLeads } from "../_shared/metaLeadMetrics.ts";
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
@@ -123,7 +124,10 @@ Deno.serve(async (req) => {
     const aiUrl = Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions";
     const aiModel = Deno.env.get("AI_MODEL") || "gpt-4.1-mini";
     if (aiKey) {
-      const ai = await fetch(aiUrl, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: aiModel, messages: [{ role: "system", content: "Você é o resumo executivo diário da Growdash. Responda em português, até 100 palavras, use somente os números fornecidos, destaque risco e uma ação. Valores null significam indisponível, nunca zero. Não invente dados." }, { role: "user", content: JSON.stringify({ account: account.name, date, timezone, attribution_window: attributionWindow, metrics }) }] }) });
+      // `stream: false` é explícito: a resposta não-streaming devolve o resumo
+      // completo em `choices[0].message.content`. O deadline impede que uma
+      // OpenAI pendurada consuma o runtime inteiro da Edge Function.
+      const ai = await fetchWithTimeout(aiUrl, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: aiModel, stream: false, messages: [{ role: "system", content: "Você é o resumo executivo diário da Growdash. Responda em português, até 100 palavras, use somente os números fornecidos, destaque risco e uma ação. Valores null significam indisponível, nunca zero. Não invente dados." }, { role: "user", content: JSON.stringify({ account: account.name, date, timezone, attribution_window: attributionWindow, metrics }) }] }) }, 20_000);
       if (ai.ok) executiveSummary = (await ai.json())?.choices?.[0]?.message?.content || executiveSummary;
     }
     const payload = { workspace_id: account.workspace_id, ad_account_id: accountId, snapshot_date: date, account_timezone: timezone, attribution_window: attributionWindow, source_freshness: { meta: account.last_sync_success_at, generated_at: new Date().toISOString() }, unified_metrics: metrics, executive_summary: executiveSummary, model: aiKey ? aiModel : "deterministic-fallback" };

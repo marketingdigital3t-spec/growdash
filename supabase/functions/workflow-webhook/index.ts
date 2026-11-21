@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, x-workflow-secret", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const MAX_BODY = 256 * 1024;
@@ -29,7 +30,7 @@ Deno.serve(async (req) => {
   await admin.from("growdash_workflow_webhooks").update({ last_received_at: new Date().toISOString() }).eq("workflow_id", hook.workflow_id).eq("path_token", token);
   const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
   if (internalSecret.length < 24) return json({ error: "AUTOMATION_INTERNAL_SECRET não configurado" }, 503);
-  const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: hook.workflow_id, input: payload, idempotency_key: req.headers.get("x-idempotency-key") || payload?.id || payload?.leadgen_id || crypto.randomUUID(), mode: "webhook" }) });
+  const response = await fetchWithTimeout(`${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: hook.workflow_id, input: payload, idempotency_key: req.headers.get("x-idempotency-key") || payload?.id || payload?.leadgen_id || crypto.randomUUID(), mode: "webhook" }) }, 15_000);
   const result = await response.json().catch(() => ({}));
   return json(result, response.status);
 });

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,7 +135,7 @@ Regras:
 - Sempre dê um nome curto e descritivo à visualização (ex: "Funil LP Expert X").
 - NÃO inclua os widgets de sistema (ask_ai, budget_bm, campaigns_detail) — eles são adicionados automaticamente.`;
 
-    const resp = await fetch(apiUrl, {
+    const resp = await fetchWithTimeout(apiUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -147,7 +148,7 @@ Regras:
         tools,
         tool_choice: "required",
       }),
-    });
+    }, 60_000);
 
     if (!resp.ok) {
       if (resp.status === 429) return new Response(JSON.stringify({ error: "Limite atingido. Tente novamente em alguns segundos." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 export type MetaTokenInspection = {
   isValid: boolean;
   expiresAt: string | null;
@@ -30,7 +31,7 @@ export async function inspectMetaToken(
   const debugUrl = new URL("https://graph.facebook.com/debug_token");
   debugUrl.searchParams.set("input_token", token);
   debugUrl.searchParams.set("access_token", `${appId}|${appSecret}`);
-  const response = await fetch(debugUrl, { headers: { Accept: "application/json" } });
+  const response = await fetchWithTimeout(debugUrl, { headers: { Accept: "application/json" } }, 15_000);
   const payload = await response.json().catch(() => ({}));
   const error = payload?.error;
   const data = payload?.data ?? {};

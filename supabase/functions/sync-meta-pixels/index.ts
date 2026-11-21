@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
       try {
         // 1) List pixels/datasets in this ad account
         const pxUrl = `${graphBase}/${meta}/adspixels?fields=id,name&access_token=${acc.access_token}`;
-        const pxRes = await fetch(pxUrl);
+        const pxRes = await fetchWithTimeout(pxUrl, {}, 15_000);
         const pxJson = await pxRes.json();
         if (pxJson.error) {
           errors.push(`${acc.name}: ${pxJson.error.message}`);
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
           // 2a) Pixel stats → which standard events have fired
           try {
             const statsUrl = `${graphBase}/${px.id}/stats?aggregation=event&access_token=${acc.access_token}`;
-            const statsRes = await fetch(statsUrl);
+            const statsRes = await fetchWithTimeout(statsUrl, {}, 15_000);
             const statsJson = await statsRes.json();
             const seen = new Set<string>();
             for (const row of (statsJson.data || []) as any[]) {
@@ -141,7 +142,7 @@ Deno.serve(async (req) => {
           // 2b) Custom conversions on this pixel
           try {
             const ccUrl = `${graphBase}/${meta}/customconversions?fields=id,name,custom_event_type,pixel&limit=200&access_token=${acc.access_token}`;
-            const ccRes = await fetch(ccUrl);
+            const ccRes = await fetchWithTimeout(ccUrl, {}, 15_000);
             const ccJson = await ccRes.json();
             for (const cc of (ccJson.data || []) as any[]) {
               // Filter to this pixel if pixel info present

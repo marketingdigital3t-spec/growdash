@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,7 +90,7 @@ Deno.serve(async (req) => {
 
         // Fetch account balance info from Meta API with all relevant financial fields
         const url = `${graphBase}/${metaAccountId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${accessToken}`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, 15_000);
         const data = await res.json();
 
         if (data.error) {

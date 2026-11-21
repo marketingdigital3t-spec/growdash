@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { cancelWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, x-client-info, content-type",
@@ -25,8 +26,8 @@ Deno.serve(async (req) => {
   if (!member) return json({ error: "Workspace não autorizado" }, 403);
   const number = Array.isArray((conversation as any).whatsapp_numbers) ? (conversation as any).whatsapp_numbers[0] : (conversation as any).whatsapp_numbers;
   const response = number.provider === "waha"
-    ? await fetch(`${(Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "")}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${conversation.wa_contact_id}@c.us`, text }) })
-    : await fetch(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: conversation.wa_contact_id, type: "text", text: { body: text } }) });
+    ? await fetchWithTimeout(`${(Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "")}/api/sendText`, { method: "POST", headers: { "Content-Type": "application/json", "X-Api-Key": Deno.env.get("WAHA_API_KEY") || "" }, body: JSON.stringify({ session: number.waha_session_name, chatId: `${conversation.wa_contact_id}@c.us`, text }) }, 15_000)
+    : await fetchWithTimeout(`https://graph.facebook.com/v23.0/${number.phone_number_id}/messages`, { method: "POST", headers: { Authorization: `Bearer ${number.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ messaging_product: "whatsapp", to: conversation.wa_contact_id, type: "text", text: { body: text } }) }, 15_000);
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.error) return json({ error: result.error?.message || result.message || "O provedor recusou o envio." }, 400);
   const wamid = result.messages?.[0]?.id || result.id || result.messageId || crypto.randomUUID();

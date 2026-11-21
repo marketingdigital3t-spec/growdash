@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveAuthorizedAdAccounts } from "../_shared/adAccountAccess.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -46,7 +47,7 @@ async function executeMetaChange(account: Account, entityId: string, changes: { 
   const payload = new URLSearchParams({ access_token: account.access_token });
   if (changes.status) payload.set("status", changes.status);
   if (changes.daily_budget != null) payload.set("daily_budget", String(Math.round(changes.daily_budget * 100)));
-  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${entityId}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: payload });
+  const response = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${entityId}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: payload }, 15_000);
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result?.error) return { ok: false, error: safe(result?.error?.message || `META_HTTP_${response.status}`) };
   return { ok: true, result };
