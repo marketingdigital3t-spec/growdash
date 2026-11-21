@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,11 +10,11 @@ type Result = { ok: boolean; status: number; body: Record<string, unknown> };
 
 async function invoke(base: string, key: string, name: string, body: Record<string, unknown>): Promise<Result> {
   try {
-    const response = await fetch(`${base}/functions/v1/${name}`, {
+    const response = await fetchWithTimeout(`${base}/functions/v1/${name}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }, 15_000);
     const text = await response.text();
     let parsed: Record<string, unknown> = {};
     try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { response: text.slice(0, 2000) }; }

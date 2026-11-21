@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,8 +55,10 @@ Deno.serve(async (req) => {
     };
     // Leitura do estado REAL na Meta antes de qualquer mutação. Validar depois
     // do POST é tarde: a mudança já aconteceu e o gasto já foi feito.
-    const remoteRead = await fetch(
+    const remoteRead = await fetchWithTimeout(
       `https://graph.facebook.com/${graphVersion}/${proposal.entity_id}?fields=status,daily_budget&access_token=${account.access_token}`,
+      {},
+      15_000,
     );
     const remoteAdset = await remoteRead.json().catch(() => ({}));
     if (!remoteRead.ok || remoteAdset?.error) {
@@ -93,7 +96,7 @@ Deno.serve(async (req) => {
     if (change.status) payload.set("status", change.status);
     if (change.daily_budget != null) payload.set("daily_budget", String(Math.round(Number(change.daily_budget) * 100)));
     await admin.from("traffic_action_audit").insert({ workspace_id: workspace.id, proposal_id: proposal.id, event_type: "executing", actor_id: user.id, old_value: expected, new_value: change });
-    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${proposal.entity_id}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: payload });
+    const response = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${proposal.entity_id}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: payload }, 15_000);
     const provider = await response.json().catch(() => ({}));
     if (!response.ok || provider?.error) {
       await failProposal(String(provider?.error?.message || `META_HTTP_${response.status}`).slice(0, 500));

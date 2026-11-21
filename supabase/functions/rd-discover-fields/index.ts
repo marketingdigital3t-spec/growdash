@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +47,7 @@ async function fetchRDCustomFields(token: string): Promise<RDField[]> {
   const all: RDField[] = [];
   for (let page = 1; page <= 10; page++) {
     const url = `https://crm.rdstation.com/api/v1/custom_fields?token=${encodeURIComponent(token)}&page=${page}&limit=200`;
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url, {}, 15_000);
     if (!r.ok) {
       console.log(`[rd-discover] /custom_fields page ${page} status=${r.status}`);
       break;

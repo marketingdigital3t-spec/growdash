@@ -4,6 +4,7 @@ import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
 import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
 import { aggregateSyncStatus, finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -497,12 +498,12 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       let response: Response;
       try {
-        response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+        response = await fetchWithTimeout(`${supabaseUrl}/functions/v1/${name}`, {
           method: "POST",
           headers: { Authorization: authHeader, "Content-Type": "application/json" },
           body: JSON.stringify(body),
           signal: controller.signal,
-        });
+        }, 15_000);
       } finally {
         clearTimeout(timeout);
       }

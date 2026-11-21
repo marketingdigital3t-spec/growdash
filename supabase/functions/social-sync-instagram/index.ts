@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function graphJson(url: URL) {
   let response: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    response = await fetch(url, { headers: { Accept: "application/json" } });
+    response = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 15_000);
     if (response.status !== 429) break;
     await response.text();
     await sleep(800 * (attempt + 1));

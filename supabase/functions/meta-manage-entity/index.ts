@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,9 +55,9 @@ Deno.serve(async (req) => {
         deep_copy: "true",
         rename_options: JSON.stringify({ rename_strategy: "DEEP_RENAME", rename_prefix: `${name} — ` }),
       });
-      const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${campaignId}/copies`, {
+      const metaResponse = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${campaignId}/copies`, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: copyPayload,
-      });
+      }, 15_000);
       const metaResult = await metaResponse.json().catch(() => ({}));
       const duplicateId = String(metaResult?.copied_campaign_id ?? metaResult?.id ?? "");
       if (!metaResponse.ok || metaResult?.error || !/^[0-9]{5,30}$/.test(duplicateId)) {
@@ -67,9 +68,9 @@ Deno.serve(async (req) => {
       // A cópia da Meta pode receber um nome automático. Renomeie e mantenha
       // pausada antes de devolvê-la à interface para edição.
       const updatePayload = new URLSearchParams({ access_token: account.access_token, name, status: "PAUSED" });
-      const updateResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${duplicateId}`, {
+      const updateResponse = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${duplicateId}`, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: updatePayload,
-      });
+      }, 15_000);
       const updateResult = await updateResponse.json().catch(() => ({}));
       if (!updateResponse.ok || updateResult?.error) return json({ error: updateResult?.error?.message ?? "A cópia foi criada, mas não pôde ser pausada para revisão." }, 422);
 
@@ -111,11 +112,11 @@ Deno.serve(async (req) => {
         special_ad_categories: "[]",
       });
       const providerAccountId = String(account.account_id ?? "").replace(/^act_/i, "");
-      const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/act_${providerAccountId}/campaigns`, {
+      const metaResponse = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/act_${providerAccountId}/campaigns`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: metaPayload,
-      });
+      }, 15_000);
       const metaResult = await metaResponse.json().catch(() => ({}));
       if (!metaResponse.ok || metaResult?.error || !metaResult?.id) {
         const message = metaResult?.error?.message ?? "A Meta recusou a criação";
@@ -216,11 +217,11 @@ Deno.serve(async (req) => {
     }
 
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
-    const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${entityId}`, {
+    const metaResponse = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${entityId}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: metaPayload,
-    });
+    }, 15_000);
     const metaResult = await metaResponse.json().catch(() => ({}));
     if (!metaResponse.ok || metaResult?.error) {
       const message = metaResult?.error?.message ?? "A Meta recusou a alteração";

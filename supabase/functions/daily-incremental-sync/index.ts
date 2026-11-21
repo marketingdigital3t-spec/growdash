@@ -5,6 +5,7 @@ import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../
 import { finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
 import { buildLeadSyncWindow, selectRotatingRDSyncTargets } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,7 +101,7 @@ async function callFunction(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${baseUrl}/functions/v1/${functionName}`, {
+    const response = await fetchWithTimeout(`${baseUrl}/functions/v1/${functionName}`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${serviceKey}`,
@@ -109,7 +110,7 @@ async function callFunction(
       },
       body: JSON.stringify(body),
       signal: controller.signal,
-    });
+    }, 15_000);
     const raw = await response.text();
     let parsed: Record<string, unknown>;
     try {

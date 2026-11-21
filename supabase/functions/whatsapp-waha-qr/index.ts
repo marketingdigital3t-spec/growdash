@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, x-client-info, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
   const base = (Deno.env.get("WAHA_BASE_URL") || "").replace(/\/$/, "");
   const apiKey = Deno.env.get("WAHA_API_KEY") || "";
   if (!base || !apiKey) return json({ error: "WAHA não configurado." }, 503);
-  const response = await fetch(`${base}/api/${encodeURIComponent(number.waha_session_name)}/auth/qr`, { headers: { "X-Api-Key": apiKey } });
+  const response = await fetchWithTimeout(`${base}/api/${encodeURIComponent(number.waha_session_name)}/auth/qr`, { headers: { "X-Api-Key": apiKey } }, 15_000);
   if (!response.ok) return json({ error: "QR Code ainda não está disponível.", status: response.status }, 502);
   const contentType = response.headers.get("content-type") || "image/png";
   const bytes = new Uint8Array(await response.arrayBuffer());

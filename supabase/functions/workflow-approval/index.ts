@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
   const { data: run } = await admin.from("growdash_automation_runs").select("automation_id").eq("id", approval.run_id).maybeSingle();
   const secret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
   if (!run?.automation_id || secret.length < 24) return json({ error: "Executor interno indisponível." }, 503);
-  const response = await fetch(`${base}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": secret }, body: JSON.stringify({ workflow_id: run.automation_id, mode: "resume", approval_id: approval.id, idempotency_key: `approval:${approval.id}` }) });
+  const response = await fetchWithTimeout(`${base}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": secret }, body: JSON.stringify({ workflow_id: run.automation_id, mode: "resume", approval_id: approval.id, idempotency_key: `approval:${approval.id}` }) }, 15_000);
   const result = await response.json().catch(() => ({}));
   return json(result, response.status);
 });

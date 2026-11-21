@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
       return json({ error: "Acesso negado: usuário não é admin/master" }, 403);
     }
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/daily-reconciliation`, {
+    const response = await fetchWithTimeout(`${supabaseUrl}/functions/v1/daily-reconciliation`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
         apikey: serviceKey,
       },
       body: JSON.stringify({ trigger_source: "manual" }),
-    });
+    }, 15_000);
 
     if (!response.ok) return json({ error: "Erro ao executar reconciliação", status: response.status }, 500);
 

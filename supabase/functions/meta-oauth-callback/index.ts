@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { inspectMetaToken } from "../_shared/metaToken.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const resultPage = (status: "success" | "error", message: string, accounts = 0) => {
   const appUrl = (Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").replace(/\/$/, "");
@@ -51,7 +52,7 @@ async function fetchPagedAccounts(graphVersion: string, path: string, accessToke
     accountsUrl.searchParams.set("access_token", accessToken);
     if (after) accountsUrl.searchParams.set("after", after);
 
-    const response = await fetch(accountsUrl, { headers: { Accept: "application/json" } });
+    const response = await fetchWithTimeout(accountsUrl, { headers: { Accept: "application/json" } }, 15_000);
     const result = await response.json().catch(() => ({})) as MetaPage<MetaAccount>;
     if (!response.ok || result.error) {
       return { accounts, error: result.error?.message || `HTTP ${response.status}` };
@@ -112,7 +113,7 @@ Deno.serve(async (req) => {
     tokenUrl.searchParams.set("client_secret", appSecret);
     tokenUrl.searchParams.set("redirect_uri", redirectUri);
     tokenUrl.searchParams.set("code", code);
-    const tokenResponse = await fetch(tokenUrl, { headers: { Accept: "application/json" } });
+    const tokenResponse = await fetchWithTimeout(tokenUrl, { headers: { Accept: "application/json" } }, 15_000);
     const tokenResult = await tokenResponse.json().catch(() => ({}));
     if (!tokenResponse.ok || !tokenResult.access_token) {
       console.error("Meta short token exchange failed", tokenResult?.error?.code ?? tokenResponse.status);
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
     longTokenUrl.searchParams.set("client_id", appId);
     longTokenUrl.searchParams.set("client_secret", appSecret);
     longTokenUrl.searchParams.set("fb_exchange_token", tokenResult.access_token);
-    const longResponse = await fetch(longTokenUrl, { headers: { Accept: "application/json" } });
+    const longResponse = await fetchWithTimeout(longTokenUrl, { headers: { Accept: "application/json" } }, 15_000);
     const longResult = await longResponse.json().catch(() => ({}));
     const accessToken = longResponse.ok && longResult.access_token
       ? String(longResult.access_token)
@@ -150,10 +151,9 @@ Deno.serve(async (req) => {
     // Merge Business Manager assets as well: /me/adaccounts may omit client
     // accounts that the profile can still manage.
     {
-      const businessesResponse = await fetch(
+      const businessesResponse = await fetchWithTimeout(
         `https://graph.facebook.com/${graphVersion}/me/businesses?fields=id&limit=100&access_token=${encodeURIComponent(accessToken)}`,
-        { headers: { Accept: "application/json" } },
-      );
+        { headers: { Accept: "application/json" } }, 15_000);
       const businessesResult = await businessesResponse.json().catch(() => ({})) as MetaPage<{ id?: string }>;
       if (businessesResponse.ok && !businessesResult.error) {
         for (const business of businessesResult.data ?? []) {

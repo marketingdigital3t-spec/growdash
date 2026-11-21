@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -22,7 +23,7 @@ async function userFor(req: Request) {
 async function graph(accountToken: string, path: string, method = "GET", fields: Record<string, string> = {}) {
   const payload = new URLSearchParams({ access_token: accountToken, ...fields });
   const endpoint = `https://graph.facebook.com/${graphVersion}/${path}${method === "GET" ? `?${payload.toString()}` : ""}`;
-  const response = await fetch(endpoint, { method, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: method === "GET" ? undefined : payload });
+  const response = await fetchWithTimeout(endpoint, { method, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: method === "GET" ? undefined : payload }, 15_000);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.error) throw new Error(String(data?.error?.message || `META_HTTP_${response.status}`));
   return data;

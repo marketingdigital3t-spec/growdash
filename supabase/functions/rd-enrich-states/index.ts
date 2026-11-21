@@ -1,6 +1,7 @@
 // Enrich rd_deals.lead_state for deals missing state by re-fetching contacts from RD CRM.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +79,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function fetchJson(url: string, attempts = 3): Promise<any | null> {
   for (let i = 0; i < attempts; i++) {
     try {
-      const r = await fetch(url);
+      const r = await fetchWithTimeout(url, {}, 15_000);
       if (r.ok) return await r.json();
       if ([429, 500, 502, 503, 504].includes(r.status) && i < attempts - 1) {
         await sleep(500 * (i + 1) ** 2);

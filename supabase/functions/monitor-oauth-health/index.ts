@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveMetaPermissionStatus } from "../_shared/metaPermissions.ts";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 
@@ -33,7 +34,7 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
   const debugUrl = new URL("https://graph.facebook.com/debug_token");
   debugUrl.searchParams.set("input_token", token);
   debugUrl.searchParams.set("access_token", `${appId}|${appSecret}`);
-  const response = await fetch(debugUrl, { headers: { Accept: "application/json" } });
+  const response = await fetchWithTimeout(debugUrl, { headers: { Accept: "application/json" } }, 15_000);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error) {
     return {
@@ -82,7 +83,7 @@ async function checkInstagramToken(token: string, version: string): Promise<Toke
   const profileUrl = new URL(`https://graph.instagram.com/${version}/me`);
   profileUrl.searchParams.set("fields", "id,username");
   profileUrl.searchParams.set("access_token", token);
-  const response = await fetch(profileUrl, { headers: { Accept: "application/json" } });
+  const response = await fetchWithTimeout(profileUrl, { headers: { Accept: "application/json" } }, 15_000);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.error || !payload?.id) {
     return {
