@@ -75,7 +75,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const queryClient = useQueryClient();
   const inFlight = useRef(new Map<string, Promise<void>>());
   const invalidateTimer = useRef<number | null>(null);
-  const [state, setState] = useState<SyncState>("idle");
+  const [metaState, setMetaState] = useState<SyncState>("idle");
+  const [rdState, setRdState] = useState<SyncState>("idle");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     const task = withInFlightScope(inFlight.current, scope, async () => {
       invalidationGate.current.syncInFlight = true;
       try {
-        if (isCurrentScope()) setState("refreshing");
+        if (isCurrentScope()) setMetaState("refreshing");
         // Refresh only the selected scope's recent provider window. The
         // persisted snapshot remains the source for the selected historical
         // period; no global or historical reconciliation runs on navigation.
@@ -181,7 +182,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
             if (isCurrentScope()) {
               setSyncError(backgroundSyncStatus().message);
               setLastUpdatedAt(new Date());
-              setState(backgroundSyncStatus().state);
+              setMetaState(backgroundSyncStatus().state);
             }
             // Do not cancel the Edge Function. It may still persist a valid
             // snapshot after the five-second UI deadline.
@@ -189,7 +190,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
               if (lateError || lateData?.error || ["failed", "error"].includes(String(lateData?.meta_status || lateData?.status || ""))) {
                 if (isCurrentScope()) {
                   setSyncError("Meta não concluiu a atualização. O último snapshot válido permanece visível.");
-                  setState(hasCachedSnapshot() ? "partial" : "error");
+                  setMetaState(hasCachedSnapshot() ? "partial" : "error");
                 }
                 return;
               }
@@ -197,14 +198,14 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
                 setSyncError(null);
                 if (lateData?.synced_at) setLastSyncAt(new Date(lateData.synced_at));
                 setLastUpdatedAt(new Date());
-                setState(String(lateData?.meta_status || lateData?.status || "success") === "partial" ? "partial" : "fresh");
+                setMetaState(String(lateData?.meta_status || lateData?.status || "success") === "partial" ? "partial" : "fresh");
               }
               invalidateLiveQueries();
             }).catch((lateError) => {
               console.warn("[near-realtime-sync] Meta reconciliation after UI deadline", lateError);
               if (isCurrentScope()) {
                 setSyncError("Meta não concluiu a atualização. O último snapshot válido permanece visível.");
-                setState(hasCachedSnapshot() ? "partial" : "error");
+                setMetaState(hasCachedSnapshot() ? "partial" : "error");
               }
             });
           } else {
@@ -230,7 +231,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           if (!metaFailed) setRdSyncError(null);
           if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
           setLastUpdatedAt(new Date());
-          setState(failure?.state || (metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh"));
+          setMetaState(failure?.state || (metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh"));
           if (!failure && ["failed", "partial", "error"].includes(metaStatus)) {
             setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
           }
@@ -279,7 +280,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
             if (isCurrentScope()) {
               const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "RD", message });
               setRdSyncError(failure.message);
-              setState((current) => current === "error" ? current : failure.state);
+              setRdState((current) => current === "error" ? current : failure.state);
             }
             return;
           }
@@ -291,7 +292,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
             const message = rdError instanceof Error ? rdError.message : String(rdError);
             const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "RD", message });
             setRdSyncError(failure.message);
-            setState((current) => current === "error" ? current : failure.state);
+            setRdState((current) => current === "error" ? current : failure.state);
           }
         });
         // The selected Meta snapshot is the response that unblocks the UI.
@@ -307,7 +308,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           const message = error instanceof Error ? error.message : String(error);
           const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message });
           setSyncError(failure.message);
-          setState(failure.state);
+          setMetaState(failure.state);
         }
       } finally {
         // As gravações do sync chegaram enquanto ele rodava. Uma única
@@ -355,5 +356,5 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     };
   }, [enabled, invalidateLiveQueries, scope]);
 
-  return { state, lastUpdatedAt, lastSyncAt, syncError, rdSyncError, refresh };
+  return { metaState, rdState, lastUpdatedAt, lastSyncAt, syncError, rdSyncError, refresh };
 }
