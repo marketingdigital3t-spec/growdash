@@ -32,10 +32,12 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   status: "hydrating",
   errorMessage: null,
+  sessionExpired: false,
   retrySession: async () => {},
   signOut: async () => {},
   bootstrap: createBootstrapSnapshot(),
   setBootstrapStep: () => {},
+  setSessionExpired: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
