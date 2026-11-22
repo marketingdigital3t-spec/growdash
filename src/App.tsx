@@ -14,6 +14,7 @@ import { PhaseProvider, PhaseDevSwitcher } from "@/components/phase/PhaseProvide
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, latestBuildRecoveryUrl, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
+import { SessionExpiredBanner } from "@/components/auth/SessionExpiredBanner";
 
 // Keep the authenticated shell and the heavier workspace/agents modules out
 // of the initial bundle. The route-level Suspense boundary below gives the
@@ -239,8 +240,12 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 }
 
 function AuthenticatedLayout() {
-  const { user, loading, status, errorMessage, retrySession } = useAuth();
+  const { user, loading, status, errorMessage, retrySession, sessionExpired } = useAuth();
   if (loading) return <LoadingModule context="auth" onRetry={() => void retrySession()} />;
+  if (sessionExpired)
+    return (
+      <SessionExpiredBanner onRetry={() => void retrySession()} />
+    );
   if (status === "unavailable") return <section className="grid min-h-[52vh] place-items-center px-4 text-center"><div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl"><p className="text-lg font-black">Não foi possível validar seu acesso.</p><p className="mt-2 text-sm text-muted-foreground">{errorMessage || "Sua sessão não foi removida. Verifique a conexão e tente novamente."}</p><button type="button" onClick={() => void retrySession()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Tentar conexão</button></div></section>;
   if (!user) return <Navigate to="/auth" replace />;
   return <MfaChallengeGate><GlobalFiltersProvider><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></GlobalFiltersProvider></MfaChallengeGate>;
