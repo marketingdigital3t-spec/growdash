@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import authCosmicScene from "@/assets/auth-cosmic-scene.webp";
 import rocketFeathered from "@/assets/rocket-logo-feathered.webp";
@@ -10,11 +11,21 @@ import rocketFeathered from "@/assets/rocket-logo-feathered.webp";
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, status } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [launched, setLaunched] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+
+  // Se o usuário já está autenticado, redireciona para o dashboard.
+  // `Navigate` declarativo evita navegar durante o render, que o React
+  // proíbe e que pode entrar em loop de renderização.
+  if (user && (status === "authenticated" || status === "degraded")) {
+    return <Navigate to="/" replace />;
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
