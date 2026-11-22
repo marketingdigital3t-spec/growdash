@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import {
+  ACTION_SCOPE_TIMEOUT_MS,
+  fetchActionRows,
+  normalizeActionScopeAccountIds,
+} from "@/lib/metaActionScope";
+import { withRequestTimeout } from "@/lib/resilience";
 
 export type CustomMetricKind = "count" | "cost_per" | "rate";
 export type CustomMetricFormat = "number" | "currency" | "percent";
@@ -77,16 +84,29 @@ export interface ActionEntry { action_type: string; count: number; total: number
 
 /** Catálogo de action_types já vistos nas contas do usuário (com contagem de eventos). */
 export function useAvailableActions() {
+  const { data: adAccounts } = useAdAccounts();
+  const accountIds = normalizeActionScopeAccountIds(adAccounts);
   return useQuery({
-    queryKey: ["available_actions"],
+    queryKey: ["available_actions", accountIds],
+    // Sem o escopo de contas a policy RLS de insight_actions e reavaliada em
+    // cada linha da tabela. Ler sem filtro custa um seq scan completo e
+    // esgota o pool de conexoes do PostgREST.
+    enabled: accountIds.length > 0,
     queryFn: async (): Promise<ActionEntry[]> => {
-      const rows: any[] = [];
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from("insight_actions" as any).select("action_type, value").range(from, from + 999);
-        if (error) throw error;
-        rows.push(...(data || []));
-        if (!data || data.length < 1000) break;
-      }
+      const rows = await fetchActionRows<{ action_type: string; value: number | null }>({
+        accountIds,
+        fetchPage: async ({ accountIds: scope, from, to }) => {
+          const { data, error } = await withRequestTimeout(
+            supabase
+              .from("insight_actions" as any)
+              .select("action_type, value")
+              .in("ad_account_id", scope)
+              .range(from, to),
+            ACTION_SCOPE_TIMEOUT_MS,
+          );
+          return { rows: (data || []) as any[], error };
+        },
+      });
       const map = new Map<string, { count: number; total: number }>();
       for (const r of rows) {
         const ex = map.get(r.action_type) || { count: 0, total: 0 };
@@ -103,8 +123,11 @@ export function useAvailableActions() {
 
 /** Catálogo de action_types por conta (mapeado via ads → adsets → campaigns → ad_accounts). */
 export function useActionsByAccount() {
+  const { data: adAccounts } = useAdAccounts();
+  const accountIds = normalizeActionScopeAccountIds(adAccounts);
   return useQuery({
-    queryKey: ["actions_by_account"],
+    queryKey: ["actions_by_account", accountIds],
+    enabled: accountIds.length > 0,
     queryFn: async (): Promise<Record<string, ActionEntry[]>> => {
       const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
         supabase.from("campaigns").select("id, ad_account_id"),
@@ -114,13 +137,20 @@ export function useActionsByAccount() {
       if (campaignsRes.error) throw campaignsRes.error;
       if (adsetsRes.error) throw adsetsRes.error;
       if (adsRes.error) throw adsRes.error;
-      const actionRows: any[] = [];
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from("insight_actions" as any).select("ad_id, action_type, value").range(from, from + 999);
-        if (error) throw error;
-        actionRows.push(...(data || []));
-        if (!data || data.length < 1000) break;
-      }
+      const actionRows = await fetchActionRows<{ ad_id: string; action_type: string; value: number | null }>({
+        accountIds,
+        fetchPage: async ({ accountIds: scope, from, to }) => {
+          const { data, error } = await withRequestTimeout(
+            supabase
+              .from("insight_actions" as any)
+              .select("ad_id, action_type, value")
+              .in("ad_account_id", scope)
+              .range(from, to),
+            ACTION_SCOPE_TIMEOUT_MS,
+          );
+          return { rows: (data || []) as any[], error };
+        },
+      });
 
       const campaignToAccount = new Map<string, string>();
       for (const c of (campaignsRes.data || []) as any[]) campaignToAccount.set(c.id, c.ad_account_id);
