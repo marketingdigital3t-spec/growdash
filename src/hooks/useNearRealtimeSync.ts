@@ -10,6 +10,7 @@ import { backgroundSyncStatus, closeLiveInvalidationWindow, createLiveInvalidati
 import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
 import { canRunAutomaticSync, recordManualSync } from "@/lib/manualSyncPolicy";
 import { readSyncBackoff, recordSyncBackoff, syncBackoffDelayMs } from "@/lib/syncBackoff";
+import { useWorkspace } from "@/hooks/useWorkspace";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
