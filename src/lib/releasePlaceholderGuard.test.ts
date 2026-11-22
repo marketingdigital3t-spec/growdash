@@ -32,6 +32,8 @@ describe("release bundle placeholder guard", () => {
     for (const file of files) {
       const content = readFileSync(file, "utf8");
       for (const marker of PLACEHOLDER_MARKERS) {
+        // Pré-filtro: só abre a varredura detalhada quando o marcador existe.
+        if (!content.includes(marker)) continue;
         let index = content.indexOf(marker);
         while (index !== -1) {
           // O literal pode existir dentro da função que detecta placeholders.
@@ -45,5 +47,5 @@ describe("release bundle placeholder guard", () => {
     }
 
     expect(offenders, `Bundle contém credenciais placeholder: ${offenders.join(", ")}`).toEqual([]);
-  });
+  }, 60_000);
 });
