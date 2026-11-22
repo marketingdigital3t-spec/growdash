@@ -81,6 +81,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [rdSyncError, setRdSyncError] = useState<string | null>(null);
+  const { data: workspace } = useWorkspace();
+  const workspaceId = workspace?.id;
   const startDateKey = startDate ? businessDateKey(startDate, timezone || undefined) : "today";
   const endDateKey = endDate ? businessDateKey(endDate, timezone || undefined) : "today";
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
@@ -344,8 +346,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   }, [enabled, historicalScope, invalidateLiveQueries, scope]);
 
   useEffect(() => {
-    if (!enabled) return;
-    let channel = supabase.channel(`live-data-${scope}-${Math.random().toString(36).slice(2)}`);
+    if (!enabled || !workspaceId) return;
+    let channel = supabase.channel(`live-data-workspace-${workspaceId}`);
     for (const table of LIVE_TABLES) {
       channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, invalidateLiveQueries);
     }
@@ -354,7 +356,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
       void supabase.removeChannel(channel);
     };
-  }, [enabled, invalidateLiveQueries, scope]);
+  }, [enabled, invalidateLiveQueries, workspaceId]);
 
   return { metaState, rdState, lastUpdatedAt, lastSyncAt, syncError, rdSyncError, refresh };
 }
