@@ -13,10 +13,12 @@ interface AuthContextType {
   loading: boolean;
   status: "hydrating" | "authenticated" | "degraded" | "unauthenticated" | "unavailable";
   errorMessage: string | null;
+  sessionExpired: boolean;
   retrySession: () => Promise<void>;
   signOut: () => Promise<void>;
   bootstrap: AccessBootstrapSnapshot;
   setBootstrapStep: (step: AccessBootstrapSnapshot["step"]) => void;
+  setSessionExpired: (expired: boolean) => void;
 }
 
 function createBootstrapSnapshot(attempt = 0): AccessBootstrapSnapshot {
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthContextType["status"]>("hydrating");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState<boolean>(false);
   const [bootstrap, setBootstrap] = useState<AccessBootstrapSnapshot>(() => createBootstrapSnapshot());
   const attemptRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
@@ -77,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     timeout = window.setTimeout(() => {
       if (active && !recoverFromStorage()) {
         setStatus((current) => current === "hydrating" ? "unavailable" : current);
+        setSessionExpired(true);
         setBootstrap((current) => current.status === "hydrating" ? { ...current, status: "unavailable", updatedAt: new Date().toISOString(), errorCode: "AUTH_SESSION_TIMEOUT", errorMessage: authSessionErrorMessage(new Error("timeout")), retryAvailable: true } : current);
       }
     }, SESSION_CHECK_TIMEOUT_MS);
@@ -150,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setSessionExpired(false);
   };
 
   const setBootstrapStep = (step: AccessBootstrapSnapshot["step"]) => {
@@ -157,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, errorMessage, retrySession, signOut, bootstrap, setBootstrapStep }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading: status === "hydrating", status, errorMessage, sessionExpired, retrySession, signOut, bootstrap, setBootstrapStep, setSessionExpired }}>
       {children}
     </AuthContext.Provider>
   );
