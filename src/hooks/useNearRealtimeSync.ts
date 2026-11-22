@@ -9,6 +9,7 @@ import { describeSyncFailure } from "@/lib/syncStatus";
 import { backgroundSyncStatus, closeLiveInvalidationWindow, createLiveInvalidationGate, deferLiveInvalidation, shouldApplyLiveInvalidationNow, shouldForceSyncForContextChange, shouldUseSelectedPeriodSync, SYNC_UI_DEADLINE_MS, type SyncContext } from "@/lib/nearRealtimeSyncPolicy";
 import { readBackgroundSyncAttempt, recordBackgroundSyncAttempt } from "@/lib/backgroundSyncStorage";
 import { canRunAutomaticSync, recordManualSync } from "@/lib/manualSyncPolicy";
+import { readSyncBackoff, recordSyncBackoff, syncBackoffDelayMs } from "@/lib/syncBackoff";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -135,6 +136,13 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     const previousAttempt = readBackgroundSyncAttempt(storage, storageKey);
     if (!force && Date.now() - previousAttempt < LOCAL_DEDUP_WINDOW_MS) return;
     recordBackgroundSyncAttempt(storage, storageKey);
+
+    const backoffDelay = syncBackoffDelayMs(storage, scope);
+    if (!force && backoffDelay > 0) {
+      // Falhas consecutivas já aumentam o atraso automaticamente; aguarda o
+      // backoff antes de tentar novamente sem bloquear a navegação.
+      await new Promise((resolve) => window.setTimeout(resolve, backoffDelay));
+    }
 
     const task = withInFlightScope(inFlight.current, scope, async () => {
       invalidationGate.current.syncInFlight = true;
@@ -301,11 +309,13 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // RD continues independently and invalidates CRM queries when it
         // finishes, so a large funnel cannot keep the sync button locked.
         void rdRefresh;
+        recordSyncBackoff(storage, scope, false);
 
       } catch (error) {
         // Falha silenciosa: o histórico armazenado permanece visível e uma nova
         // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
         console.warn("[near-realtime-sync]", error);
+        recordSyncBackoff(storage, scope, true);
         if (isCurrentScope()) {
           const message = error instanceof Error ? error.message : String(error);
           const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message });
