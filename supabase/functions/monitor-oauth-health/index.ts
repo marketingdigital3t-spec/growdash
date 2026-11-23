@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 import { resolveMetaPermissionStatus } from "../_shared/metaPermissions.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 
 const corsHeaders = {
@@ -110,7 +111,9 @@ Deno.serve(async (req) => {
     const admin = createClient(url, service);
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const isService = Boolean(bearer && bearer === service);
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O padrão do repositório é `secretsMatch`.
+    const isService = secretsMatch(bearer, service);
     let user: { id: string } | null = null;
     let isCron = false;
     if (!isService) {

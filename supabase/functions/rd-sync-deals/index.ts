@@ -906,7 +906,7 @@ Deno.serve(async (req) => {
     if (funnel.ad_account_id) {
       const { data, error: fieldConfigsError } = await admin
         .from("rd_field_configs")
-        .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
+        .select("id, key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
         .eq("ad_account_id", funnel.ad_account_id);
       if (fieldConfigsError) throw fieldConfigsError;
       fieldConfigsRows = (data as FieldConfig[]) || [];
