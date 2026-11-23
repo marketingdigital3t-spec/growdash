@@ -121,6 +121,8 @@ O primeiro run do merge (`45182587373`) ainda falhou, e a causa era o meu própr
 
 Pelo lado do servidor, o CI mede `Initialising login role` levando **16,2 s** até `status 544: Failed to create login role: Connection terminated due to connection timeout`. O projeto reporta `ACTIVE_HEALTHY` e a região responde — mas o **Postgres não aceita conexão** (5432 e 6543 sem resposta TCP).
 
+**Como o navegador reporta isso:** o console de `growdash.com.br/auth` registra `Access to fetch at '.../auth/v1/token?grant_type=password' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present` seguido de `TypeError: Failed to fetch` em `signInWithPassword`. O browser acusa CORS, mas a causa é o 522: o Kong devolve a página de timeout do Cloudflare, que não tem os headers CORS do Supabase. **Não é configuração de CORS no projeto** — nenhuma mudança de código a resolve.
+
 A correção de código está publicada e verificada. O que resta é infraestrutura do Supabase: **o banco do projeto não aceita novas conexões**. Isso exige ação no painel do Supabase (verificar/restaurar a conexão do banco) ou contato com o suporte — não há alteração de código capaz de destravar um Postgres que recusa o handshake.
 
 ## Itens bloqueados
