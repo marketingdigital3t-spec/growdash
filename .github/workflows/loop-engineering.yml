@@ -207,6 +207,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -u
+          set +e
           timeout -k 10s 90s supabase link --project-ref cixnvosxqlacjbpymjha
           status=$?
           if [ "$status" -ne 0 ]; then
@@ -223,6 +224,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -u
+          set +e
           timeout -k 10s 90s supabase migration list --linked
           list_status=$?
           timeout -k 10s 90s supabase db push --linked --dry-run
@@ -263,6 +265,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -u
+          set +e
           # O fail-closed do schema é absoluto: sem dry-run validado, nenhuma
           # migration é aplicada. Só a publicação de código pode seguir sem o
           # banco acessível — publicar Edge Functions não altera o schema.
