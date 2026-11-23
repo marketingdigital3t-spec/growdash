@@ -97,9 +97,36 @@ Verificadas uma a uma em 22/11/2026 contra o código atual. **O registro origina
 - **A10** (migration sem guarda): as migrations recentes com DDL já usam `IF EXISTS` / `IF NOT EXISTS`. Sem caso real.
 - **A8** (placeholder no bundle): os literais `your-project-ref` só aparecem em guardas e testes. Sem caso real.
 
+## Estado da publicação — 23/11/2026
+
+**PRs:** #11 (`5e0b24ad` + `f899c43e`) e #12 (`bfc1708a`) — ambos mergeados na `main`.
+**Run:** `45188082141` — **conclusion: success**. Publicou as 83 Edge Functions, o bundle do frontend e o source map no Sentry.
+**Produção:** `growdash.com.br` serve `assets/app-C1hAWXOj.js`, idêntico ao do deploy `51a706d6` (commit `363923f`). Smoke pós-deploy: 16 testes visuais aprovados.
+
+### Correção adicional — o errexit do runner
+
+O primeiro run do merge (`45182587373`) ainda falhou, e a causa era o meu próprio ajuste: o runner executa os steps com `bash -e`, então a PRIMEIRA falha aborta o script **antes** do `if`, e o `exit 0` de bloqueio nunca era alcançado. O log provou: imprimiu `MIGRATIONS_BLOCKED=1` e morreu logo depois com `status 544`. Correção em `bfc1708a`: `set +e` nos três steps que já tratam o status de saída manualmente.
+
+### Causa raiz restante — o Postgres não aceita conexão
+
+**O `rd_field_configs` não era a causa da saturação.** Com a função corrigida publicada (v319) e as 83 funções no ar, o pool continua idêntico:
+
+| Requisição | Resultado |
+|---|---|
+| `/` (raiz) | 404 em 67 ms — Kong no ar |
+| `/rest/v1/` sem auth | 401 em 77 ms — recusa na borda |
+| `/rest/v1/rd_field_configs` (consulta real) | **522 em ~20 s** |
+| `/auth/v1/health` | **522 em ~19,8 s** (consistente em 20+ amostras) |
+| `/functions/v1/*` | 401 em 0,2–1,9 s — Edge Functions no ar |
+
+Pelo lado do servidor, o CI mede `Initialising login role` levando **16,2 s** até `status 544: Failed to create login role: Connection terminated due to connection timeout`. O projeto reporta `ACTIVE_HEALTHY` e a região responde — mas o **Postgres não aceita conexão** (5432 e 6543 sem resposta TCP).
+
+A correção de código está publicada e verificada. O que resta é infraestrutura do Supabase: **o banco do projeto não aceita novas conexões**. Isso exige ação no painel do Supabase (verificar/restaurar a conexão do banco) ou contato com o suporte — não há alteração de código capaz de destravar um Postgres que recusa o handshake.
+
 ## Itens bloqueados
 
-- Publicação em produção (ver seção do incidente de 22/11).
+- **BLOQUEADO:** o Postgres do projeto `cixnvosxqlacjbpymjha` não aceita conexão (status 544 / 522). O código corrigido está publicado e no ar; enquanto o banco recusar o handshake, o login falha por indisponibilidade de infraestrutura, não por defeito do app.
+- **BLOQUEADO:** o MCP do Supabase exige reautenticação; logs de função e advisors do painel ficaram indisponíveis nesta sessão.
 
 ## Decisões (ver DECISIONS.md)
 
