@@ -97,6 +97,31 @@ Verificadas uma a uma em 22/11/2026 contra o código atual. **O registro origina
 - **A10** (migration sem guarda): as migrations recentes com DDL já usam `IF EXISTS` / `IF NOT EXISTS`. Sem caso real.
 - **A8** (placeholder no bundle): os literais `your-project-ref` só aparecem em guardas e testes. Sem caso real.
 
+## Estado da publicação — 24/11/2026
+
+**PRs:** #11 (`5e0b24ad` + `f899c43e`), #12 (`bfc1708a`), #13, #14, #15 (`3c31529c` — cards do Dashboard) e #16 (`c047aa22` — snapshot visual) — todos mergeados na `main`.
+
+### Defeito do gate — snapshot visual defasado
+
+O run do PR #15 (`45296834048`) terminou em **failure** no `Enforce gate`, com 1 achado:
+
+```
+medium | test | Comando falhou: npm run test:visual
+```
+
+O teste `login não cria overflow horizontal` compara a tela de login com o snapshot `desktop/auth.png` e falhava com **182.857 pixels diferentes (ratio 0.13)**. Causa raiz: o snapshot era de **18/07** e nunca foi regenerado depois do redesenho da tela de login (composição cósmica em 11/11, tela imersiva em 22/11). Defeito pré-existente, não introduzido pelas correções do dashboard. Correção em `c047aa22`: snapshot regenerado com `npx playwright test tests/visual/growdash.spec.ts --project=desktop --update-snapshots --workers=1`.
+
+**Por que era crítico:** o `Enforce gate` falha o job inteiro quando o relatório tem `status: blocked`. Sem o PR #16, nenhuma correção de backend ou de dashboard chegaria à produção — o mesmo impasse do incidente de 22/11.
+
+### Correções do Dashboard publicadas
+
+- `src/components/ui/KpiCard.tsx`: rótulo com `min-w-0` (sem isso o item flex não cede espaço e o texto vaza para fora do card) e valor com `min-w-0 truncate`.
+- `src/components/dashboard/MissionDashboard.tsx`: removido o `changeLabel` dos 4 cards (Investimento, Leads, CPL, Faturamento). A variação percentual permanece.
+- Teste de regressão: `src/components/dashboard/MissionDashboardLabels.test.tsx` (ciclo vermelho-verde verificado).
+- Verificado no DOM de produção: os 4 cards mostram apenas rótulo + valor, **zero elementos cortados**.
+
+---
+
 ## Estado da publicação — 23/11/2026
 
 **PRs:** #11 (`5e0b24ad` + `f899c43e`) e #12 (`bfc1708a`) — ambos mergeados na `main`.
