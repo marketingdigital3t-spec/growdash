@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { PHASE_COLORS } from "@/lib/phase/phaseColors";
 
 /**
  * Platform theme (fonte única de verdade do visual).
@@ -38,7 +39,8 @@ export function applyAccent(phase?: string) {
   const isOrbita = activePhase === "orbita";
 
   const themeName = isGalaxia ? "galaxia" : isOrbita ? "orbita" : "terra";
-  const themeColorHex = isGalaxia ? "#A855F7" : isOrbita ? "#FFC107" : "#00A8FF";
+  const phaseColor = PHASE_COLORS[themeName];
+  const themeColorHex = phaseColor.primary;
 
   root.dataset.accent = themeName;
   root.dataset.platformTheme = themeName;

@@ -136,7 +136,6 @@ const safeMetrics = {
           label="Investimento"
           value={formatCurrency(safeMetrics.spend)}
           changePercent={safeMetrics.spendChange}
-          changeLabel="Meta Ads"
           icon={<Coins className="h-5 w-5" />}
           sparklineData={[14, 18, 16, 24, 22, 30, 28, 36, 32, 42, 38, 48]}
         />
@@ -146,7 +145,6 @@ const safeMetrics = {
           label="Leads"
           value={formatInteger(safeMetrics.leads)}
           changePercent={safeMetrics.leadsChange}
-          changeLabel="total do período"
           icon={<Users className="h-5 w-5" />}
           sparklineData={[120, 160, 140, 220, 200, 280, 260, 320, 300, 380, 350, 420]}
         />
@@ -157,7 +155,6 @@ const safeMetrics = {
           value={formatCurrency(safeMetrics.cpl)}
           changePercent={safeMetrics.cplChange}
           invertChangeColor
-          changeLabel="custo por lead"
           icon={<BarChart3 className="h-5 w-5" />}
           sparklineData={[32, 30, 31, 28, 29, 26, 27, 24, 25, 23.61]}
         />
@@ -167,7 +164,6 @@ const safeMetrics = {
           label="Faturamento"
           value={formatCurrency(safeMetrics.revenue)}
           changePercent={safeMetrics.revenueChange}
-          changeLabel={`${formatInteger(safeMetrics.sales)} vendas realizadas`}
           icon={<ShoppingCart className="h-5 w-5" />}
           sparklineData={[2.4, 2.8, 3.1, 2.9, 3.4, 3.8, 3.5, 4.0, 3.9, 4.37]}
         />

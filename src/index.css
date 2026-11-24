@@ -2683,7 +2683,7 @@ html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, 
 
 /* Reference composition tuning: the phase owns the shell accent while all
    existing widgets, data and interaction contracts remain unchanged. */
-.brand-shell[data-space-phase="terra"] { --brand-accent-rgb: 0,168,255; --brand-gold: #00a8ff; --brand-gold-light: #38bdf8; --brand-bronze: #0284c7; --primary: 199 89% 48%; --primary-foreground: 0 0% 100%; --ring: 199 89% 58%; --accent: 199 80% 14%; --accent-foreground: 199 89% 94%; --background: 215 35% 4%; --foreground: 0 0% 100%; --card: 215 32% 7%; --card-foreground: 0 0% 100%; --popover: 215 32% 7%; --popover-foreground: 0 0% 100%; --secondary: 215 28% 12%; --secondary-foreground: 0 0% 96%; --muted: 215 25% 12%; --muted-foreground: 215 20% 72%; --border: 199 60% 20%; --input: 199 60% 20%; --chart-1: 199 89% 55%; --chart-2: 199 80% 45%; --chart-3: 199 70% 35%; --chart-4: 185 85% 48%; --chart-5: 210 75% 60%; background: #020408; }
+.brand-shell[data-space-phase="terra"] { --brand-accent-rgb: 0,168,255; --brand-gold: #00a8ff; --brand-gold-light: #4eb5ff; --brand-bronze: #00a8ff; --primary: 199 89% 48%; --primary-foreground: 0 0% 100%; --ring: 199 89% 58%; --accent: 199 80% 14%; --accent-foreground: 199 89% 94%; --background: 215 35% 4%; --foreground: 0 0% 100%; --card: 215 32% 7%; --card-foreground: 0 0% 100%; --popover: 215 32% 7%; --popover-foreground: 0 0% 100%; --secondary: 215 28% 12%; --secondary-foreground: 0 0% 96%; --muted: 215 25% 12%; --muted-foreground: 215 20% 72%; --border: 199 60% 20%; --input: 199 60% 20%; --chart-1: 199 89% 55%; --chart-2: 199 80% 45%; --chart-3: 199 70% 35%; --chart-4: 185 85% 48%; --chart-5: 210 75% 60%; background: #020408; }
 .brand-shell[data-space-phase="orbita"] { --brand-accent-rgb: 255,193,7; --brand-gold: #ffc107; --brand-gold-light: #ffe082; --brand-bronze: #a66b00; --primary: 45 100% 50%; --primary-foreground: 45 40% 8%; --ring: 45 100% 58%; --accent: 45 60% 16%; --accent-foreground: 45 100% 82%; --foreground: 0 0% 100%; background: #050505; }
 .brand-shell[data-space-phase="galaxia"] { --brand-accent-rgb: 168,85,247; --brand-gold: #a855f7; --brand-gold-light: #d8b4fe; --brand-bronze: #6c3483; --primary: 271 91% 65%; --primary-foreground: 271 40% 8%; --ring: 271 91% 68%; --accent: 271 55% 18%; --accent-foreground: 271 95% 88%; --foreground: 0 0% 100%; background: #050505; }
 .brand-shell[data-space-phase] .brand-sidebar { background: linear-gradient(180deg, rgba(2,6,14,.98), rgba(2,3,8,.98)); border-color: color-mix(in srgb, var(--brand-gold) 28%, rgba(255,255,255,.12)); }
@@ -16608,6 +16608,158 @@ html[data-space-phase="terra"],
   height: 320px;
   background: radial-gradient(ellipse at center, rgba(0, 120, 255, 0.3) 0%, rgba(2, 6, 20, 0.7) 60%, transparent 85%);
   animation: smoke-drift-spread 5.5s ease-in-out infinite;
+}
+
+/* Foguete flutuando continuamente (semelhante a um GIF animado) */
+@keyframes rocket-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  33% { transform: translateY(-12px) rotate(1deg); }
+  66% { transform: translateY(-6px) rotate(-0.5deg); }
+}
+
+@keyframes rocket-vibrate {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(-1px) translateY(1px); }
+  50% { transform: translateX(1px) translateY(-1px); }
+  75% { transform: translateX(-1px) translateY(-1px); }
+}
+
+/* Assembly que agrupa foguete + fogo e se move junto */
+.auth-rocket-assembly {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.auth-rocket-assembly--launch {
+  animation: rocket-launch 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: center bottom;
+}
+
+/* Imagem do foguete flutuando continuamente (semelhante a um GIF animado) */
+.auth-rocket-hero-img {
+  width: auto;
+  max-width: min(760px, 92%);
+  height: auto;
+  max-height: 55%;
+  object-fit: contain;
+  object-position: center top;
+  filter: brightness(1.06) contrast(1.08) saturate(1.14);
+  transform-origin: center bottom;
+}
+
+.auth-rocket-hero-img--float {
+  animation: rocket-float 5s ease-in-out infinite, rocket-vibrate 0.15s linear infinite;
+}
+
+.auth-rocket-hero-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 30% 26% at 50% 24%, rgba(0, 190, 255, 0.24) 0%, transparent 70%),
+    radial-gradient(ellipse 52% 24% at 50% 52%, rgba(2, 132, 199, 0.3) 0%, transparent 74%);
+  filter: blur(16px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.auth-rocket-hero-glow--launch {
+  animation: glow-burst 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes glow-burst {
+  0% { opacity: 0.6; filter: blur(16px) drop-shadow(0 0 30px #00a8ff); }
+  100% { opacity: 1; filter: blur(16px) drop-shadow(0 0 90px #00a8ff) drop-shadow(0 0 160px #38bdf8); }
+}
+
+/* Fogo no jato de propulsão do foguete, fixo na base da imagem */
+.auth-rocket-exhaust {
+  position: absolute;
+  bottom: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 150px;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 0 12px rgba(0, 168, 255, 0.6));
+}
+
+.auth-exhaust-plume {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 44px;
+  height: 120px;
+  transform: translateX(-50%) scaleY(1);
+  background: linear-gradient(to bottom, #ffffff 0%, #38bdf8 25%, #00a8ff 60%, rgba(0, 168, 255, 0) 100%);
+  border-radius: 50% 50% 40% 40%;
+  animation: flame-flicker 0.12s ease-in-out infinite alternate;
+}
+
+@keyframes flame-flicker {
+  0% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 0.95; }
+  100% { transform: translateX(-50%) scaleY(1.18) scaleX(0.92); opacity: 0.85; }
+}
+
+.auth-exhaust-plume--launch {
+  animation: flame-ignite 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  height: 220px;
+  width: 70px;
+}
+
+@keyframes flame-ignite {
+  0% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 0.95; }
+  100% { transform: translateX(-50%) scaleY(2.6) scaleX(1.35); opacity: 0.6; }
+}
+
+@keyframes rocket-launch {
+  0% { transform: translate(-50%, 0) scale(1) rotate(-1deg); }
+  100% { transform: translate(-50%, -90vh) scale(1.15) rotate(-6deg); }
+}
+
+/* Fumaça volumétrica se espalhando pela tela inteira */
+@keyframes smoke-float {
+  0% { transform: translateY(0) scale(0.8) rotate(0deg); opacity: 0.7; }
+  50% { transform: translateY(-40px) scale(1.1) rotate(2deg); opacity: 0.5; }
+  100% { transform: translateY(0) scale(0.8) rotate(-2deg); opacity: 0.7; }
+}
+
+.auth-smoke-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.auth-smoke {
+  position: absolute;
+  bottom: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(56, 189, 248, 0.18) 0%, rgba(2, 6, 20, 0.6) 60%, transparent 80%);
+  filter: blur(22px);
+  pointer-events: none;
+  z-index: 3;
+  animation: smoke-float 6s ease-in-out infinite;
+}
+
+.auth-smoke--float {
+  animation-duration: 7s;
+  animation-delay: var(--smoke-delay, 0s);
+}
+
+.auth-cosmic-viewport--launching {
+  overflow: hidden;
 }
 
 /* Jato de propulsão expandido com ondas de choque de calor */

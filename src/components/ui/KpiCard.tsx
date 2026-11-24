@@ -62,14 +62,16 @@ export function KpiCard({
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-card-border-active bg-primary/10 text-primary-neon shadow-glow-sm transition group-hover:scale-105">
           {icon}
         </span>
-        <p className="truncate text-right text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">
+        {/* O rotulo precisa de min-w-0 para que o truncate funcione: sem isso o
+            flex item nao cede espaco e o texto vaza para fora do card. */}
+        <p className="min-w-0 truncate text-right text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted" title={label}>
           {label}
         </p>
       </div>
 
       <div className="mt-3 flex items-baseline justify-between gap-2">
         {/* Valor da metrica grande e denso em Space Grotesk */}
-        <strong className="font-display text-2xl font-bold tracking-tight text-text-primary tabular-nums sm:text-3xl">
+        <strong className="min-w-0 truncate font-display text-2xl font-bold tracking-tight text-text-primary tabular-nums sm:text-3xl" title={value}>
           {value}
         </strong>
 
