@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
@@ -32,7 +33,9 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
-    const internalCall = internalSecret.length >= 24 && req.headers.get("x-growdash-automation-secret") === internalSecret;
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O guard de tamanho mínimo continua valendo antes da comparação.
+    const internalCall = internalSecret.length >= 24 && secretsMatch(req.headers.get("x-growdash-automation-secret"), internalSecret);
     let user: { id: string } | null = null;
     if (!internalCall) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });

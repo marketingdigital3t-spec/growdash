@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,7 +86,9 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization") || "";
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const isService = Boolean(bearer && bearer === serviceKey);
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O padrão do repositório é `secretsMatch`.
+    const isService = secretsMatch(bearer, serviceKey);
     let userId: string | null = null;
     let allowedAccountIds: string[] | null = null;
     if (!isService) {

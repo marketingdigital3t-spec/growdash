@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-cron-secret, apikey, content-type" };
@@ -11,8 +12,10 @@ Deno.serve(async (req) => {
   const cronSecret = Deno.env.get("INTELLIGENCE_CRON_SECRET");
   const auth = req.headers.get("Authorization") || "";
   const bearer = auth.replace(/^Bearer\s+/i, "").trim();
-  const isService = Boolean(bearer && bearer === service);
-  const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+  // resposta. O padrão do repositório é `secretsMatch`.
+  const isService = secretsMatch(bearer, service);
+  const isCron = secretsMatch(req.headers.get("x-cron-secret"), cronSecret);
   const admin = createClient(url, service);
   let allowedWorkspaceIds: string[] = [];
   if (!isCron && !isService) {

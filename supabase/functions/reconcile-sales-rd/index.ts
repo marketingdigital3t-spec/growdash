@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
@@ -89,7 +90,9 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bearer = auth.replace(/^Bearer\s+/i, "").trim();
     const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-    const isInternal = bearer === serviceKey || (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O padrão do repositório é `secretsMatch`.
+    const isInternal = secretsMatch(bearer, serviceKey) || (!!cronSecret && secretsMatch(req.headers.get("x-cron-secret"), cronSecret));
     let userId: string;
     if (isInternal) {
       userId = typeof body?.service_user_id === "string" ? body.service_user_id.trim() : "";

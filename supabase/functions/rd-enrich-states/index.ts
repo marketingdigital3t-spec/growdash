@@ -1,6 +1,7 @@
 // Enrich rd_deals.lead_state for deals missing state by re-fetching contacts from RD CRM.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
 import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
 
 const corsHeaders = {
@@ -104,7 +105,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
     const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-    const isInternal = bearer === serviceKey || (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O padrão do repositório é `secretsMatch`.
+    const isInternal = secretsMatch(bearer, serviceKey) || (!!cronSecret && secretsMatch(req.headers.get("x-cron-secret"), cronSecret));
     const limit = Math.min(Math.max(Number(body?.limit ?? 200), 1), 1000);
     const offset = Math.max(Number(body?.offset ?? 0), 0);
     let userId: string;

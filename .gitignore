@@ -80,3 +80,9 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 # Artefatos de demonstração e vídeo gerados localmente.
 growdash-demo.mp4
 growdash-video/
+
+# Worktrees do Claude Opus 5 Code. Cada um traz o proprio tsconfig.json, e o ESLint
+# encontra varias raizes candidatas e falha com "multiple candidate
+# TSConfigRootDirs are present" em todo arquivo — o que derrubou `npm run lint`
+# com milhares de erros e bloqueou o gate do loop-engineering.
+.claude/worktrees/
