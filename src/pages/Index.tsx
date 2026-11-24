@@ -358,7 +358,7 @@ const Index = () => {
       <MissionDashboard
         metrics={{
           spend: glassSpend,
-          leads: dashboardDeals.length > 0 ? dashboardDeals.length : glassLeads,
+          leads: glassLeads,
           cpl: glassCpl,
           sales: glassSales.totalQuantity,
           revenue: glassSales.totalGross,
