@@ -76,3 +76,7 @@ tests/visual/__screenshots__/growdash.spec.ts/auth.png
 * 2.json
 * 2.md
 * 2.jpg
+
+# Artefatos de demonstração e vídeo gerados localmente.
+growdash-demo.mp4
+growdash-video/
