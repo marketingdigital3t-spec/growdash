@@ -24,8 +24,10 @@ const indexPageSource = readFileSync(
 );
 
 describe("ETAPA 3 — Dashboard Completo da Missão", () => {
-  it("implementa os 4 KpiCards com sparkline SVG e suporte a inversao de cor para custos", () => {
-    expect(kpiCardSource).toContain("MiniSparkline");
+  it("implementa os 4 KpiCards com icone, rotulo e valor, sem sparkline", () => {
+    // A sparkline foi removida dos cards do Dashboard: ela ocupava a metade
+    // direita do card e empurrava o valor para fora da area util.
+    expect(kpiCardSource).not.toContain("MiniSparkline");
     expect(kpiCardSource).toContain("invertChangeColor");
     expect(kpiCardSource).toContain("text-primary-neon");
     expect(kpiCardSource).toContain("font-display");

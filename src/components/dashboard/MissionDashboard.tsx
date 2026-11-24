@@ -137,7 +137,6 @@ const safeMetrics = {
           value={formatCurrency(safeMetrics.spend)}
           changePercent={safeMetrics.spendChange}
           icon={<Coins className="h-5 w-5" />}
-          sparklineData={[14, 18, 16, 24, 22, 30, 28, 36, 32, 42, 38, 48]}
         />
 
         {/* 2. Leads */}
@@ -146,7 +145,6 @@ const safeMetrics = {
           value={formatInteger(safeMetrics.leads)}
           changePercent={safeMetrics.leadsChange}
           icon={<Users className="h-5 w-5" />}
-          sparklineData={[120, 160, 140, 220, 200, 280, 260, 320, 300, 380, 350, 420]}
         />
 
         {/* 3. CPL — queda e positiva (invertChangeColor) */}
@@ -156,7 +154,6 @@ const safeMetrics = {
           changePercent={safeMetrics.cplChange}
           invertChangeColor
           icon={<BarChart3 className="h-5 w-5" />}
-          sparklineData={[32, 30, 31, 28, 29, 26, 27, 24, 25, 23.61]}
         />
 
         {/* 4. Vendas e Faturamento */}
@@ -165,7 +162,6 @@ const safeMetrics = {
           value={formatCurrency(safeMetrics.revenue)}
           changePercent={safeMetrics.revenueChange}
           icon={<ShoppingCart className="h-5 w-5" />}
-          sparklineData={[2.4, 2.8, 3.1, 2.9, 3.4, 3.8, 3.5, 4.0, 3.9, 4.37]}
         />
       </div>
 
