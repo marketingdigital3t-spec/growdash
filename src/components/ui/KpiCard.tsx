@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { useEffectivePhase } from "@/lib/phase/phaseStore";
 
 export interface KpiCardProps {
   /** Rotulo da metrica em CAIXA ALTA (ex.: "IMPRESSÕES", "ROAS"). */
@@ -15,8 +14,6 @@ export interface KpiCardProps {
   invertChangeColor?: boolean;
   /** Icone exibido dentro da moldura circular neon. */
   icon: ReactNode;
-  /** Pontos para desenhar a sparkline (8 a 14 valores numericos). */
-  sparklineData?: number[];
   className?: string;
 }
 
@@ -27,7 +24,6 @@ export interface KpiCardProps {
  * - Moldura circular com borda neon ao redor do icone
  * - Rotulo em caixa alta e tracking largo
  * - Numero grande em Space Grotesk com `tabular-nums`
- * - Sparkline SVG fluida na cor neon da fase com area em degradê
  * - Variacao percentual com verde para positivo e vermelho para negativo
  */
 export function KpiCard({
@@ -37,10 +33,8 @@ export function KpiCard({
   changeLabel = "vs mês anterior",
   invertChangeColor = false,
   icon,
-  sparklineData = [12, 16, 14, 22, 19, 28, 24, 32, 29, 38],
   className = "",
 }: KpiCardProps) {
-  const phase = useEffectivePhase();
   const hasChange = typeof changePercent === "number" && Number.isFinite(changePercent);
   const isDrop = hasChange && changePercent < 0;
 
@@ -69,17 +63,10 @@ export function KpiCard({
         </p>
       </div>
 
-      <div className="mt-3 flex items-baseline justify-between gap-2">
-        {/* Valor da metrica grande e denso em Space Grotesk */}
-        <strong className="min-w-0 truncate font-display text-2xl font-bold tracking-tight text-text-primary tabular-nums sm:text-3xl" title={value}>
-          {value}
-        </strong>
-
-        {/* Sparkline na cor da fase ativa */}
-        <div className="h-10 w-24 shrink-0 sm:w-28" aria-hidden="true">
-          <MiniSparkline data={sparklineData} phase={phase} />
-        </div>
-      </div>
+      {/* Valor da metrica grande e denso em Space Grotesk */}
+      <strong className="mt-3 block min-w-0 truncate font-display text-2xl font-bold tracking-tight text-text-primary tabular-nums sm:text-3xl" title={value}>
+        {value}
+      </strong>
 
       {/* Variacao percentual */}
       {hasChange && (
@@ -96,48 +83,5 @@ export function KpiCard({
         </div>
       )}
     </article>
-  );
-}
-
-/** Sparkline SVG pura e leve, sem dependencias externas pesadas */
-function MiniSparkline({ data, phase }: { data: number[]; phase: string }) {
-  if (!data || data.length < 2) return null;
-
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const width = 110;
-  const height = 40;
-  const padding = 3;
-
-  const points = data.map((val, idx) => {
-    const x = (idx / (data.length - 1)) * (width - padding * 2) + padding;
-    const y = height - ((val - min) / range) * (height - padding * 2) - padding;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-
-  const linePath = `M ${points.join(" L ")}`;
-  const areaPath = `${linePath} L ${width - padding},${height} L ${padding},${height} Z`;
-  const gradId = `spark-grad-${phase}`;
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary-neon)" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="var(--primary-neon)" stopOpacity="0.0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradId})`} />
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--primary-neon)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="drop-shadow-[0_0_6px_var(--primary-neon)]"
-      />
-    </svg>
   );
 }

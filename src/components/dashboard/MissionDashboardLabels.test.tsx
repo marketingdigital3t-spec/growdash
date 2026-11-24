@@ -19,7 +19,9 @@ describe("Dashboard — cards de KPI sem texto auxiliar cortado", () => {
   });
 
   it("o valor do card e truncado em vez de estourar o layout", () => {
-    expect(kpiCardSource).toMatch(/<strong className="min-w-0 truncate font-display/);
+    // A asserção verifica a garantia (min-w-0 + truncate), nao o markup exato:
+    // remover a sparkline mudou o <strong> de flex items-baseline para block.
+    expect(kpiCardSource).toMatch(/<strong className="[^"]*min-w-0[^"]*truncate[^"]*font-display/);
   });
 
   it("nenhum card do Dashboard passa texto auxiliar com contagem", () => {
