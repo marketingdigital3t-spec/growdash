@@ -19,6 +19,42 @@ achados_bloqueados: 0
 
 `.next/` (artefato de build do Next.js 16.4.6 que falhou) foi versionado em `ef944b9` e nunca removido. O ESLint varr `.next/types/*.ts` porque o flat config só ignorava `dist`, produzindo 71 erros falsos. `npm run lint` retornava exit 1, o step `detect` do loop-engineering terminava em `blocked`, e todo run agendado falhava ("All jobs have failed"). Correção: `.next/` removido (32 arquivos) e adicionado ao `.gitignore`. Loop local: `blocked` → `detected` (0 findings).
 
+## Recuperação do backend — 24/11/2026
+
+**Branch:** `fix/dashboard-remove-sparkline` · PRs #15 a #20, todos mergeados na `main`.
+
+### Defeitos corrigidos
+
+| # | Defeito | Correção |
+|---|---|---|
+| 1 | `rd-sync-deals` lia `rd_field_configs` sem a coluna `id` e atualizava com `.eq("id", existing.id)` → `?id=eq.undefined` → HTTP 400 em toda atualização do catálogo | `select` passa a trazer `id` (PR #15) |
+| 2 | Worktrees aninhados em `.claude/worktrees/` com `tsconfig.json` próprio faziam o ESLint falhar com `multiple candidate TSConfigRootDirs` em todo arquivo: 7258 erros, travando o gate do `loop-engineering` | `.gitignore` versiona `.claude/worktrees/` (PR #15) |
+| 3 | Snapshot `desktop/auth.png` era de 18/07 e nunca foi regenerado depois do redesenho da tela | Snapshot regenerado (PR #16) |
+| 4 | Cards de KPI do Dashboard com texto auxiliar cortado embaixo do valor | `changeLabel` removido; `min-w-0` + `truncate` no rótulo e no valor (PR #15) |
+| 5 | Sparkline ocupa metade do card e empurra o valor para fora da área útil | `MiniSparkline` e a prop `sparklineData` removidos (PR #18) |
+| 6 | `d0c75c1d` removeu o botão "Esqueceu a senha?" e as funções `recover`/`sendAccessLink` da tela de login — a recuperação de senha foi perdida de verdade e o `test:visual` travava o gate | Fluxo de recuperação restaurado (PR #19) |
+| 7 | Seis dos sete jobs do `pg_cron` com `active = false`, incluindo o `growdash-fifteen-minute-sync` | Migration `20261124140000` reativa os jobs com `cron.alter_job` (PR #20) |
+| 8 | `link_rd_deal_to_meta_form_lead` fazia `candidate.lead_id`, coluna que não existe em `meta_leads` → `record "candidate" has no field "lead_id"` abortava o upsert do RD | Migration `20261124150000` recria a função com `candidate.meta_lead_id` (PR #20) |
+| 9 | Arquivo local `20261122120000` com timestamp diferente da versão aplicada no banco (`20261122031447`) → `supabase db push` falhava com `DbPushMissingLocalError` | Arquivo renomeado para reconciliar (PR #20) |
+
+### Evidência de produção (24/11/2026, após as correções)
+
+- `auth/v1/health` → **200 em ~0,4s** (era 522 em ~20s).
+- Consulta real ao banco → **200 em ~0,7s**.
+- **Zero** runs com erro no `sync_runs` em 20 minutos (antes: falhas contínuas).
+- Execuções do `pg_cron` com `status: succeeded` — 24 execuções do `workflow-scheduler` e do `whatsapp-followup-sweep` em 30 min.
+- **401** negócios do RD com `meta_lead_id` e **1857** com `meta_attribution_method` — valores que só são gravados se a trigger rodar sem erro.
+- **10.643** negócios RD (era 10.625), `updated_at` às 13:30 UTC.
+- **292 ganhos = 292 vendas confirmadas** — a contagem por `closed_at` fecha.
+- Banner "Não foi possível atualizar o RD Station" **ausente**; o rodapé mostra "Atualizado agora".
+- Cards do Dashboard em produção: **zero** elementos cortados, **zero** sparklines.
+
+### Itens bloqueados
+
+- Nenhum. O `loop-engineering` roda com `status: success` e publica frontend e Edge Functions a cada push na `main`.
+
+---
+
 ## Incidente — 22/11/2026 — Login indisponível em produção
 
 **Branch:** `fix/backend-defects-2026-11-22` (a partir de `origin/main` = `74cdc5e8`)
