@@ -59,6 +59,47 @@ export default function Auth() {
     }, 2200);
   }
 
+  async function recover() {
+    const recoveryEmail = (forgotEmail || email).trim();
+    if (!recoveryEmail.includes("@")) {
+      toast({ title: "Informe um e-mail válido", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    // Production uses BrowserRouter, so a hash redirect lands on /auth and
+    // prevents the password recovery screen from receiving the Supabase token.
+    const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (error) {
+      toast({ title: "Recuperação não enviada", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Link de recuperação enviado" });
+    setForgotOpen(false);
+  }
+
+  async function sendAccessLink() {
+    const accessEmail = (forgotEmail || email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accessEmail)) {
+      toast({ title: "Informe um e-mail válido", variant: "destructive" });
+      return;
+    }
+    setAuthPersistence(true);
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: accessEmail,
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/` },
+    });
+    setLoading(false);
+    if (error) {
+      toast({ title: "Link de acesso não enviado", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Link de acesso enviado", description: "Verifique a caixa de entrada e o spam para entrar sem a senha." });
+  }
+
   if (launched) {
     return (
       <main
@@ -159,6 +200,50 @@ export default function Auth() {
                   </button>
                 </label>
               </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                <span>Acesso mantido neste dispositivo</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotOpen((v) => !v);
+                    setForgotEmail(email.includes("@") ? email : "");
+                  }}
+                  className="font-semibold text-sky-400 hover:underline"
+                >
+                  Esqueceu a senha?
+                </button>
+              </div>
+              {forgotOpen && (
+                <div className="rounded-xl border border-sky-400/30 bg-sky-950/30 p-3 text-xs text-slate-300 space-y-2">
+                  <p>Recupere a senha ou receba um link de acesso por e-mail:</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      aria-label="E-mail para recuperação"
+                      className="flex-1 bg-black/40 border border-border rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={recover}
+                      disabled={loading}
+                      className="bg-primary text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-primary/90"
+                    >
+                      Enviar
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={sendAccessLink}
+                    disabled={loading}
+                    className="text-sky-400 hover:underline text-[11px] block text-center w-full pt-1"
+                  >
+                    Enviar link de acesso sem senha
+                  </button>
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={loading}
