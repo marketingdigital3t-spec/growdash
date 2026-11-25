@@ -1,0 +1,179 @@
+/* O escritorio do Habblaud dentro do shell da Growdash.
+ *
+ * O Habblaud original ocupa a janela inteira: o canvas e a UI sao
+ * `position: fixed` um sobre o outro, e os paineis (barra do topo, lateral,
+ * gaveta, feed) tambem sao `fixed`, posicionados em relacao a janela
+ * (veja `client/index.html` e `client/src/ui/styles.css`).
+ *
+ * Na Growdash a aba Agentes vive dentro do conteudo da plataforma, com a
+ * barra lateral e a navegacao ao redor. Um painel `fixed` cobriria essa
+ * navegacao.
+ *
+ * A solucao e CSS puro: um `transform` no host o torna o bloco contentor dos
+ * descendentes `position: fixed` (a especificacao do CSS transforms). Os
+ * paineis do Habblaud continuam `fixed` no CSS original e passam a se
+ * posicionar dentro do host, sem nenhuma regra do Habblaud reescrita.
+ *
+ * O `100vw`/`100vh` do CSS original medem a janela, nao o host. Como o host e
+ * o bloco contentor, o `100%` mede o escritorio. As regras abaixo trocam as
+ * unidades de janela por unidades do escritorio nos seletores que as usam.
+ *
+ * A matematica de coordenadas (a dica flutuante, o campo de renomear, o
+ * popover de configuracoes e a janela movel da gaveta) e tratada em
+ * `client/src/ui/frame.ts`.
+ */
+
+.habblaud-office-host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  overflow: hidden;
+  /* O escritorio e escuro por natureza; a pagina nao deve transparentar. */
+  background: #12151d;
+  /* Torna o host o bloco contentor dos paineis `fixed` do Habblaud. */
+  transform: translateZ(0);
+  /* Contexto de empilhamento proprio: os paineis nao sobem por cima da
+     navegacao da plataforma. */
+  isolation: isolate;
+  /* As regras responsivas do Habblaud foram trocadas de `@media` para
+     `@container office` (ver scripts/vendor-habblaud-css.mjs): elas passam a
+     medir o escritorio, e nao a janela. */
+  container: office / inline-size;
+}
+
+/* Tela cheia: o escritorio ocupa a janela inteira, por cima de tudo.
+ *
+ * Nao e a Fullscreen API (que exige permissao no navegador): e um overlay
+ * `fixed` que cobre a viewport. O `Esc` fecha (ver HabblaudOfficePanel.tsx).
+ */
+.habblaud-office-frame.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: #12151d;
+}
+
+.habblaud-office-frame.is-fullscreen .habblaud-office-host {
+  height: 100vh;
+  min-height: 100vh;
+}
+
+/* O canvas e a UI preenchem o host. */
+.habblaud-office-host #world,
+.habblaud-office-host #city,
+.habblaud-office-host #visit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.habblaud-office-host #world[hidden],
+.habblaud-office-host #city[hidden],
+.habblaud-office-host #visit[hidden] {
+  display: none;
+}
+
+.habblaud-office-host #ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.habblaud-office-host #ui > * {
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------------- medidas
+ *
+ * O `100vw`/`100vh` original medem a janela. Aqui medem o escritorio: o host e
+ * o bloco contentor, entao `100%` equivale ao que `100vw`/`100vh` faziam no
+ * Habblaud solto na tela.
+ */
+
+/* A largura das colunas da UI e limitada pelo escritorio, nao pela janela. */
+.habblaud-office-host .ui-root {
+  --side-w: min(340px, calc(100% - var(--gap) * 2));
+  --drawer-w: min(400px, calc(100% - var(--gap) * 2));
+}
+
+/* O feed ocupa o escritorio. */
+.habblaud-office-host .ui-feed,
+.habblaud-office-host .has-sidebar .ui-feed,
+.habblaud-office-host .has-drawer .ui-feed,
+.habblaud-office-host .has-sidebar.has-drawer .ui-feed {
+  width: min(var(--feed-max), calc(100% - var(--gap) * 2));
+}
+
+.habblaud-office-host .has-sidebar .ui-feed {
+  width: min(var(--feed-max), calc(100% - var(--side-w) - var(--gap) * 3));
+}
+
+.habblaud-office-host .has-drawer .ui-feed {
+  width: min(var(--feed-max), calc(100% - var(--drawer-w) - var(--gap) * 3));
+}
+
+.habblaud-office-host .has-sidebar.has-drawer .ui-feed {
+  width: min(var(--feed-max), calc(100% - var(--side-w) - var(--drawer-w) - var(--gap) * 4));
+}
+
+/* O estado vazio fica no centro da area livre do escritorio. */
+.habblaud-office-host .ui-empty {
+  top: calc((var(--free-top) + 100% - var(--free-bottom)) / 2);
+  left: calc((var(--free-left) + 100% - var(--free-right)) / 2);
+  width: min(528px, calc(100% - var(--free-left) - var(--free-right) - 16px), calc(100% - 32px));
+  max-height: calc(100% - var(--free-top) - var(--free-bottom));
+}
+
+/* O popover de configuracoes: a altura maxima e a do escritorio. */
+.habblaud-office-host .ui-popover {
+  max-height: calc(100% - var(--top-h) - 24px);
+}
+
+/* A janela flutuante e a folha inferior da gaveta. */
+.habblaud-office-host .ui-term {
+  --term-w: min(920px, 72%, max(560px, calc(100% - var(--free-left) - var(--free-right) - 16px)));
+  --term-h: min(72%, calc(100% - var(--top-h) - var(--gap) * 2));
+  top: calc(var(--top-h) + var(--gap) + (100% - var(--top-h) - var(--gap) * 2 - var(--term-h)) / 2);
+  left: clamp(var(--gap), calc((var(--free-left) + 100% - var(--free-right) - var(--term-w)) / 2), calc(100% - var(--term-w) - var(--gap)));
+}
+
+.habblaud-office-host .ui-drawer {
+  height: min(58%, calc(100% - var(--top-h) - var(--gap) * 2));
+}
+
+/* O selo do replay e a barra do timelapse: centro da area livre. */
+.habblaud-office-host .ui-lapse-badge,
+.habblaud-office-host .ui-lapse {
+  left: calc((var(--free-left) + 100% - var(--free-right)) / 2);
+}
+
+.habblaud-office-host .ui-lapse {
+  width: min(780px, calc(100% - var(--free-left) - var(--free-right) - 16px), calc(100% - 16px));
+}
+
+/* As caixas de dialogo e as dicas que podem passar da largura do escritorio. */
+.habblaud-office-host .ui-dialog,
+.habblaud-office-host .ui-deliv-modal,
+.habblaud-office-host .ui-deliv-viewer,
+.habblaud-office-host .ui-world-dialog,
+.habblaud-office-host .ui-world-popup,
+.habblaud-office-host .ui-world-sent {
+  width: min(760px, calc(100% - 32px));
+  max-width: 100%;
+  max-height: calc(100% - 32px);
+}
+
+.habblaud-office-host .ui-banner,
+.habblaud-office-host .ui-usage-tip,
+.habblaud-office-host .ui-deliv-toast,
+.habblaud-office-host .ui-visit-bar {
+  max-width: calc(100% - 24px);
+}

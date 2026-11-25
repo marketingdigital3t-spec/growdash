@@ -43,7 +43,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import AgentsOfficePage from "./AgentsOfficePage";
+import HabblaudOfficePanel from "./HabblaudOfficePanel";
 import { useToast } from "@/hooks/use-toast";
 import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
@@ -59,8 +59,6 @@ import { WorkflowEditor } from "./automations/WorkflowEditor";
 import { isAutomationSchemaError, isTransientAutomationError } from "./automations/automationRuntime";
 import { withRequestTimeout } from "@/lib/resilience";
 import { readLocalCache, writeLocalCache } from "@/lib/localCache";
-
-const LifeSimPage = lazy(() => import("./LifeSimPage"));
 
 type TabOption = { id: string; label: string };
 
@@ -898,8 +896,7 @@ export default function ModulePage() {
   const { pathname } = useLocation();
   if (pathname === "/kanban") return <KanbanModule />;
   if (pathname === "/meta-connect") return <MetaConnectModule />;
-  if (pathname === "/agentes" || pathname === "/neural-core") return <AgentsOfficePage />;
-  if (pathname === "/life-sim") return <Suspense fallback={<div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Carregando simulador…</div>}><LifeSimPage /></Suspense>;
+  if (pathname === "/agentes" || pathname === "/neural-core") return <HabblaudOfficePanel />;
   if (pathname === "/ia-do-funil") return <FunnelAIModule />;
   return <Navigate to="/" replace />;
 }

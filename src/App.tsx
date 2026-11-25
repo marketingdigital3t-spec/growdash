@@ -25,7 +25,7 @@ const BusinessUnavailablePage = lazyWithRetry(
   () => import("@/growdash/BusinessWorkspacePage").then(({ BusinessUnavailablePage: Component }) => ({ default: Component })),
   "business-unavailable",
 );
-const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage"), "agents");
+const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/HabblaudOfficePanel"), "agents");
 
 // Route modules must remain lazy here as well as in the layout preloader.
 // Statically importing them defeated code splitting and made one stale asset
@@ -406,7 +406,6 @@ export default function App() {
                     <Route path="gestor-trafego" element={<RequirePage page="agents"><TrafficAgentPage /></RequirePage>} />
                     <Route path="quadro" element={<ResilientRoute><QuadroPage /></ResilientRoute>} />
                     <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
-                    <Route path="life-sim" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="ia-do-funil" element={<Navigate to="/crm?tab=ai" replace />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

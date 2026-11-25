@@ -1,300 +1,39 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+// O Mapa da Inteligencia: o nucleo neural que mostra as areas da operacao
+// Growdash, o agente responsavel por cada uma e os dados reais de cada conta.
+//
+// O escritorio (o Habblaud, em pixel art) e a vista principal da aba Agentes e
+// vive em `HabblaudOfficePanel.tsx`. Este arquivo guarda o mapa, que continua
+// disponivel como a segunda aba.
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import {
-  Activity,
-  ArrowLeft,
-  ArrowRight,
   Bot,
   BriefcaseBusiness,
-  Coffee,
   ChevronRight,
   MessageCircle,
-  Minimize2,
   Network,
   Radar,
-  Rotate3D,
   RotateCcw,
-  Send,
   Sparkles,
-  UserCog,
-  UsersRound,
-  WandSparkles,
   X,
   Zap,
 } from "lucide-react";
-import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
-import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
-import { aggregateSales, useSales } from "@/hooks/useSales";
+import { useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
-import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
-import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
-import { safeSetLocalStorage } from "@/lib/localCache";
 import { Link } from "react-router-dom";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
 
-type AgentStatus = "working" | "walking" | "free";
-type ChatMessage = { id: string; role: "agent" | "user"; text: string };
 type AgentOfficeQuery = {
   select: (columns: string) => AgentOfficeQuery;
   eq: (column: string, value: unknown) => AgentOfficeQuery;
   order: (column: string) => Promise<{ data: unknown; error: { message: string } | null }>;
 };
 type AgentOfficeClient = { from: (table: string) => AgentOfficeQuery };
-
-const LifeSimPage = lazy(() => import("@/growdash/LifeSimPage"));
-
-const AGENTS = [
-  { id: "ceo", name: "Helena", role: "CEO · Chief of Staff", specialty: "Prioridades & decisões", task: "Consolidando a operação", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
-  { id: "marketing", name: "Ágata", role: "Gestora de Marketing", specialty: "Tráfego & crescimento", task: "Analisando campanhas", color: "#38bdf8", desk: "station-creative", position: "npc-milo", look: "look-f", skin: "#f0b18d", hair: "#c36c37", outfit: "#a84e24", pants: "#39333a" },
-  { id: "commercial", name: "Camila", role: "Diretora Comercial", specialty: "CRM & vendas", task: "Revisando pipeline", color: "#fb7185", desk: "station-sales", position: "npc-dora", look: "look-c", skin: "#b87556", hair: "#161518", outfit: "#a63e5d", pants: "#272128" },
-  { id: "finance", name: "Bianca", role: "CFO", specialty: "Caixa & margem", task: "Conciliando resultado", color: "#34d399", desk: "station-finance", position: "npc-fina", look: "look-b", skin: "#e0a07d", hair: "#4b2b24", outfit: "#266e59", pants: "#343038" },
-  { id: "legal", name: "Júlia", role: "Advogada", specialty: "Risco & compliance", task: "Auditando permissões", color: "#a78bfa", desk: "station-seo", position: "npc-otto", look: "look-d", skin: "#efb08d", hair: "#7e3f29", outfit: "#27648d", pants: "#34383d" },
-] as const;
-
-const INITIAL_LIFE_STATES = createInitialAgentLifeStates(AGENTS);
-
-function readStored<T>(key: string, fallback: T): T {
-  try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
-}
-
-export default function AgentsOfficePage() {
-  const { data: accounts = [] } = useAdAccounts();
-  const { startDate, endDate, businessUnitId, segment } = useGlobalFilters();
-  const visibleAccounts = useMemo(() => businessUnitId
-    ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
-    : accounts, [accounts, businessUnitId, segment]);
-  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
-  // The command map is the primary agent surface. The 3D office remains
-  // available as a secondary workspace for presence and status controls.
-  // O escritório 3D é a superfície principal da área de agentes. O mapa
-  // neural continua disponível como uma visão complementar.
-  const [view, setView] = useState<"map" | "office">("office");
-  const showLegacyOfficePreview = window.location.hash === "#legacy-office";
-  const [officeAngle, setOfficeAngle] = useState(0);
-  const officeDragStart = useRef<number | null>(null);
-  const officeAngleStart = useRef(0);
-  const [minimized, setMinimized] = useState(false);
-  const [input, setInput] = useState("");
-  const [gameMinutes, setGameMinutes] = useState(8 * 60 + 20);
-  const [timeSpeed, setTimeSpeed] = useState<0 | 1 | 2 | 3>(1);
-  const [lifeMode, setLifeMode] = useState<"life" | "build">("life");
-  const [autonomyEnabled, setAutonomyEnabled] = useState(true);
-  const [lifeStates, setLifeStates] = useState<Record<string, AgentLifeState>>(() => INITIAL_LIFE_STATES);
-  const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
-  const [assignments, setAssignments] = useState<Record<string, string>>(() => readStored("growdash:agent-accounts", {}));
-  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(() => Object.fromEntries(AGENTS.map((agent) => [agent.id, [{ id: `${agent.id}-welcome`, role: "agent", text: `Olá, eu sou ${agent.name}. Vincule uma conta e pergunte sobre tráfego, leads, funil ou escala.` }]])));
-  const gameMinutesRef = useRef(gameMinutes);
-  const statusesRef = useRef(statuses);
-  const timeSpeedRef = useRef(timeSpeed);
-  const autonomyRef = useRef(autonomyEnabled);
-  const lifeStatesRef = useRef(lifeStates);
-  const activeAgent = AGENTS.find((agent) => agent.id === activeAgentId) || null;
-  const activeAccountId = activeAgent ? assignments[activeAgent.id] : undefined;
-  const account = visibleAccounts.find((item) => item.id === activeAccountId);
-  const { data: insights = [], isFetching: loadingInsights } = useInsights({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: activeAccountId ? [activeAccountId] : [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, !!activeAccountId);
-  const { data: deals = [], isFetching: loadingDeals } = useRDDealsForPeriod({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
-  const { data: sales = [] } = useSales({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
-
-  useEffect(() => { safeSetLocalStorage("growdash:agent-statuses", JSON.stringify(statuses)); }, [statuses]);
-  useEffect(() => { safeSetLocalStorage("growdash:agent-accounts", JSON.stringify(assignments)); }, [assignments]);
-  useEffect(() => { gameMinutesRef.current = gameMinutes; }, [gameMinutes]);
-  useEffect(() => { statusesRef.current = statuses; }, [statuses]);
-  useEffect(() => { timeSpeedRef.current = timeSpeed; }, [timeSpeed]);
-  useEffect(() => { autonomyRef.current = autonomyEnabled; }, [autonomyEnabled]);
-  useEffect(() => { lifeStatesRef.current = lifeStates; }, [lifeStates]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const speed = timeSpeedRef.current;
-      if (speed === 0) return;
-      const nextMinutes = (gameMinutesRef.current + speed) % (24 * 60);
-      gameMinutesRef.current = nextMinutes;
-      setGameMinutes(nextMinutes);
-      setLifeStates((current) => Object.fromEntries(AGENTS.map((agent) => [
-        agent.id,
-        advanceAgentLifeState(current[agent.id] || INITIAL_LIFE_STATES[agent.id], statusesRef.current[agent.id] || "working", nextMinutes),
-      ])));
-      if (autonomyRef.current && nextMinutes % 45 === 0) {
-        setStatuses((current) => Object.fromEntries(AGENTS.map((agent) => {
-          const state = lifeStatesRef.current[agent.id];
-          const nextStatus = state?.needs.energia !== undefined && state.needs.energia < 24 ? "free" : current[agent.id] === "free" ? "working" : current[agent.id];
-          return [agent.id, nextStatus];
-        })) as Record<string, AgentStatus>);
-      }
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const metrics = useMemo<AgentMetrics>(() => {
-    const media = metaTraffic.data;
-    const confirmed = aggregateSales(sales);
-    return {
-      ...media,
-      rdLeads: deals.length,
-      wonDeals: confirmed.totalQuantity,
-      revenue: confirmed.totalNet,
-    };
-  }, [deals, metaTraffic.data, sales]);
-
-  const activeLifeState = activeAgent ? lifeStates[activeAgent.id] : null;
-  const gameClock = formatAgentClock(gameMinutes);
-  const fundsLabel = "R$ 284.290";
-  const phaseLabel = activeLifeState ? getAgentPhaseLabel(activeLifeState.phase) : "Selecione uma agente";
-
-  const updateStatus = (agentId: string, status: AgentStatus) => setStatuses((current) => ({ ...current, [agentId]: status }));
-  const openAgent = (agentId: string) => { setActiveAgentId(agentId); setMinimized(false); };
-  const sendMessage = () => {
-    if (!activeAgent || !input.trim()) return;
-    const question = input.trim();
-    const period = `${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}`;
-    const answer = activeAccountId
-      ? buildAgentAnswer(question, metrics, account?.name || "Conta selecionada", period)
-      : "Primeiro escolha uma conta de anúncio para este agente. Assim eu cruzo Meta Ads e RD Station sem misturar operações.";
-    setMessages((current) => ({
-      ...current,
-      [activeAgent.id]: [...(current[activeAgent.id] || []), { id: crypto.randomUUID(), role: "user", text: question }, { id: crypto.randomUUID(), role: "agent", text: answer }],
-    }));
-    setInput("");
-  };
-
-  return (
-    <div className="agents-office-page mx-auto w-full max-w-[1920px]">
-      {view === "map" ? <KnowledgeMap
-        onOpenOffice={() => setView("office")}
-        accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name, target_cpl: account.target_cpl }))}
-        startDate={startDate}
-        endDate={endDate}
-      /> : <>
-        <div className="agents-office-3d-shell">
-          <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#161108] text-sm text-primary">Carregando escritório 3D…</div>}>
-            <LifeSimPage />
-          </Suspense>
-          <button type="button" className="agents-office-map-switch" onClick={() => setView("map")}>
-            <Network className="h-3.5 w-3.5" /> Mapa da inteligência
-          </button>
-        </div>
-        {showLegacyOfficePreview && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
-        <div className="office-sim-topbar">
-          <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH LIFE</b><small>AGENT OPERATIONS</small></span></div>
-          <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
-            {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-presence-agent", `is-${statuses[agent.id] || "working"}`)} style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-presence-avatar"><Bot className="h-3 w-3" /></span><span><b>{agent.name}</b><small>{statuses[agent.id] === "working" ? "online" : statuses[agent.id] === "walking" ? "andando" : "livre"}</small></span><i /></button>)}
-          </div>
-          <div className="office-sim-live"><span className="office-live-dot" /><span><b>Operação ao vivo</b><small>5 diretores conectados</small></span><button type="button" onClick={() => updateStatus("ceo", "walking")} aria-label="Abrir standup da equipe">STANDUP BOARD</button></div>
-        </div>
-        <aside className="office-sim-rail" aria-label="Navegação do escritório">
-          <span className="office-rail-logo"><Sparkles className="h-4 w-4" /></span>
-          <button type="button" className="is-active" aria-label="Escritório"><BriefcaseBusiness className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setView("map")} aria-label="Mapa de inteligência"><Network className="h-4 w-4" /></button>
-          <button type="button" onClick={() => openAgent(activeAgentId || AGENTS[0].id)} aria-label="Chat dos agentes"><MessageCircle className="h-4 w-4" /></button>
-          <button type="button" onClick={() => updateStatus("ceo", "working")} aria-label="Ativar operação"><Activity className="h-4 w-4" /></button>
-          <span className="office-rail-spacer" />
-          <button type="button" onClick={() => setOfficeAngle(0)} aria-label="Recentrar escritório"><RotateCcw className="h-4 w-4" /></button>
-        </aside>
-        <div className="office-viewport-toolbar" role="toolbar" aria-label="Controles da câmera do escritório">
-          <span className="office-viewport-title"><Rotate3D className="h-3.5 w-3.5" />ESCRITÓRIO 360°</span>
-          <span className="office-viewport-hint">Arraste a visão ou use as setas para orbitar</span>
-          <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => value - 18)} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => value + 18)} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
-        </div>
-        <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-180, Math.min(180, officeAngleStart.current + (event.clientX - officeDragStart.current) / 4.5))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
-          <div className="office-life-hud" aria-label="Controles do Growdash Life">
-            <div className="office-life-clock"><span className="office-life-clock-icon">◷</span><span><b>{gameClock}</b><small>{timeSpeed === 0 ? "Pausado" : `Velocidade ${timeSpeed}x`}</small></span></div>
-            <div className="office-life-mode" role="group" aria-label="Modo do escritório"><button type="button" className={cn(lifeMode === "life" && "is-active")} onClick={() => setLifeMode("life")}>◈ Vida</button><button type="button" className={cn(lifeMode === "build" && "is-active")} onClick={() => setLifeMode("build")}>▦ Construir</button></div>
-            <div className="office-life-speed" role="group" aria-label="Velocidade do tempo"><button type="button" className={cn(timeSpeed === 0 && "is-active")} onClick={() => setTimeSpeed(0)} aria-label="Pausar tempo">Ⅱ</button>{([1, 2, 3] as const).map((speed) => <button key={speed} type="button" className={cn(timeSpeed === speed && "is-active")} onClick={() => setTimeSpeed(speed)} aria-label={`Velocidade ${speed}x`}>{speed}×</button>)}</div>
-            <div className="office-life-funds"><span>§</span><b>{fundsLabel}</b></div>
-            <button type="button" className={cn("office-life-autonomy", autonomyEnabled && "is-active")} onClick={() => setAutonomyEnabled((value) => !value)} aria-pressed={autonomyEnabled}><span className="office-live-dot" /> Autonomia</button>
-          </div>
-          <div className="office-architecture" aria-hidden="true">
-            <span className="office-ceiling-plane"><i /><i /><i /><b>GROWDASH HQ · LIVE INTELLIGENCE FLOOR</b></span>
-            <span className="office-architecture-wall office-architecture-wall-back"><i /><i /><i /><b>CONTROL ROOM 01</b></span>
-            <span className="office-architecture-wall office-architecture-wall-left"><i /><i /></span>
-            <span className="office-architecture-wall office-architecture-wall-right"><i /><i /></span>
-            <span className="office-light-beam office-light-beam-a" /><span className="office-light-beam office-light-beam-b" /><span className="office-light-beam office-light-beam-c" />
-            <span className="office-ceiling-spot spot-a" /><span className="office-ceiling-spot spot-b" /><span className="office-ceiling-spot spot-c" />
-          </div>
-          <div className="office-room-shell" aria-hidden="true"><span className="room-wall room-wall-back" /><span className="room-wall room-wall-left" /><span className="room-wall room-wall-right" /><span className="room-door room-door-main" /><span className="room-window-strip" /></div>
-          <div className="office-glass-divider divider-a" aria-hidden="true"><i /><i /><i /></div><div className="office-glass-divider divider-b" aria-hidden="true"><i /><i /><i /></div>
-          <div className="office-zone zone-war"><b>WAR ROOM</b><small>Planejamento</small></div><div className="office-zone zone-lounge"><b>LOUNGE</b><small>Tempo livre</small></div><div className="office-zone zone-focus"><b>FOCUS PODS</b><small>Execução</small></div>
-          <div className="office-window"><span /><span /><span /></div>
-          <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
-          <div className="office-floor-grid" />
-          <div className="office-rug"><Bot className="h-8 w-8" /><span>AI<br />HUB</span></div>
-          <div className="office-plant plant-a"><i /><b /></div><div className="office-plant plant-b"><i /><b /></div>
-          <div className="office-room-label room-label-lounge"><Coffee className="h-3 w-3" /> Lounge</div><div className="office-room-label room-label-war"><Sparkles className="h-3 w-3" /> War room</div>
-          {AGENTS.map((agent) => {
-            const phase = lifeStates[agent.id]?.phase || "TRABALHAR";
-            const monitorOn = phase === "TRABALHAR" || phase === "INTERAGIR";
-            return <div key={agent.id} className={cn("office-desk", agent.desk, monitorOn && "is-monitor-on")}>
-              <span className="office-desk-top" /><span className="office-desk-leg desk-leg-left" /><span className="office-desk-leg desk-leg-right" />
-              <span className="office-monitor-shell"><span className={cn("office-monitor", monitorOn ? "is-on" : "is-off")} aria-label={monitorOn ? "Computador ligado" : "Computador desligado"}><Activity /></span><i className="office-monitor-reflection" /></span>
-              <span className="office-keyboard" /><span className="office-desk-lamp"><i /><b /></span><span className="office-chair"><i /><b /></span><small>{agent.specialty}</small>
-            </div>;
-          })}
-          <div className="office-lounge"><Coffee className="h-5 w-5" /><span>PAUSA</span></div>
-          <div className="office-whiteboard"><b>OPERATIONAL BOARD</b><span>Prioridades · alertas · próximos passos</span><i /><i /><i /></div>
-
-          {AGENTS.map((agent, index) => {
-            const status = statuses[agent.id] || "working";
-            const lifeState = lifeStates[agent.id] || INITIAL_LIFE_STATES[agent.id];
-            const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
-            return (
-              <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc office-3d-npc", agent.position, agent.look, `is-${status}`, `phase-${lifeState.phase.toLowerCase()}`, lifeState.phase === "IDLE" && "is-resting")} style={{ "--agent-color": agent.color, "--npc-delay": `${index * -0.7}s`, "--npc-skin": agent.skin, "--npc-hair": agent.hair, "--npc-outfit": agent.outfit, "--npc-pants": agent.pants } as React.CSSProperties} aria-label={`Abrir estação de ${agent.name}, ${agent.role}`}>
-                <span className="npc-shadow" /><span className="npc-ground-light" /><span className="npc-chair-back" /><span className="npc-body"><i className="npc-head" /><i className="npc-hair" /><i className="npc-neck" /><i className="npc-shirt" /><i className="npc-arm npc-arm-left" /><i className="npc-arm npc-arm-right" /><i className="npc-legs" /><i className="npc-shoe npc-shoe-left" /><i className="npc-shoe npc-shoe-right" /></span>
-                <span className="npc-plumbob" /><span className="npc-task-light" />
-                <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small><em>{lifeState.phase === "IDLE" && status === "working" ? "Pausa automática" : getAgentPhaseLabel(lifeState.phase)}</em></span>
-              </button>
-            );
-          })}
-        </div>
-
-        {activeAgent && activeLifeState && <aside className="office-life-inspector" aria-live="polite">
-          <div className="office-life-inspector-head"><span className="office-agent-avatar" style={{ "--agent-color": activeAgent.color } as React.CSSProperties}><Bot className="h-3.5 w-3.5" /></span><span><b>{activeAgent.name}</b><small>{phaseLabel}</small></span><i className={cn(activeLifeState.phase === "IDLE" ? "is-warn" : "is-ok")} /></div>
-          <div className="office-needs-grid">{(Object.keys(AGENT_NEED_META) as AgentNeedKey[]).map((key) => { const meta = AGENT_NEED_META[key]; const value = activeLifeState.needs[key]; return <div key={key} className="office-need-row"><span><b>{meta.icon}</b>{meta.label}</span><span className="office-need-track"><i style={{ width: `${value}%`, background: meta.color }} /></span><small>{Math.round(value)}</small></div>; })}</div>
-        </aside>}
-
-        <div className="office-command-bar" aria-label="Comandos dos agentes">
-          <div className="office-command-copy"><b>Comando do escritório</b><small>Escolha o que cada NPC deve fazer agora.</small></div>
-          {AGENTS.map((agent) => <div key={agent.id} className="office-agent-command"><button type="button" onClick={() => openAgent(agent.id)} className="office-agent-identity" style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-agent-avatar"><Bot className="h-3.5 w-3.5" /></span><span><b>{agent.name}</b><small>{agent.role}</small></span></button><div className="office-agent-modes"><AgentModeButton active={statuses[agent.id] === "working"} onClick={() => updateStatus(agent.id, "working")} icon={<BriefcaseBusiness />} label="Trabalhar" /><AgentModeButton active={statuses[agent.id] === "walking"} onClick={() => updateStatus(agent.id, "walking")} icon={<UsersRound />} label="Andar" /><AgentModeButton active={statuses[agent.id] === "free"} onClick={() => updateStatus(agent.id, "free")} icon={<Coffee />} label="Livre" /></div></div>)}
-        </div>
-
-        {activeAgent && (
-          <aside className={cn("agent-chat-panel", minimized && "is-minimized")}>
-            <header className="flex items-center gap-3 border-b border-white/10 p-3">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/15 text-primary"><Bot className="h-5 w-5" /></span>
-              <div className="min-w-0 grow"><b className="block truncate text-sm text-white">{activeAgent.name}</b><span className="block truncate text-[9px] text-white/45">{activeAgent.role}</span></div>
-              <button type="button" onClick={() => setMinimized((value) => !value)} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white" aria-label="Minimizar chat"><Minimize2 className="h-4 w-4" /></button>
-              <button type="button" onClick={() => setActiveAgentId(null)} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white" aria-label="Fechar chat"><X className="h-4 w-4" /></button>
-            </header>
-            {!minimized && <>
-              <div className="border-b border-white/10 p-3">
-                <label className="mb-1 block text-[9px] font-black uppercase tracking-wider text-white/45">Conta analisada por este agente</label>
-                <Select value={assignments[activeAgent.id] || ""} onValueChange={(value) => setAssignments((current) => ({ ...current, [activeAgent.id]: value }))}><SelectTrigger className="h-9 border-white/15 bg-black/45 text-xs text-white"><SelectValue placeholder="Vincular conta Meta Ads" /></SelectTrigger><SelectContent>{visibleAccounts.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>
-                <div className="mt-2 grid grid-cols-3 gap-1"><AgentModeButton active={statuses[activeAgent.id] === "working"} onClick={() => updateStatus(activeAgent.id, "working")} icon={<BriefcaseBusiness />} label="Trabalhar" /><AgentModeButton active={statuses[activeAgent.id] === "walking"} onClick={() => updateStatus(activeAgent.id, "walking")} icon={<UsersRound />} label="Andar" /><AgentModeButton active={statuses[activeAgent.id] === "free"} onClick={() => updateStatus(activeAgent.id, "free")} icon={<Coffee />} label="Livre" /></div>
-              </div>
-              <div className="agent-chat-messages growdash-scrollbar">
-                {(messages[activeAgent.id] || []).map((message) => <div key={message.id} className={cn("agent-message", message.role === "user" ? "is-user" : "is-agent")}>{message.text}</div>)}
-                {(loadingInsights || metaTraffic.isLoading || loadingDeals) && activeAccountId && <div className="agent-message is-agent animate-pulse">Atualizando dados da conta em segundo plano…</div>}
-              </div>
-              <div className="border-t border-white/10 p-3">
-                <div className="mb-2 flex gap-1 overflow-x-auto growdash-scrollbar-hidden">{["Leads e CPL", "CTR e criativos", "Vendas e ROAS"].map((suggestion) => <button key={suggestion} type="button" onClick={() => setInput(suggestion)} className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[9px] text-white/55 hover:border-primary/50 hover:text-primary">{suggestion}</button>)}</div>
-                <div className="flex gap-2"><input aria-label={`Perguntar ao agente ${activeAgent.name}`} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") sendMessage(); }} placeholder="Pergunte sobre esta conta…" className="h-10 min-w-0 grow rounded-xl border border-white/15 bg-black/50 px-3 text-xs text-white outline-none placeholder:text-white/25 focus:border-primary/55" /><button type="button" onClick={sendMessage} className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground" aria-label="Enviar pergunta"><Send className="h-4 w-4" /></button></div>
-              </div>
-            </>}
-          </aside>
-        )}
-        </div>}</>}
-    </div>
-  );
-}
 
 const KNOWLEDGE_NODES: KnowledgeNode[] = [
   { id: "strategy", dbRole: "ceo", label: "CEO · Estratégia", agentName: "Helena", agentRole: "Gestora de estratégia", agentColor: "#f2c14e", chatRole: "ceo", note: "Prioridades, decisões e alinhamento", document: "Lê o Cérebro Central e consolida os sinais das outras salas em prioridades de negócio.", decision: "Escolha uma prioridade por ciclo, registre a decisão e encaminhe o próximo passo para o gestor responsável.", strategies: [["Visão executiva", "executive"], ["Prioridades", "priorities"], ["Revisão cruzada", "cross-review"]] },
@@ -350,7 +89,7 @@ const SPATIAL_GRAPH_EDGES = [
   ...KNOWLEDGE_NODES.map((node) => ["growdash", node.id] as const),
 ] as const;
 
-function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
+export function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
   const [phase, setPhase] = useState<CorePhase>("core");
   const [selectedArea, setSelectedArea] = useState<CoreAreaId | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
@@ -607,3 +346,4 @@ function getAreaMetrics(area: CoreAreaId, summary: ReturnType<typeof buildCoreAc
 
 function StatusLegend({ color, label }: { color: string; label: string }) { return <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1"><i className={cn("h-2 w-2 rounded-full", color)} />{label}</span>; }
 function AgentModeButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) { return <button type="button" onClick={onClick} className={cn("flex min-w-0 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-[9px] font-bold", active ? "border-primary/60 bg-primary/15 text-primary" : "border-white/10 text-white/45 hover:bg-white/5")}><span className="[&>svg]:h-3 [&>svg]:w-3">{icon}</span>{label}</button>; }
+
