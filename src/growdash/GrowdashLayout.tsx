@@ -1,0 +1,588 @@
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  LogOut,
+  Menu,
+  Moon,
+  PanelLeftClose,
+  Sun,
+  X,
+  Check,
+  RotateCcw,
+  UserRound,
+  Palette,
+  BadgeDollarSign,
+} from "lucide-react";
+import { businessMonthRange, aggregateMonthlyGoalRevenue } from "@/lib/monthlyGoalRevenue";
+import { NAV_SECTIONS } from "./navigation";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useIsMaster } from "@/hooks/useIsMaster";
+import { usePermissions } from "@/hooks/usePermissions";
+import { BrandLogo, BrandMark } from "@/components/BrandLogo";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner";
+import { useSalesGoals } from "@/hooks/useSalesGoals";
+import { useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
+import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
+import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { supabase } from "@/integrations/supabase/client";
+import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
+import { PageTransition } from "@/components/PageTransition";
+import { SpacePhaseBackground, SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
+import { useEffectivePhase, usePhaseStore } from "@/lib/phase/phaseStore";
+import { Starfield } from "@/components/cosmic/Starfield";
+import { CosmicObject } from "@/components/cosmic/CosmicObject";
+import { FuelBar } from "@/components/layout/FuelBar";
+import { PhasePill } from "@/components/layout/PhasePill";
+import { ShipLevelCard } from "@/components/layout/ShipLevelCard";
+import { HeaderCosmicBrand } from "@/components/layout/HeaderCosmicBrand";
+import { GlobalFooter } from "@/components/layout/GlobalFooter";
+import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
+import { AgentChatDock } from "@/components/agents/AgentChatDock";
+import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
+
+const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
+const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
+
+// Preload only after an intentional hover/focus. This removes the cold-chunk
+// pause from menu navigation without making the initial login/app shell heavy.
+const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
+  "/": () => import("@/pages/Index"),
+  "/resumo-performance": () => import("@/pages/PerformanceSummaryPage"),
+  "/painel-expert": () => import("@/pages/ExpertDashboard"),
+  "/crm": () => import("@/growdash/CrmPage"),
+  "/comercial": () => import("@/growdash/CommercialPage"),
+  "/campanhas": () => import("@/growdash/TrafficPage"),
+  "/alertas": () => import("@/pages/Alerts"),
+  "/analise-de-funis": () => import("@/pages/FunnelAnalysis"),
+  "/business": () => import("@/growdash/BusinessPage"),
+  "/estrategia": () => import("@/growdash/StrategyPage"),
+  "/financeiro": () => import("@/growdash/FinancePage"),
+  "/integracoes": () => import("@/growdash/IntegrationsPage"),
+  "/kanban": () => import("@/growdash/KanbanPage"),
+  "/configuracoes": () => import("@/pages/Settings"),
+  "/usuarios": () => import("@/pages/Users"),
+  "/gestor-trafego": () => import("@/growdash/TrafficAgentPage"),
+  "/quadro": () => import("@/growdash/QuadroPage"),
+};
+
+function ContentLoadingFallback() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 8_000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return <div className="grid min-h-[42vh] place-items-center rounded-2xl border border-border/70 bg-card/35 p-6 motion-safe:animate-in motion-safe:fade-in" role="status" aria-live="polite">
+    {slow ? <div className="max-w-sm text-center"><p className="font-bold text-foreground">Este módulo demorou mais do que o esperado.</p><p className="mt-2 text-sm text-muted-foreground">A navegação continua disponível. Escolha outra tela ou atualize esta versão manualmente.</p><button type="button" onClick={() => window.location.reload()} className="gd-button mt-4">Atualizar versão</button></div> : <div className="flex items-center gap-3 text-sm font-semibold text-muted-foreground"><span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />Abrindo módulo…</div>}
+  </div>;
+}
+
+function getInitialSidebarState() {
+  if (typeof window === "undefined") return false;
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (saved !== null) return saved === "true";
+  } catch {
+    // O menu usa o padrão responsivo quando o navegador bloqueia storage.
+  }
+  return window.innerWidth >= 768 && window.innerWidth < 1024;
+}
+
+function getInitialSectionState() {
+  const defaults = Object.fromEntries(NAV_SECTIONS.map((section) => [section.label, true]));
+  if (typeof window === "undefined") return defaults;
+  try {
+    return { ...defaults, ...JSON.parse(window.localStorage.getItem(SIDEBAR_SECTIONS_STORAGE_KEY) || "{}") } as Record<string, boolean>;
+  } catch {
+    return defaults;
+  }
+}
+
+export default function GrowdashLayout() {
+  const { mode, setMode } = useAccentTheme();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(getInitialSidebarState);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
+  // `navigator.onLine` can be false briefly (or be inaccurate) while Chrome is
+  // still connected. Start optimistic and only show the warning after the
+  // browser emits a real offline transition.
+  const [isOnline, setIsOnline] = useState(true);
+  // O cache/último snapshot aparece imediatamente; a sincronização começa em
+  // segundo plano no mesmo mount, sem esperar o navegador ficar ocioso.
+  const [loadBackgroundData] = useState(true);
+  const { editor } = useDashboardEditor();
+  const { pathname, search } = useLocation();
+  const { user, status: authStatus, errorMessage: authErrorMessage, retrySession, signOut } = useAuth();
+  const { data: sidebarProfile } = useQuery({
+    queryKey: ["sidebar-profile", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("full_name, avatar_url").eq("user_id", user!.id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: isMaster = false } = useIsMaster();
+  const permissions = usePermissions();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
+  const {
+    adAccountId,
+    adAccountIds,
+    funnelIds,
+    setAdAccountId,
+    segment,
+    businessUnitId,
+    workspaceId,
+    startDate,
+    endDate,
+  } = useGlobalFilters();
+  usePerformanceMonitor(workspaceId);
+  const visibleAccounts = useMemo(
+    () => businessUnitId
+      ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+      : adAccounts,
+    [adAccounts, businessUnitId, segment],
+  );
+  const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
+  // Mantém a mesma referência de mês durante toda a sessão do layout. Assim,
+  // atualizações de UI não criam novas chaves de consulta para a meta mensal.
+  const currentMonth = useMemo(() => new Date(), []);
+  const monthlyRange = useMemo(() => businessMonthRange(currentMonth), [currentMonth]);
+  const goalAccountIds = useMemo(
+    () => adAccountId === "all"
+      ? (adAccountIds.length ? adAccountIds.filter((id) => visibleAccountIds.has(id)).sort() : Array.from(visibleAccountIds).sort())
+      : [adAccountId],
+    [adAccountId, adAccountIds, visibleAccountIds],
+  );
+  const goalVisibleAccountIds = useMemo(() => new Set(goalAccountIds), [goalAccountIds]);
+  const goalAccountScopeReady = !loadingAdAccounts
+    && (adAccountId === "all" ? visibleAccountIds.size > 0 : visibleAccountIds.has(adAccountId));
+  const monthlyWonDealsQuery = useRDWonDealsForPeriod({
+    startDate: monthlyRange.startDate,
+    endDate: monthlyRange.endDate,
+    adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    adAccountIds: goalAccountIds,
+    // Resolve funnels from the exact account scope instead of reusing a
+    // global funnel list that could include another business unit.
+    funnelIds: undefined,
+    enabled: loadBackgroundData && goalAccountScopeReady && goalAccountIds.length > 0,
+  });
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(monthlyRange.startDate, { enabled: loadBackgroundData });
+  const monthlyWonDeals = useMemo(() => monthlyWonDealsQuery.data ?? [], [monthlyWonDealsQuery.data]);
+  const goalRevenue = useMemo(() => aggregateMonthlyGoalRevenue(monthlyWonDeals, {
+    startDate: monthlyRange.startDate,
+    endDate: monthlyRange.endDate,
+    visibleAccountIds: goalVisibleAccountIds,
+    selectedAccountId: adAccountId,
+    funnelIds: monthlyWonDealsQuery.resolvedFunnelIds,
+  }), [adAccountId, goalVisibleAccountIds, monthlyRange.endDate, monthlyRange.startDate, monthlyWonDeals, monthlyWonDealsQuery.resolvedFunnelIds]);
+  const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => goalVisibleAccountIds.has(goal.ad_account_id)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [goalData?.rows, goalVisibleAccountIds]);
+  const goalAccountLabel = adAccountId === "all"
+    ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
+    : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
+  const setMonthlyRevenue = usePhaseStore((state) => state.setMonthlyRevenue);
+  useEffect(() => {
+    setMonthlyRevenue(goalRevenue);
+  }, [goalRevenue, setMonthlyRevenue]);
+  const effectivePhase = useEffectivePhase();
+  const spacePhase: SpacePhase = effectivePhase;
+
+  // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
+  // plano, sem bloquear a navegação ou trocar a tela por um loader.
+  const backgroundSync = useNearRealtimeSync({
+    adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    adAccountIds: adAccountId === "all" ? adAccountIds : undefined,
+    funnelIds,
+    startDate,
+    endDate,
+    enabled: loadBackgroundData,
+  });
+
+  const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
+  const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
+  const effectiveCollapsed = editor ? false : collapsed;
+  const showSidebarLabels = !!editor || !effectiveCollapsed || mobileOpen;
+  const campaignSearchParams = new URLSearchParams(search);
+  const campaignWorkspaceTab = campaignSearchParams.get("aba") || "campaigns";
+  const campaignAnalysisMode = ["alerts", "intelligence"].includes(campaignSearchParams.get("analise") || "");
+  // Somente a grade do Gerenciador usa viewport travada. Quando uma análise
+  // está aberta, a página volta ao fluxo normal e exibe o conteúdo completo.
+  const isCampaignsWorkspace = pathname.startsWith("/campanhas")
+    && campaignWorkspaceTab === "campaigns"
+    && !campaignAnalysisMode;
+  // Campanhas owns its account and date controls in the Meta-style manager
+  // header. Rendering the shell-wide scope bar as well duplicates the same
+  // controls and places them underneath the traffic rail.
+  const isCampaignsRoute = pathname.startsWith("/campanhas");
+  const preloadRoute = useCallback((path: string) => {
+    const pathnameOnly = path.split("?")[0];
+    void ROUTE_PRELOADERS[pathnameOnly]?.().catch(() => {
+      // Navigation keeps its normal resilient retry path if a preload fails.
+    });
+  }, []);
+
+  const permittedPath = (item: (typeof NAV_SECTIONS)[number]["items"][number]) => {
+    // The n8n editor remains behind the same automation permission as the
+    // former internal module; an external URL must not broaden access.
+    if (item.external) return permissions.canAutomations;
+    const path = item.path;
+    const pathnameOnly = path.split("?")[0];
+    const guarded: Record<string, boolean> = {
+      "/": permissions.canDashboard,
+      "/resumo-performance": permissions.canDashboard,
+      "/painel-expert": permissions.canExpertDashboard,
+      "/crm": permissions.canCrm,
+      "/comercial": permissions.canCommercial,
+      "/campanhas": permissions.canCampaigns,
+      "/analise-de-funis": permissions.canFunnels,
+      "/business": permissions.canCampaigns,
+      "/estrategia": permissions.canBrands,
+      "/alertas": permissions.canAlerts,
+      "/kanban": permissions.canKanban,
+      "/financeiro": permissions.canFinance,
+      "/integracoes": permissions.canIntegrations,
+      "/usuarios": permissions.canUsers,
+      "/agentes": permissions.canAgents,
+      "/quadro": true,
+      "/configuracoes": permissions.canSettings,
+      "/saude-dos-dados": permissions.canDataHealth,
+    };
+    return guarded[pathnameOnly] ?? isMaster;
+  };
+  const visibleSections = NAV_SECTIONS
+    .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item)) }))
+    .filter((section) => section.items.length > 0);
+
+  // Route chunks are fetched only after a person points at or focuses a menu
+  // item (see the handlers below). Loading every module after login made
+  // unrelated pages compete with the active screen for network and memory.
+
+  useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed)); } catch { /* preferência apenas nesta sessão */ }
+  }, [collapsed]);
+  useEffect(() => {
+    try { window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections)); } catch { /* preferência apenas nesta sessão */ }
+  }, [openSections]);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  useEffect(() => {
+    // Durante o carregamento/refetch a lista pode ficar vazia por um instante.
+    // Não trate esse estado transitório como remoção de acesso, pois isso faz o
+    // seletor global e a meta mensal saltarem para "todas as contas".
+    if (loadingAdAccounts || visibleAccounts.length === 0) return;
+    if (adAccountId !== "all" && !visibleAccounts.some((account) => account.id === adAccountId)) {
+      setAdAccountId("all");
+    }
+  }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
+
+  return (
+    <div className="brand-shell growdash-app-shell gd-nebula-bg relative min-h-screen max-w-full overflow-x-hidden text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+      {/* Textura de ruido organico fixo com 3.5% de opacidade (ETAPA 4) */}
+      <div className="gd-noise-overlay pointer-events-none fixed inset-0 z-0" aria-hidden="true" />
+      {/* Fundo estrelado em Canvas 2D a 60fps com parallax suave */}
+      <Starfield />
+      {/* Fundo espacial oficial da Fase com Planeta Terra 8K, atmosfera e estrelas em movimento */}
+      <SpacePhaseBackground phase={spacePhase} dashboardScene={pathname === "/"} />
+      {/* Elemento cosmico exclusivo da fase ativa (Terra, Orbita, Galaxia) */}
+      <CosmicObject />
+      <aside
+        className={cn(
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300 overflow-x-hidden",
+          showSidebarLabels ? "w-[220px]" : "w-16",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        <div className={cn("flex h-[86px] shrink-0 items-center border-b border-white/5", showSidebarLabels ? "px-4" : "justify-center px-2")}>
+          <NavLink to="/" className="flex min-w-0 items-center" aria-label="Growdash - início">
+            {showSidebarLabels ? (
+              <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
+            ) : (
+              <BrandMark className="brand-mark-premium h-10 w-10 shrink-0" />
+            )}
+          </NavLink>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 lg:hidden"
+            aria-label="Fechar menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {editor ? (
+          <div className="flex min-h-0 grow flex-col">
+            <div className="border-b border-white/10 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Editor do dashboard</p>
+              <h2 className="mt-1 truncate text-sm font-black">{editor.title}</h2>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/48">Mostre ou oculte métricas. No conteúdo, arraste e redimensione pelos cantos.</p>
+            </div>
+            <div className="growdash-scrollbar min-h-0 grow space-y-4 overflow-y-auto px-3 py-3">
+              {Array.from(new Set(editor.items.map((item) => item.category))).map((category) => (
+                <section key={category}>
+                  <p className="mb-2 px-1 text-[9px] font-black uppercase tracking-[.16em] text-white/38">{category}</p>
+                  <div className="space-y-1.5">
+                    {editor.items.filter((item) => item.category === category).map((item) => (
+                      <button key={item.type} type="button" onClick={() => editor.onToggle(item.type)} className={cn("w-full rounded-lg border px-3 py-2 text-left transition", item.enabled ? "border-primary/45 bg-primary/10" : "border-white/8 bg-white/[.025] hover:bg-white/[.06]")}>
+                        <span className="flex items-center gap-2 text-[11px] font-bold"><span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", item.enabled ? "border-primary bg-primary text-primary-foreground" : "border-white/20 text-transparent")}>{item.enabled && <Check className="h-3 w-3" />}</span><span className="truncate">{item.title}</span></span>
+                        <span className="mt-1 block line-clamp-2 pl-6 text-[9px] leading-relaxed text-white/42">{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div className="space-y-2 border-t border-white/10 p-3">
+              <Button variant="outline" size="sm" className="w-full border-white/15 bg-transparent text-white hover:bg-white/10" onClick={editor.onReset}><RotateCcw className="mr-2 h-3.5 w-3.5" />Restaurar original</Button>
+              <div className="grid grid-cols-2 gap-2"><Button variant="ghost" size="sm" className="text-white/65 hover:bg-white/10 hover:text-white" onClick={editor.onCancel}>Cancelar</Button><Button size="sm" onClick={editor.onSave} disabled={editor.saving}>{editor.saving ? "Salvando…" : "Salvar"}</Button></div>
+            </div>
+          </div>
+        ) : <><TooltipProvider delayDuration={180}>
+        <nav className="gd-sidebar-nav-list growdash-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4" aria-label="Navegação principal">
+          {visibleSections.map((section) => {
+            const isOpen = openSections[section.label] ?? true;
+            const sectionContentId = `sidebar-section-${section.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+            return (
+            <section key={section.label} className="mb-4">
+              {showSidebarLabels && (
+                <button
+                  type="button"
+                  onClick={() => setOpenSections((current) => ({ ...current, [section.label]: !current[section.label] }))}
+                  className="mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-[.12em] text-white/45 transition hover:bg-white/[.05] hover:text-white/70"
+                  aria-expanded={isOpen}
+                  aria-controls={sectionContentId}
+                >
+                  <span>{section.sidebarLabel || section.label}</span>
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !isOpen && "-rotate-90")} />
+                </button>
+              )}
+              <div id={sectionContentId} hidden={showSidebarLabels && !isOpen} className="space-y-0.5">
+                {(!showSidebarLabels || isOpen) && section.items.map((item) => {
+                  const Icon = item.icon;
+                  const [itemPathname, itemSearch = ""] = item.path.split("?");
+                  const targetAnalysis = new URLSearchParams(itemSearch).get("analise");
+                  const currentAnalysis = new URLSearchParams(location.search).get("analise");
+                  const isActive = item.external ? false : targetAnalysis
+                    ? location.pathname.startsWith(itemPathname) && currentAnalysis === targetAnalysis
+                    : itemPathname === "/"
+                      ? location.pathname === "/"
+                      : location.pathname.startsWith(itemPathname);
+                  const linkClassName = cn(
+                    "gd-sidebar-nav-link group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                    showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
+                    !showSidebarLabels
+                      ? "bg-transparent text-white/75 shadow-none hover:bg-white/[.06] hover:text-white"
+                      : isActive
+                      ? "bg-white/[.10] text-white shadow-none"
+                      : "text-white/68 hover:bg-white/[.07] hover:text-white",
+                  );
+                  const link = item.external ? (
+                    <a
+                      href={item.path}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${item.label} (abre em nova aba)`}
+                      // Sidebar navigation triggers only the lightweight
+                      // recent-window refresh; the explicit toolbar action
+                      // remains the path for an exact selected-period sync.
+                      onClick={() => void backgroundSync.refresh(false)}
+                      className={linkClassName}
+                    >
+                      <span className="gd-sidebar-nav-chip" aria-hidden="true">
+                        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      </span>
+                      {showSidebarLabels && <span className="truncate">{item.label}</span>}
+                    </a>
+                  ) : (
+                    <NavLink
+                      to={item.path}
+                      end={itemPathname === "/"}
+                      aria-label={item.label}
+                      onClick={() => void backgroundSync.refresh(false)}
+                      onPointerEnter={() => preloadRoute(item.path)}
+                      onFocus={() => preloadRoute(item.path)}
+                      onPointerDown={() => preloadRoute(item.path)}
+                      className={linkClassName}
+                    >
+                      <span className="gd-sidebar-nav-chip" aria-hidden="true">
+                        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      </span>
+                      {showSidebarLabels && <span className="truncate">{item.label}</span>}
+                    </NavLink>
+                  );
+                  return collapsed && !showSidebarLabels ? (
+                    <Tooltip key={item.path}>
+                      <TooltipTrigger asChild>{link}</TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={12} className="growdash-sidebar-tooltip z-[120] px-3 py-2 text-xs font-semibold shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : <div key={item.path}>{link}</div>;
+                })}
+              </div>
+            </section>
+            );
+          })}
+        </nav>
+        </TooltipProvider>
+
+        <div className="shrink-0 border-t border-white/10 p-2">
+          {/* Card "NÍVEL DA NAVE" exibindo a fase atual e barra de progresso */}
+          <ShipLevelCard collapsed={!showSidebarLabels} className="mb-2" />
+          <button
+            type="button"
+            onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+            data-theme-toggle
+            className={cn(
+              "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
+              showSidebarLabels ? "gap-3 px-3" : "justify-center",
+            )}
+            aria-label={mode === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            {mode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {showSidebarLabels && <span>{mode === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
+          </button>
+          <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Abrir opções do meu perfil" className={cn("mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left hover:bg-white/[.06]", showSidebarLabels ? "gap-3" : "justify-center")}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/90 to-primary/45 text-[11px] font-extrabold text-primary-foreground">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials || "GD"}
+            </span>
+            {showSidebarLabels && (
+              <div className="min-w-0 grow">
+                <div className="truncate text-[12px] font-semibold">{displayName}</div>
+                <div className="truncate text-[10px] text-white/45">{isMaster ? "Proprietário" : "Membro"}</div>
+              </div>
+            )}
+            {showSidebarLabels && <ChevronUp className="h-4 w-4 text-white/40" />}
+          </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align={showSidebarLabels ? "start" : "center"} sideOffset={8} collisionPadding={12} className="z-[130] w-60">
+            <DropdownMenuLabel><span className="block truncate">{displayName}</span><span className="block truncate text-[10px] font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=personal"><UserRound className="mr-2 h-4 w-4" />Perfil e dados</NavLink></DropdownMenuItem>
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=appearance"><Palette className="mr-2 h-4 w-4" />Personalização e metas</NavLink></DropdownMenuItem>
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=plan"><BadgeDollarSign className="mr-2 h-4 w-4" />Planos e assinatura</NavLink></DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void signOut()} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />Sair da conta
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+          </DropdownMenu>
+        </div></>}
+      </aside>
+
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Fechar navegação"
+          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <div className={cn(
+        "growdash-content-shell min-h-screen min-w-0 max-w-full overflow-x-hidden transition-[padding] duration-300",
+        // Keep a visible 16px breathing room between the expanded sidebar and
+        // the content canvas. The collapsed state keeps its existing offset.
+        effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]",
+      )}>
+        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 items-center justify-between gap-3 border-b px-3 py-2 text-foreground shadow-sm sm:px-6">
+          {/* Controles de navegacao a esquerda */}
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="rounded-md p-1.5 text-white/75 hover:bg-white/10 lg:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
+              <BrandMark className="brand-mark-premium h-7 w-7" />
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => !editor && setCollapsed((value) => !value)}
+              className={cn("hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 lg:block", editor && "pointer-events-none opacity-30")}
+              aria-label={effectiveCollapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
+            </button>
+          </div>
+
+          {/* Combustivel da Missao DE UMA PONTA A OUTRA (100% da largura central) */}
+          <div className="flex-1 min-w-0 mx-1 sm:mx-3">
+            <FuelBar topbar className="w-full" />
+          </div>
+
+          {/* Pill FASE: TERRA / ORBITA / GALAXIA a direita */}
+          <div className="flex items-center gap-2 shrink-0">
+            <PhasePill />
+          </div>
+        </header>
+
+        <main
+          className={cn(
+            "growdash-main min-w-0 max-w-full overflow-x-clip px-[var(--gd-page-gutter)] py-[var(--gd-page-gutter)] pb-[calc(var(--gd-page-gutter)+env(safe-area-inset-bottom))]",
+            pathname.startsWith("/business") && "business-main",
+            isCampaignsWorkspace
+              ? "md:h-[calc(100dvh-48px)] md:min-h-0 md:overflow-hidden"
+              : "min-h-[calc(100vh-48px)]",
+          )}
+        >
+          <div
+            className={cn(
+              "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",
+              isCampaignsWorkspace && "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
+            )}
+          >
+            {authStatus === "degraded" && authErrorMessage && (
+              <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/35 bg-warning/10 px-4 py-3 text-xs font-semibold text-foreground">
+                <span>{authErrorMessage} Os dados protegidos continuam sujeitos à validação da sessão.</span>
+                <button type="button" onClick={() => void retrySession()} className="rounded-lg border border-warning/40 px-3 py-1.5 font-bold transition hover:bg-warning/10">Tentar conexão</button>
+              </div>
+            )}
+            <GlobalAnnouncementBanner />
+            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} syncError={backgroundSync.rdSyncError || backgroundSync.syncError} onSyncNow={() => void backgroundSync.refresh(true)} />}
+            {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
+            <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
+              <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>
+                <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
+              </PageTransition>
+            </RouteErrorBoundary>
+            {/* Rodapé global da missão com integracoes, saude da nave e refresh */}
+            <GlobalFooter onRefresh={() => void backgroundSync.refresh(true)} isRefreshing={backgroundSync.state === "refreshing"} />
+          </div>
+        </main>
+      </div>
+      {!isOnline && (
+        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-warning/35 bg-card/95 px-4 py-3 text-xs font-semibold text-card-foreground shadow-2xl backdrop-blur-xl">
+          Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
+        </div>
+      )}
+      {permissions.canAgents && <AgentChatDock />}
+    </div>
+  );
+}

@@ -1,0 +1,432 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { withRequestTimeout } from "@/lib/resilience";
+import { businessDateKey } from "@/lib/businessDate";
+import { isSameQueryScope } from "@/lib/queryScope";
+import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { ANALYTICS_REQUEST_TIMEOUT_MS } from "@/lib/campaignQuery";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+
+interface UseInsightsParams {
+  adAccountId?: string;
+  adAccountIds?: string[];
+  campaignId?: string;
+  campaignIds?: string[];
+  objectives?: string[];
+  attributionWindow?: string;
+  attributionWindowsByAccount?: Record<string, string>;
+  startDate: Date;
+  endDate: Date;
+  enabled?: boolean;
+}
+
+export function buildInsightsQueryKey({
+  adAccountId,
+  adAccountIds,
+  campaignId,
+  campaignIds,
+  objectives,
+  attributionWindow = "account_default",
+  attributionWindowsByAccount = {},
+  startDate,
+  endDate,
+}: Pick<UseInsightsParams, "adAccountId" | "adAccountIds" | "campaignId" | "campaignIds" | "objectives" | "attributionWindow" | "attributionWindowsByAccount" | "startDate" | "endDate">) {
+  // A single account and an equivalent one-item account list describe the
+  // same provider scope. Canonicalising that boundary lets React Query share
+  // the in-flight snapshot between Dashboard and the Meta aggregate hook.
+  const accountScope = (adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [])
+    .slice()
+    .sort()
+    .join(",");
+  return [
+    "insights",
+    accountScope,
+    campaignId,
+    campaignIds?.slice().sort().join(","),
+    objectives?.slice().sort().join(","),
+    attributionWindow,
+    JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))),
+    businessDateKey(startDate),
+    businessDateKey(endDate),
+  ] as const;
+}
+
+export function buildInsightsSnapshotCacheKey(userId: string | undefined, queryKey: readonly unknown[]) {
+  return userId ? `growdash:insights-snapshot:${userId}:${encodeURIComponent(JSON.stringify(queryKey))}` : "";
+}
+
+export interface InsightRow {
+  ad_id: string;
+  adset_id?: string | null;
+  adset_destination_type?: string | null;
+  campaign_id?: string | null;
+  date: string;
+  spend: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  cpm: number;
+  frequency: number;
+  leads: number;
+  form_leads?: number;
+  site_leads?: number;
+  conversations?: number;
+  cpl: number;
+  conversion_rate: number;
+  efficiency_rate: number;
+  health_score: number;
+  ad_name: string;
+  adset_name: string;
+  campaign_name: string;
+  campaign_objective?: string | null;
+  optimization_goal?: string | null;
+  result_type?: string | null;
+  result_value?: number | null;
+  thumbnail_url?: string | null;
+  ad_status?: string | null;
+  adset_status?: string | null;
+  campaign_status?: string | null;
+  ad_account_id?: string | null;
+  attribution_window?: string | null;
+}
+
+export function canonicalInsightLeads(row: {
+  form_leads?: number | null;
+  site_leads?: number | null;
+  conversations?: number | null;
+}) {
+  const forms = Number(row.form_leads ?? 0);
+  const site = Number(row.site_leads ?? 0);
+  const conversations = Number(row.conversations ?? 0);
+  return {
+    forms,
+    site,
+    conversations,
+    // Always use the three disjoint canonical facts. `insights.leads` is a
+    // legacy aggregate that can include broad Meta aliases and must never be
+    // a fallback for a global lead KPI.
+    total: forms + site + conversations,
+  };
+}
+
+/**
+ * Insights are daily facts. A single ad/date must contribute once to a
+ * multi-account total even when an old sync retry left a repeated response in
+ * a cached client payload. The database has this same unique key; applying it
+ * at the boundary keeps the UI mathematically stable while reconciliation is
+ * running in the background.
+ */
+export const dedupeDailyInsights = dedupeDailyMetaInsights;
+
+/**
+ * Keep historical facts scoped by the campaign id persisted on the fact.
+ * The current ad -> adset -> campaign catalog is only a legacy fallback;
+ * archived or temporarily missing catalog rows must not turn valid Insights
+ * into an apparent zero snapshot.
+ */
+export function filterInsightsByCampaignScope<T extends { ad_id: string; campaign_id?: string | null }>(
+  rows: T[],
+  campaignIds: string[] | undefined,
+  campaignIdByAd: Record<string, string | null | undefined>,
+) {
+  if (!campaignIds?.length) return rows;
+  const allowedCampaigns = new Set(campaignIds.map(String));
+  return rows.filter((row) => {
+    const campaignId = row.campaign_id ?? campaignIdByAd[row.ad_id];
+    return campaignId != null && allowedCampaigns.has(String(campaignId));
+  });
+}
+
+export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
+  const { user } = useAuth();
+  const queryKey = buildInsightsQueryKey({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow, attributionWindowsByAccount, startDate, endDate });
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = buildInsightsSnapshotCacheKey(user?.id, queryKey);
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<InsightRow[]>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: InsightRow[]) => {
+    if (snapshotCacheKey) {
+      writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    }
+    return value;
+  };
+  return useQuery({
+    queryKey,
+    queryFn: async () => {
+      const start = businessDateKey(startDate);
+      const end = businessDateKey(endDate);
+      const scopedAccountIds = adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [];
+
+      // Facts are now directly scoped by the internal account id. This path
+      // avoids returning an empty snapshot when the campaign/ad catalog is
+      // incomplete after an interrupted Meta sync.
+      if (scopedAccountIds.length) {
+        const PAGE = 1000;
+        const directRows: any[] = [];
+        let directAvailable = true;
+        const directQuery = (supabase as any)
+          .from("insights")
+          .select("ad_id,ad_account_id,campaign_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,form_leads,site_leads,conversations,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
+          .in("ad_account_id", scopedAccountIds)
+          .gte("date", start)
+          .lte("date", end)
+          .order("date", { ascending: true });
+        for (let page = 0; ; page++) {
+          // The dashboard has a persisted snapshot fallback. Bound the fresh
+          // core read so a slow Supabase request cannot hold the first paint
+          // for 15–20 seconds; the next refresh can retry in the background.
+          const { data, error } = await withRequestTimeout(directQuery.range(page * PAGE, page * PAGE + PAGE - 1), 2_500);
+          if (error) {
+            // Older deployments without the additive column continue through
+            // the legacy catalog path below; the migration makes this branch
+            // authoritative after deployment.
+            if (!/ad_account_id|column/i.test(error.message || "")) throw error;
+            directAvailable = false;
+            break;
+          }
+          const batch = data || [];
+          directRows.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+        // An account-scoped facts query is authoritative even when it returns
+        // no rows. Falling back to the catalog in that case made a broken or
+        // incomplete catalog look like a different zero-valued snapshot.
+        if (directAvailable) {
+          const adIds = Array.from(new Set(directRows.map((row) => String(row.ad_id || "")).filter(Boolean)));
+          const adCatalog: Record<string, any> = {};
+          const adsetIds: string[] = [];
+          if (adIds.length) {
+            const { data: ads } = await withRequestTimeout((supabase as any).from("ads").select("id,name,thumbnail_url,adset_id,status").in("id", adIds), 900).catch(() => ({ data: [] }));
+            for (const ad of ads || []) {
+              adCatalog[String(ad.id)] = ad;
+              if (ad.adset_id) adsetIds.push(String(ad.adset_id));
+            }
+          }
+          const adsetCatalog = new Map<string, any>();
+          const campaignIdsFromAds: string[] = [];
+          if (adsetIds.length) {
+            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id,destination_type,status").in("id", Array.from(new Set(adsetIds))), 900).catch(() => ({ data: [] }));
+            for (const adset of adsets || []) {
+              adsetCatalog.set(String(adset.id), adset);
+              if (adset.campaign_id) campaignIdsFromAds.push(String(adset.campaign_id));
+            }
+          }
+          const campaignCatalog = new Map<string, any>();
+          const campaignIdsFromFacts = directRows.map((row) => row.campaign_id).filter(Boolean).map(String);
+          const campaignIdsForCatalog = Array.from(new Set([...campaignIdsFromFacts, ...campaignIdsFromAds]));
+          if (campaignIdsForCatalog.length) {
+            const { data: campaigns } = await withRequestTimeout((supabase as any).from("campaigns").select("id,name,objective,ad_account_id,status").in("id", campaignIdsForCatalog), 900).catch(() => ({ data: [] }));
+            for (const campaign of campaigns || []) campaignCatalog.set(String(campaign.id), campaign);
+          }
+          const normalizeWindow = (value: unknown) => String(value || "account_default")
+            .split(",").map((item) => item.trim()).filter(Boolean).sort().join(",") || "account_default";
+          const filteredRows = directRows
+            .filter((row) => {
+              const accountWindow = normalizeWindow(attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow);
+              // Older snapshots may have a null window. Treat null and the
+              // explicit default as equivalent, but never mix configured
+              // windows between accounts.
+              return matchesMetaAttributionWindow(row.attribution_window, accountWindow);
+            });
+          const campaignIdByAd = Object.fromEntries(Object.entries(adCatalog).map(([adId, ad]) => {
+            const adset = adsetCatalog.get(String(ad.adset_id));
+            return [adId, adset?.campaign_id ?? null];
+          }));
+          const rowsForDisplay = filterInsightsByCampaignScope(filteredRows, campaignIds, campaignIdByAd);
+          return persistSnapshot(dedupeDailyInsights(rowsForDisplay
+            .map((row) => {
+              const ad = adCatalog[String(row.ad_id)] || {};
+              const adset = adsetCatalog.get(String(ad.adset_id)) || {};
+              const campaign = campaignCatalog.get(String(adset.campaign_id)) || {};
+              return {
+                ad_id: row.ad_id,
+                adset_id: ad.adset_id ?? null,
+                adset_destination_type: adset.destination_type ?? null,
+                date: row.date,
+                attribution_window: row.attribution_window ?? null,
+                spend: row.spend ?? 0,
+                impressions: row.impressions ?? 0,
+                reach: row.reach ?? 0,
+                clicks: row.clicks ?? 0,
+                ctr: row.ctr ?? 0,
+                cpm: row.cpm ?? 0,
+                frequency: row.frequency ?? 0,
+                leads: canonicalInsightLeads(row).total,
+                form_leads: canonicalInsightLeads(row).forms,
+                site_leads: canonicalInsightLeads(row).site,
+                conversations: canonicalInsightLeads(row).conversations,
+                cpl: row.cpl ?? 0,
+                conversion_rate: row.conversion_rate ?? 0,
+                efficiency_rate: row.efficiency_rate ?? 0,
+                health_score: row.health_score ?? 0,
+                ad_name: ad.name ?? "",
+                thumbnail_url: ad.thumbnail_url ?? null,
+                adset_name: adset.name ?? "",
+                campaign_name: campaign.name ?? "",
+                campaign_objective: campaign.objective ?? null,
+                optimization_goal: row.optimization_goal ?? null,
+                result_type: row.result_type ?? null,
+                result_value: row.result_value ?? null,
+                ad_status: ad.status ?? null,
+                adset_status: adset.status ?? null,
+                campaign_status: campaign.status ?? null,
+                campaign_id: row.campaign_id ?? adset.campaign_id ?? null,
+                ad_account_id: row.ad_account_id ?? campaign.ad_account_id ?? null,
+              };
+            }) as InsightRow[]));
+        }
+      }
+
+      // Build the media catalog with separate queries. The previous nested
+      // inner join discarded valid daily facts when a historical adset or
+      // campaign relationship was missing, rendering accounts as zeroed out.
+      const adCatalog: Record<string, any> = {};
+      const accountIds = adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [];
+      let campaignsQuery = supabase.from("campaigns").select("id,name,status,objective,ad_account_id").order("id", { ascending: true });
+      if (accountIds.length) campaignsQuery = campaignsQuery.in("ad_account_id", accountIds);
+      if (campaignId) campaignsQuery = campaignsQuery.eq("id", campaignId);
+      if (campaignIds?.length) campaignsQuery = campaignsQuery.in("id", campaignIds);
+      if (objectives?.length) campaignsQuery = campaignsQuery.in("objective", objectives);
+      const { data: campaignRows, error: campaignsError } = await withRequestTimeout(campaignsQuery, 2_500);
+      if (campaignsError) throw campaignsError;
+      const campaigns = (campaignRows || []) as any[];
+      const campaignIdSet = new Set(campaigns.map((row) => String(row.id)));
+      if (campaignIdSet.size === 0) return [];
+
+      const { data: adsetRows, error: adsetsError } = await withRequestTimeout(
+        supabase.from("adsets").select("id,name,status,campaign_id,destination_type").in("campaign_id", Array.from(campaignIdSet)),
+        ANALYTICS_REQUEST_TIMEOUT_MS,
+      );
+      if (adsetsError) throw adsetsError;
+      const adsets = (adsetRows || []) as any[];
+      const adsetIdSet = new Set(adsets.map((row) => String(row.id)));
+      if (adsetIdSet.size === 0) return [];
+
+      const { data: adRows, error: adsError } = await withRequestTimeout(
+        supabase.from("ads").select("id,name,status,adset_id,thumbnail_url").in("adset_id", Array.from(adsetIdSet)).order("id", { ascending: true }),
+        ANALYTICS_REQUEST_TIMEOUT_MS,
+      );
+      if (adsError) throw adsError;
+      const adsetCatalog = new Map(adsets.map((row) => [String(row.id), row]));
+      const campaignCatalog = new Map(campaigns.map((row) => [String(row.id), row]));
+      const adIds = (adRows || []).map((row: any) => {
+        const adset = adsetCatalog.get(String(row.adset_id));
+        const campaign = adset ? campaignCatalog.get(String(adset.campaign_id)) : null;
+        if (row?.id) adCatalog[String(row.id)] = { ...row, adsets: { ...adset, campaigns: campaign } };
+        return row?.id ? String(row.id) : null;
+      }).filter(Boolean) as string[];
+      if (adIds.length === 0) return [];
+
+      // Paginar para evitar o limite default de 1000 linhas do Supabase.
+      const INSIGHTS_PAGE = 1000;
+      let allRows: any[] = [];
+      const insightGroups = new Map<string, { window: string; ids: string[] }>();
+      for (const adId of adIds) {
+        const accountId = String(adCatalog[adId]?.adsets?.campaigns?.ad_account_id || "");
+        const window = attributionWindowsByAccount[accountId] || attributionWindow;
+        const key = `${accountId}::${window}`;
+        const group = insightGroups.get(key) || { window, ids: [] };
+        group.ids.push(adId);
+        insightGroups.set(key, group);
+      }
+      for (const group of insightGroups.values()) {
+        let query = supabase
+          .from("insights")
+          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, form_leads, site_leads, conversations, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value, attribution_window")
+          .in("ad_id", group.ids)
+          .gte("date", start)
+          .lte("date", end)
+          .order("date", { ascending: true });
+        if (group.window === "account_default") {
+          query = query.or("attribution_window.eq.account_default,attribution_window.is.null");
+        } else {
+          query = query.eq("attribution_window", group.window);
+        }
+        // Do not truncate long-running accounts after an arbitrary number of
+        // pages. The selected interval is already enforced by the database.
+        for (let page = 0; ; page++) {
+          const from = page * INSIGHTS_PAGE;
+          const to = from + INSIGHTS_PAGE - 1;
+          // A provider delay must surface as a recoverable query failure rather
+          // than leaving every Meta KPI in a permanent loading state.
+          const { data, error } = await withRequestTimeout(query.range(from, to), ANALYTICS_REQUEST_TIMEOUT_MS);
+          if (error) throw error;
+          const batch = data || [];
+          allRows = allRows.concat(batch);
+          if (batch.length < INSIGHTS_PAGE) break;
+        }
+      }
+
+      return persistSnapshot(dedupeDailyInsights(allRows.map((row: any) => {
+        const ad = adCatalog[String(row.ad_id)] || {};
+        const adset = ad.adsets || {};
+        const campaign = adset.campaigns || {};
+        return {
+        ad_id: row.ad_id,
+        adset_id: ad.adset_id ?? null,
+        adset_destination_type: adset.destination_type ?? null,
+        date: row.date,
+        attribution_window: row.attribution_window ?? null,
+        spend: row.spend ?? 0,
+        impressions: row.impressions ?? 0,
+        reach: row.reach ?? 0,
+        clicks: row.clicks ?? 0,
+        ctr: row.ctr ?? 0,
+        cpm: row.cpm ?? 0,
+        frequency: row.frequency ?? 0,
+          leads: canonicalInsightLeads(row).total,
+          form_leads: canonicalInsightLeads(row).forms,
+          site_leads: canonicalInsightLeads(row).site,
+          conversations: canonicalInsightLeads(row).conversations,
+        cpl: row.cpl ?? 0,
+        conversion_rate: row.conversion_rate ?? 0,
+        efficiency_rate: row.efficiency_rate ?? 0,
+        health_score: row.health_score ?? 0,
+        ad_name: ad.name ?? "",
+        thumbnail_url: ad.thumbnail_url ?? null,
+        adset_name: adset.name ?? "",
+        campaign_name: campaign.name ?? "",
+        campaign_objective: campaign.objective ?? null,
+        optimization_goal: row.optimization_goal ?? null,
+        result_type: row.result_type ?? null,
+        result_value: row.result_value ?? null,
+        ad_status: ad.status ?? null,
+        adset_status: adset.status ?? null,
+        campaign_status: campaign.status ?? null,
+        campaign_id: campaign.id ?? null,
+        ad_account_id: campaign.ad_account_id ?? null,
+      };
+      }) as InsightRow[]));
+    },
+    enabled,
+    placeholderData: (previousData, previousQuery) => {
+      if (isSameQueryScope(previousQuery?.queryKey, queryKey)) return previousData;
+      return enabled ? persistedSnapshot : undefined;
+    },
+    // The coordinator refreshes the provider snapshot every minute while this
+    // query reuses the last exact account/date snapshot immediately.
+    // Keep the previous result during the request so a pending Meta response
+    // can never make the selected cards flash to zero.
+    staleTime: 60_000,
+    // A métrica do provider só muda quando o usuário pede a atualização ou
+    // quando o ciclo de 15 minutos vence. Revalidar a cada minuto mantinha a
+    // tela piscando "indisponível" durante a análise.
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
+    gcTime: 24 * 60 * 60 * 1000,
+    // A persisted snapshot already paints the selected scope. The global
+    // realtime coordinator invalidates this active query after its next sync.
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
+    refetchOnWindowFocus: false,
+    // A retry after the 2.5s core timeout would break the first-paint budget.
+    // The five-minute interval and manual refresh provide the retry path while
+    // the persisted snapshot keeps the dashboard useful during an outage.
+    retry: 0,
+  });
+}

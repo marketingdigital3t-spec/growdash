@@ -1,0 +1,2361 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { parseLocaleAmount } from "../../../src/lib/financialAmount.ts";
+import { extractCorrelationId, structuredLog } from "../../../src/lib/observability.ts";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
+import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
+import {
+  buildPendingRDSyncCursors,
+  shouldHydrateRDAnalyticsDeal,
+  shouldHydrateRDAnalyticsItem,
+  shouldSkipRDDealEnrichment,
+} from "../_shared/rdSyncCursor.ts";
+import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
+import {
+  RD_REQUEST_ATTEMPTS,
+  RD_REQUEST_BACKOFFS_MS,
+  RD_SYNC_RUNTIME_BUDGET_MS,
+  safeRDRequestTimeoutMs,
+} from "../../../src/lib/rdSyncRuntimeBudget.ts";
+import { classifySyncErrorCode, SYNC_ERROR_CODES } from "../../../src/lib/syncContract.ts";
+import { fetchSupabaseWithTimeout } from "../_shared/supabaseFetch.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Comparação constant-time: segredos não podem ser comparados com ===, que
+// vaza informação pelo tempo de resposta. Mesmo padrão do sales-webhook.
+function secretsMatch(received: string | null | undefined, expected: string | null | undefined) {
+  const a = new TextEncoder().encode(String(received ?? ""));
+  const b = new TextEncoder().encode(String(expected ?? ""));
+  if (!a.length || a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
+
+function normalize(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/\[.*?\]/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function keyNorm(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function slugify(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function customFieldLabel(field: any): string {
+  return String(
+    field?.custom_field?.label || field?.label || field?.custom_field_id?.label || field?.name || "",
+  ).trim();
+}
+
+function customFieldValue(field: any): string | null {
+  const raw = field?.value ?? field?.values ?? null;
+  if (raw == null) return null;
+  const values = Array.isArray(raw) ? raw : [raw];
+  const normalized = values
+    .map((value) => typeof value === "object" ? (value?.label ?? value?.value ?? "") : value)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return normalized.length ? normalized.join(", ") : null;
+}
+
+function mergeUtmSources(sources: any[]) {
+  return sources.filter(Boolean).reduce((merged, source) => ({ ...merged, ...(source || {}) }), {} as Record<string, unknown>);
+}
+
+function cleanTrackingValue(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (!text || /^\{\{[^{}]+\}\}$/.test(text) || /^\$\{[^{}]+\}$/.test(text)) return null;
+  return text;
+}
+
+function pickTrackingValue(direct: any, merged: Record<string, unknown>, customSources: any[], aliases: string[]) {
+  const directValue = cleanTrackingValue(direct);
+  if (directValue) return directValue;
+  for (const alias of aliases) {
+    const value = cleanTrackingValue(merged[alias] ?? merged[`utm_${alias}`] ?? merged[`gd_${alias}`]);
+    if (value) return value;
+  }
+  return cleanTrackingValue(findCustomField(customSources, aliases));
+}
+
+function sanitizeTrackingCustomFields(fields: Record<string, string>): Record<string, string> {
+  const next = { ...fields };
+  const trackingKeys = new Set([
+    "utmsource", "utmmedium", "utmcampaign", "utmterm", "utmcontent", "utmid",
+    "metacampaignid", "metaadsetid", "metaadid", "metaformid",
+    "metacampaignname", "metaadsetname", "metaadname", "metaformname",
+    "metaplatform", "metaplacement",
+  ]);
+  for (const [key, value] of Object.entries(next)) {
+    if (trackingKeys.has(keyNorm(key)) && !cleanTrackingValue(value)) delete next[key];
+  }
+  return next;
+}
+
+/**
+ * Retains every RD custom field received with the deal. Keys are readable and
+ * stable. When a contact and a deal use the same label, the source is added so
+ * neither value silently replaces the other.
+ */
+function extractAllCustomFields(dealCfs: any[], contactCfs: any[]): Record<string, string> {
+  const entries: Array<{ source: "deal" | "contact"; label: string; value: string }> = [];
+  for (const [source, fields] of [["deal", dealCfs], ["contact", contactCfs]] as const) {
+    for (const field of Array.isArray(fields) ? fields : []) {
+      const label = customFieldLabel(field);
+      const value = customFieldValue(field);
+      if (label && value) entries.push({ source, label, value });
+    }
+  }
+  const labels = new Map<string, number>();
+  for (const entry of entries) labels.set(slugify(entry.label), (labels.get(slugify(entry.label)) || 0) + 1);
+  const out: Record<string, string> = {};
+  for (const entry of entries) {
+    const base = slugify(entry.label);
+    if (!base) continue;
+    const key = (labels.get(base) || 0) > 1 ? `${entry.source}_${base}` : base;
+    out[key] = entry.value;
+  }
+  return out;
+}
+
+type ObservedField = { label: string; source: "deal" | "contact"; values: Set<string> };
+
+function observeCustomFields(
+  target: Map<string, ObservedField>,
+  source: "deal" | "contact",
+  fields: any[],
+) {
+  for (const field of Array.isArray(fields) ? fields : []) {
+    const label = customFieldLabel(field);
+    const value = customFieldValue(field);
+    if (!label) continue;
+    const key = `${source}:${keyNorm(label)}`;
+    const entry = target.get(key) || { label, source, values: new Set<string>() };
+    if (value) entry.values.add(value);
+    target.set(key, entry);
+  }
+}
+
+const DDD_TO_UF: Record<string, string> = {
+  "11": "SP",
+  "12": "SP",
+  "13": "SP",
+  "14": "SP",
+  "15": "SP",
+  "16": "SP",
+  "17": "SP",
+  "18": "SP",
+  "19": "SP",
+  "21": "RJ",
+  "22": "RJ",
+  "24": "RJ",
+  "27": "ES",
+  "28": "ES",
+  "31": "MG",
+  "32": "MG",
+  "33": "MG",
+  "34": "MG",
+  "35": "MG",
+  "37": "MG",
+  "38": "MG",
+  "41": "PR",
+  "42": "PR",
+  "43": "PR",
+  "44": "PR",
+  "45": "PR",
+  "46": "PR",
+  "47": "SC",
+  "48": "SC",
+  "49": "SC",
+  "51": "RS",
+  "53": "RS",
+  "54": "RS",
+  "55": "RS",
+  "61": "DF",
+  "62": "GO",
+  "64": "GO",
+  "63": "TO",
+  "65": "MT",
+  "66": "MT",
+  "67": "MS",
+  "68": "AC",
+  "69": "RO",
+  "71": "BA",
+  "73": "BA",
+  "74": "BA",
+  "75": "BA",
+  "77": "BA",
+  "79": "SE",
+  "81": "PE",
+  "87": "PE",
+  "82": "AL",
+  "83": "PB",
+  "84": "RN",
+  "85": "CE",
+  "88": "CE",
+  "86": "PI",
+  "89": "PI",
+  "91": "PA",
+  "93": "PA",
+  "94": "PA",
+  "92": "AM",
+  "97": "AM",
+  "95": "RR",
+  "96": "AP",
+  "98": "MA",
+  "99": "MA",
+};
+function phoneToUF(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  let d = String(phone).replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+  return d.length >= 10 ? DDD_TO_UF[d.slice(0, 2)] || null : null;
+}
+
+function findCustomField(sources: any[], aliases: string[]): string | null {
+  const wanted = aliases.map(keyNorm);
+  for (const arr of sources) {
+    if (!Array.isArray(arr)) continue;
+    for (const f of arr) {
+      const label =
+        f?.custom_field?.label || f?.label || f?.custom_field_id?.label || f?.name || "";
+      const k = keyNorm(label);
+      if (wanted.includes(k)) {
+        const v = f?.value ?? f?.values ?? null;
+        if (v == null) continue;
+        if (Array.isArray(v)) return v[0] ? String(v[0]) : null;
+        return String(v);
+      }
+    }
+  }
+  return null;
+}
+
+function extractPaymentMethod(sources: any[]): string | null {
+  const raw = findCustomField(sources, [
+    "formadepagamento",
+    "forma_pagamento",
+    "forma pagamento",
+    "formapagamento",
+    "metododepagamento",
+    "metodopagamento",
+    "metodo de pagamento",
+    "método de pagamento",
+    "pagamento",
+    "payment",
+    "paymentmethod",
+  ]);
+  if (!raw) return null;
+  const n = String(raw)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  if (!n) return null;
+  if (n.includes("pix")) return "pix";
+  if (n.includes("boleto")) return "boleto";
+  if (n.includes("cart") || n.includes("credit") || n.includes("debit")) return "cartao";
+  if (
+    n.includes("transfer") ||
+    n.includes("ted") ||
+    n.includes("doc") ||
+    n.includes("dinheiro") ||
+    n.includes("cash") ||
+    n.includes("especie") ||
+    n.includes("outro")
+  )
+    return "outros";
+  return "outros";
+}
+
+interface FieldConfig {
+  key: string;
+  rd_source: string;
+  rd_field_label: string;
+  label?: string;
+  rd_field_aliases: string[];
+  field_type: string;
+  options: any;
+}
+
+function extractConfiguredFields(
+  configs: FieldConfig[],
+  dealCfs: any[],
+  contactCfs: any[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of configs) {
+    const sources =
+      c.rd_source === "contact"
+        ? [contactCfs]
+        : c.rd_source === "deal"
+          ? [dealCfs]
+          : [dealCfs, contactCfs];
+    const aliases = [c.rd_field_label, ...(c.rd_field_aliases || [])].filter(Boolean);
+    const v = findCustomField(sources, aliases);
+    if (v != null && String(v).trim() !== "") out[c.key] = String(v).trim();
+  }
+  return out;
+}
+
+function cleanContactName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.replace(/\s*\[.*?\]\s*$/, "").trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function contactEmailFrom(value: any): string | null {
+  if (!value || typeof value !== "object") return null;
+  const emails = Array.isArray(value.emails) ? value.emails : [];
+  return firstString(
+    value.email,
+    value.contact?.email,
+    ...emails.flatMap((item: any) => [item?.email, item?.value, item?.address]),
+  );
+}
+
+function contactPhoneFrom(value: any): string | null {
+  if (!value || typeof value !== "object") return null;
+  const phones = Array.isArray(value.phones) ? value.phones : [];
+  return firstString(
+    value.phone,
+    value.contact?.phone,
+    ...phones.flatMap((item: any) => [item?.phone, item?.value, item?.number]),
+  );
+}
+
+function asArray(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isWonDeal(d: any): boolean {
+  const stage = (rdDealStageName(d) || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, " ")
+    .trim();
+  // A etapa atual é a fonte de verdade quando o RD a informa. Alguns
+  // negócios históricos mantêm `win: true` no payload mesmo após terem sido
+  // reposicionados para uma etapa operacional; confiar no flag nesse caso
+  // infla as vendas do CRM fora da coluna de venda.
+  if (stage) {
+    if (/\b(pre|pos) venda\b/.test(stage)) return false;
+    return (
+      /^(venda|vendas|sale|sales)$/.test(stage) ||
+      /\b(vendid[oa]s?|venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
+    );
+  }
+  // Sem etapa no payload, o flag terminal do RD continua sendo o melhor
+  // fallback disponível e evita ocultar uma venda realmente fechada.
+  if (d.win === true) return true;
+  return false;
+}
+
+function bucketFromStage(
+  stageName: string | null | undefined,
+  win: boolean,
+  lost: boolean,
+): string {
+  if (win) return "client";
+  if (lost) return "lost";
+  const s = (stageName || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (s.includes("perdido") || s.includes("lost")) return "lost";
+  if (
+    s.includes("venda") ||
+    /\bvendid[oa]s?\b/.test(s) ||
+    s.includes("ganho") ||
+    s.includes("won") ||
+    s.includes("cliente") ||
+    s.includes("fechado")
+  )
+    return "client";
+  if (s.includes("oport") || s.includes("negoc") || s.includes("propos")) return "opportunity";
+  if (s.includes("sql") || s.includes("qualif")) return "sql";
+  if (s.includes("mql") || s.includes("marketing")) return "mql";
+  return "lead";
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let rdRequestTail: Promise<void> = Promise.resolve();
+let rdNextRequestAt = 0;
+const RD_MIN_REQUEST_INTERVAL_MS = 300;
+// Leave enough margin for the Edge runtime to finish the current batch and
+// close sync_runs cleanly instead of being killed by the gateway (HTTP 520).
+// Historical runs are intentionally resumable: a later invocation reuses
+// stored profiles and continues walking the remaining RD pages.
+// The per-request timeout is derived from the invocation budget so that one
+// logical provider request — every attempt plus every backoff — can never
+// outlive the budget. A request that could reach 110s (30s timeout x 3
+// attempts plus 5s and 15s backoffs) was killed by the gateway before the
+// function could return its resumable payload, so the client saw a non-2xx
+// status instead of the checkpointed partial result and the mirrored
+// snapshot stayed stale.
+const RD_REQUEST_TIMEOUT_MS = safeRDRequestTimeoutMs();
+
+/** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
+ *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
+function toBrtDateString(iso: string): string {
+  const d = new Date(iso);
+  // BRT é UTC-3 (sem horário de verão atualmente). Subtrai 3h e usa UTC.
+  const shifted = new Date(d.getTime() - 3 * 3600 * 1000);
+  return shifted.toISOString().split("T")[0];
+}
+
+// Métricas globais por execução
+const metrics = { retries: 0, errors: 0, details: 0, contacts: 0 };
+
+async function fetchWithRetry(url: string, attempts = RD_REQUEST_ATTEMPTS, deadline?: number): Promise<Response> {
+  const backoffs = RD_REQUEST_BACKOFFS_MS;
+  let lastErr: any = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      let release!: () => void;
+      const turn = rdRequestTail;
+      rdRequestTail = new Promise<void>((resolve) => { release = resolve; });
+      await turn;
+      const spacing = Math.max(0, rdNextRequestAt - Date.now());
+      if (spacing > 0) await sleep(spacing);
+      rdNextRequestAt = Date.now() + RD_MIN_REQUEST_INTERVAL_MS;
+      release();
+      // Never start an attempt that cannot finish inside the remaining budget.
+      // A request that overruns the gateway deadline is killed before the
+      // function can persist its cursor, which surfaces as a non-2xx status
+      // and leaves the mirrored snapshot stale.
+      const remaining = deadline == null ? RD_REQUEST_TIMEOUT_MS : deadline - Date.now();
+      if (remaining <= 0) throw new Error("RD sync runtime budget exhausted before the provider request");
+      const attemptTimeoutMs = Math.min(RD_REQUEST_TIMEOUT_MS, remaining);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), attemptTimeoutMs);
+      let r: Response;
+      try {
+        r = await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (r.ok) return r;
+      if ([429, 500, 502, 503, 504].includes(r.status) && i < attempts - 1) {
+        const retryAfter = Number(r.headers.get("Retry-After") || "0");
+        const wait = retryAfter > 0 ? retryAfter * 1000 : backoffs[i];
+        metrics.retries++;
+        console.log(
+          `[retry] ${r.status} on ${url.split("?")[0]} — waiting ${wait}ms (attempt ${i + 1}/${attempts})`,
+        );
+        await sleep(wait);
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        metrics.retries++;
+        console.log(
+          `[retry] network error — waiting ${backoffs[i]}ms (attempt ${i + 1}/${attempts})`,
+        );
+        await sleep(backoffs[i]);
+        continue;
+      }
+    }
+  }
+  metrics.errors++;
+  throw lastErr || new Error("fetchWithRetry exhausted attempts");
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const correlationId = extractCorrelationId(req.headers);
+  structuredLog({ level: "info", message: "rd-sync-deals invoked", correlationId });
+
+  const startedAt = Date.now();
+  metrics.retries = 0;
+  metrics.errors = 0;
+  metrics.details = 0;
+  metrics.contacts = 0;
+  let runId: string | null = null;
+  let userId: string | null = null;
+  let rdConnectionId: string | null = null;
+  let scopeFunnelId: string | null = null;
+  let scopeStartDate: string | null = null;
+  let scopeEndDate: string | null = null;
+  let scopeTimezone = "America/Sao_Paulo";
+  let previousScopeSuccessAt: string | null = null;
+  let previousScopeCoveredStart: string | null = null;
+  let previousScopeCoveredEnd: string | null = null;
+  let scopePagesProcessed = 0;
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { global: { fetch: fetchSupabaseWithTimeout } },
+  );
+  let caller: any = null;
+  const runtimeDeadline = startedAt + RD_SYNC_RUNTIME_BUDGET_MS;
+
+  async function finishRun(opts: {
+    status: "success" | "partial" | "failed";
+    deals: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errorMessage?: string | null;
+    funnelName?: string;
+  }) {
+    const duration = Date.now() - startedAt;
+    if (runId) {
+      await admin
+        .from("sync_runs")
+        .update({
+          finished_at: new Date().toISOString(),
+          duration_ms: duration,
+          status: opts.status,
+          deals_fetched: opts.deals,
+          created_count: opts.created,
+          updated_count: opts.updated,
+          skipped_count: opts.skipped,
+          details_fetched: metrics.details,
+          contacts_fetched: metrics.contacts,
+          retries_total: metrics.retries,
+          errors_total: metrics.errors,
+          error_message: opts.errorMessage ?? null,
+        })
+        .eq("id", runId);
+    }
+    if (rdConnectionId && userId) {
+      const finishedAt = new Date().toISOString();
+      const connectionState = opts.status === "success"
+        ? { last_attempt_at: finishedAt, last_success_at: finishedAt, last_error: null, updated_at: finishedAt }
+        : { last_attempt_at: finishedAt, last_error: opts.errorMessage || `Sincronização RD ${opts.status}.`, updated_at: finishedAt };
+      const { error: connectionUpdateError } = await admin.from("rd_account_connections")
+        .update(connectionState)
+        .eq("id", rdConnectionId)
+        .eq("user_id", userId);
+      if (connectionUpdateError) console.error("Não foi possível atualizar o watermark da conexão RD", connectionUpdateError.message);
+    }
+    if (scopeFunnelId && scopeStartDate && scopeEndDate) {
+      const finishedAt = new Date().toISOString();
+      const snapshotValid = opts.status === "success";
+      const { error: scopeUpdateError } = await admin.from("rd_sync_scope_state").update({
+        status: opts.status,
+        last_attempt_at: finishedAt,
+        ...(snapshotValid ? {
+          last_success_at: finishedAt,
+          covered_start_date: scopeStartDate,
+          covered_end_date: scopeEndDate,
+          rows_persisted: opts.deals,
+          pages_processed: scopePagesProcessed,
+        } : {
+          last_success_at: previousScopeSuccessAt,
+          covered_start_date: previousScopeCoveredStart,
+          covered_end_date: previousScopeCoveredEnd,
+        }),
+        last_error: opts.status === "success" ? null : opts.errorMessage || `Sincronização RD ${opts.status}.`,
+        updated_at: finishedAt,
+      }).eq("funnel_id", scopeFunnelId).eq("start_date", scopeStartDate).eq("end_date", scopeEndDate).eq("timezone", scopeTimezone);
+      if (scopeUpdateError) console.error("Não foi possível atualizar a cobertura RD", scopeUpdateError.message);
+    }
+    // Alertas
+    if (userId && (opts.status !== "success" || duration > 60000)) {
+      const severity = opts.status === "failed" ? "critical" : "warning";
+      const message =
+        opts.status === "failed"
+          ? `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} falhou: ${opts.errorMessage || "erro desconhecido"}`
+          : `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} demorou ${(duration / 1000).toFixed(1)}s (acima do esperado).`;
+      // Automatic cycles must not create an identical alert every run. Keep
+      // the alert stream useful by deduplicating the same funnel/error for a
+      // short window; a changed error or a later manual run can still alert.
+      const { data: recentAlert } = await admin
+        .from("alerts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("alert_type", "rd_sync")
+        .eq("message", message)
+        .gte("created_at", new Date(Date.now() - 15 * 60_000).toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (!recentAlert) {
+        await admin.from("alerts").insert({
+          user_id: userId,
+          alert_type: "rd_sync",
+          severity,
+          message,
+        });
+      }
+    }
+    console.log(
+      `[sync_runs] finished status=${opts.status} duration=${duration}ms retries=${metrics.retries} errors=${metrics.errors} details=${metrics.details} contacts=${metrics.contacts}`,
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const {
+      funnel_id,
+      only_missing_names,
+      missing_names_limit = 80,
+      service_user_id,
+      cron_trigger,
+      analytics_mode = false,
+      full_history = false,
+      refresh_amounts = false,
+      start_date,
+      end_date,
+      max_deals = 1000,
+      realtime = false,
+      max_pages,
+      skip_enrichment = false,
+      trigger_source,
+    } = body || {};
+    // The integrations and background paths are bounded snapshots. Treat
+    // their trigger explicitly as realtime even when an older caller omitted
+    // the boolean flag, otherwise the function walks the complete RD archive
+    // and hydrates every row before returning to the UI.
+    const boundedRealtime = realtime === true || ["auto_realtime", "integrations_realtime"].includes(String(trigger_source || ""));
+    const effectiveSkipEnrichment = shouldSkipRDDealEnrichment({
+      boundedRealtime,
+      skipEnrichment: skip_enrichment === true,
+    });
+    let deal_ids = body?.deal_ids;
+
+    // Authentication is the first contract boundary. Do not reveal request
+    // validation details (such as a missing funnel id) to unauthenticated
+    // callers or make public probes look like client errors.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!funnel_id) {
+      return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Internal path (cron/orchestrator): trust supplied user_id only when the
+    // caller proves either the service role or the configured cron secret.
+    // O papel NUNCA é inferido do payload de um JWT: o payload não é assinado
+    // neste ponto e qualquer chamador poderia forjar {"role":"service_role"}.
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const suppliedCronSecret = req.headers.get("x-cron-secret")?.trim() || bearerToken;
+    const isServiceRoleKey = !!serviceKey && secretsMatch(bearerToken, serviceKey);
+    const isCronSecret = await (async () => {
+      if (!suppliedCronSecret) return false;
+      const { data: secretIsValid, error: secretError } = await admin.rpc(
+        "verify_daily_incremental_sync_secret",
+        { candidate: suppliedCronSecret },
+      );
+      return !secretError && secretIsValid === true;
+    })();
+    const isServiceCall = Boolean(cron_trigger && service_user_id && (isServiceRoleKey || isCronSecret));
+
+    if (isServiceCall) {
+      userId = String(service_user_id);
+      if (!UUID_RE.test(userId)) {
+        return new Response(JSON.stringify({ error: "service_user_id inválido" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { fetch: fetchSupabaseWithTimeout, headers: { Authorization: authHeader } },
+      });
+      const { data: userRes } = await caller.auth.getUser();
+      userId = userRes.user?.id || null;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Usuário inválido" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Chamadas manuais usam o mesmo cliente com RLS da interface. Assim,
+    // proprietários, masters e usuários explicitamente atribuídos enxergam
+    // exatamente os mesmos funis aqui e na tela, sem ampliar acesso entre
+    // clientes. O cron continua limitado ao owner informado pelo service role.
+    const funnelQuery = (isServiceCall ? admin : caller!)
+      .from("rd_funnels")
+      .select("id, user_id, ad_account_id, rd_connection_id, rd_funnel_id, name")
+      .eq("id", funnel_id);
+    if (isServiceCall) funnelQuery.eq("user_id", userId);
+    const { data: funnel } = await funnelQuery.maybeSingle();
+
+    if (!funnel) {
+      return new Response(JSON.stringify({ error: "Funil não encontrado" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!funnel.rd_funnel_id) {
+      return new Response(JSON.stringify({ error: "Funil sem rd_funnel_id vinculado" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Credenciais e registros sincronizados continuam pertencendo ao owner
+    // original do vínculo, mesmo quando um master executa a manutenção.
+    userId = String(funnel.user_id);
+
+    let connection;
+    try {
+      connection = await resolveRDConnection(admin, { connectionId: funnel.rd_connection_id, funnelId: funnel.id, userId, access: "write" });
+      rdConnectionId = String(connection.id || funnel.rd_connection_id || "") || null;
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "RD connection unavailable",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+    const token = connection.api_token!;
+
+    // A crashed Edge invocation can leave its audit row as `running`. Do not
+    // let those orphaned rows create concurrent writers and database timeouts.
+    // Every worker is bounded by the 90-second runtime budget. A run that is
+    // still marked as running after five minutes is therefore an orphan from
+    // a cancelled/timeout invocation, and must not block the next automatic
+    // cycle for twenty minutes.
+    const staleBefore = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { data: runningRows, error: runningError } = await admin
+      .from("sync_runs")
+      .select("id,started_at")
+      .eq("funnel_id", funnel.id)
+      .eq("status", "running")
+      .order("started_at", { ascending: false })
+      .limit(20);
+    if (runningError) throw runningError;
+    const staleIds = (runningRows || [])
+      .filter((row: any) => String(row.started_at || "") < staleBefore)
+      .map((row: any) => row.id)
+      .filter(Boolean);
+    if (staleIds.length > 0) {
+      await admin.from("sync_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_message: "run órfão encerrado antes de uma nova sincronização",
+      }).in("id", staleIds).eq("status", "running");
+    }
+    const activeRun = (runningRows || []).find((row: any) => !staleIds.includes(row.id));
+    // Um run marcado como running há mais de 2 minutos é considerado abandonado:
+    // o gateway pode tê-lo encerrado sem atualizar o banco, ou o navegador do
+    // usuário pode ter fechado antes da resposta. Libera o funil para uma nova
+    // sincronização em vez de bloquear indefinidamente com HTTP 409.
+    const staleRunBefore = new Date(Date.now() - 2 * 60_000).toISOString();
+    if (activeRun && String(activeRun.started_at || "") < staleRunBefore) {
+      await admin.from("sync_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_message: "run órfão encerrado antes de uma nova sincronização",
+      }).eq("id", activeRun.id).eq("status", "running");
+    } else if (activeRun) {
+      return new Response(JSON.stringify({
+        ok: false,
+        status: "already_running",
+        run_id: activeRun.id,
+        message: "Este funil já possui uma sincronização em andamento.",
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (only_missing_names) {
+      const { data: missingRows, error: missingError } = await admin
+        .from("rd_deals")
+        .select("rd_deal_id")
+        .eq("rd_funnel_id", funnel.id)
+        .or("contact_name.is.null,contact_name.eq.")
+        .order("lead_created_at", { ascending: false, nullsFirst: false })
+        .limit(Math.min(Number(missing_names_limit) || 80, 120));
+      if (missingError) throw missingError;
+      deal_ids = (missingRows ?? []).map((row: any) => row.rd_deal_id);
+    }
+
+    // Cria sync_run (status=running)
+    const isReprocess = Array.isArray(deal_ids) && deal_ids.length > 0;
+    const { data: runRow, error: runError } = await admin
+      .from("sync_runs")
+      .insert({
+        user_id: userId,
+        funnel_id: funnel.id,
+        provider: "rd_station_crm",
+        status: "running",
+        trigger_source: isReprocess
+          ? "reprocess"
+          : trigger_source || (boundedRealtime ? "auto_realtime" : "manual"),
+      })
+      .select("id")
+      .single();
+    if (runError) {
+      // The partial unique index is the authoritative race guard. A manual
+      // refresh that loses the race with realtime must be reported as a
+      // normal in-progress response, not as an opaque HTTP 500.
+      if ((runError as any).code === "23505") {
+        const { data: active } = await admin
+          .from("sync_runs")
+          .select("id")
+          .eq("funnel_id", funnel.id)
+          .eq("status", "running")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return new Response(JSON.stringify({
+          ok: false,
+          status: "already_running",
+          run_id: active?.id || null,
+          message: "Este funil já possui uma sincronização em andamento.",
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw runError;
+    }
+    runId = runRow?.id || null;
+
+    if (analytics_mode && typeof start_date === "string" && typeof end_date === "string"
+      && /^\d{4}-\d{2}-\d{2}$/.test(start_date) && /^\d{4}-\d{2}-\d{2}$/.test(end_date)
+      && start_date <= end_date) {
+      scopeFunnelId = String(funnel.id);
+      scopeStartDate = start_date;
+      scopeEndDate = end_date;
+      const { data: previousScope, error: previousScopeError } = await admin.from("rd_sync_scope_state")
+        .select("last_success_at,covered_start_date,covered_end_date")
+        .eq("funnel_id", scopeFunnelId).eq("start_date", scopeStartDate).eq("end_date", scopeEndDate).eq("timezone", scopeTimezone)
+        .maybeSingle();
+      if (previousScopeError) throw new Error(`Falha ao ler cobertura RD: ${previousScopeError.message}`);
+      previousScopeSuccessAt = previousScope?.last_success_at || null;
+      previousScopeCoveredStart = previousScope?.covered_start_date || null;
+      previousScopeCoveredEnd = previousScope?.covered_end_date || null;
+      const { error: scopeStartError } = await admin.from("rd_sync_scope_state").upsert({
+        funnel_id: scopeFunnelId,
+        start_date: scopeStartDate,
+        end_date: scopeEndDate,
+        timezone: scopeTimezone,
+        status: "syncing",
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: previousScopeSuccessAt,
+        covered_start_date: previousScopeCoveredStart,
+        covered_end_date: previousScopeCoveredEnd,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "funnel_id,start_date,end_date,timezone" });
+      if (scopeStartError) throw new Error(`Falha ao iniciar cobertura RD: ${scopeStartError.message}`);
+    }
+
+    const { data: products, error: productsError } = await admin
+      .from("products")
+      .select("id, name, tax_rate")
+      .eq("user_id", userId);
+    if (productsError) throw productsError;
+    const productList = products || [];
+
+    // RD funnels can now exist independently of a Meta ad account. Never send
+    // a literal `null` through PostgREST's UUID equality filter (`eq(...,
+    // null)` becomes `eq.null` and aborts the whole RD sync).
+    let fieldConfigs: FieldConfig[] = [];
+    // Keep the fetched rows available to the field-catalog reconciliation
+    // below.  Declaring this inside the conditional made every funnel linked
+    // to a Meta account fail at the end of an otherwise successful sync with
+    // `fieldConfigsRows is not defined`.
+    let fieldConfigsRows: FieldConfig[] = [];
+    if (funnel.ad_account_id) {
+      const { data, error: fieldConfigsError } = await admin
+        .from("rd_field_configs")
+        .select("id, key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
+        .eq("ad_account_id", funnel.ad_account_id);
+      if (fieldConfigsError) throw fieldConfigsError;
+      fieldConfigsRows = (data as FieldConfig[]) || [];
+      fieldConfigs = fieldConfigsRows;
+    }
+    // The RD API has no reliable per-pipeline custom-field catalogue. Observe
+    // fields while reading every deal and upsert the account catalogue once at
+    // the end of this run. This makes discovery automatic for every linked
+    // funnel without exposing a privileged endpoint or adding an extra RD call.
+    const observedFields = new Map<string, ObservedField>();
+
+    async function syncObservedFieldCatalog() {
+      if (!funnel?.ad_account_id) return { created: 0, updated: 0 };
+      if (observedFields.size === 0) return { created: 0, updated: 0 };
+      const existingBySourceAndLabel = new Map<string, any>();
+      const usedKeys = new Set<string>();
+      for (const config of fieldConfigsRows || []) {
+        usedKeys.add(config.key);
+        existingBySourceAndLabel.set(
+          `${config.rd_source || "deal"}:${keyNorm(config.rd_field_label || config.label || "")}`,
+          config,
+        );
+      }
+      let created = 0;
+      let updated = 0;
+      for (const observed of observedFields.values()) {
+        const existing = existingBySourceAndLabel.get(`${observed.source}:${keyNorm(observed.label)}`);
+        const options = Array.from(observed.values).slice(0, 20).map((value) => ({ label: value, value }));
+        if (existing) {
+          const aliases = Array.from(new Set([
+            ...(existing.rd_field_aliases || []),
+            observed.label,
+          ].filter(Boolean)));
+          const keepRanges = existing.field_type === "number" && (existing.options || []).some(
+            (option: any) => option?.min != null || option?.max != null,
+          );
+          const { error } = await admin.from("rd_field_configs").update({
+            rd_field_aliases: aliases,
+            options: keepRanges || options.length === 0 ? existing.options : options,
+          }).eq("id", existing.id);
+          if (error) console.warn("[rd-fields] update failed", error.message);
+          else updated++;
+          continue;
+        }
+        const keyBase = slugify(observed.label) || "campo_rd";
+        // A key is unique per account. Prefix only when the same label exists
+        // in the other RD entity (contact vs. deal), preserving both values.
+        const key = usedKeys.has(keyBase) ? `${observed.source}_${keyBase}` : keyBase;
+        const { error } = await admin.from("rd_field_configs").upsert({
+          user_id: userId!,
+          ad_account_id: funnel!.ad_account_id,
+          key,
+          label: observed.label,
+          rd_source: observed.source,
+          rd_field_label: observed.label,
+          rd_field_aliases: [observed.label],
+          field_type: "enum",
+          options,
+          show_in_dashboard: false,
+        }, { onConflict: "ad_account_id,key" });
+        if (error) console.warn("[rd-fields] insert failed", error.message);
+        else {
+          usedKeys.add(key);
+          created++;
+        }
+      }
+      await admin.from("ad_accounts").update({
+        rd_fields_last_discovered_at: new Date().toISOString(),
+      }).eq("id", funnel!.ad_account_id);
+      return { created, updated };
+    }
+
+    // Buscar e cachear etapas reais do funil no RD
+    const stageOrderMap = new Map<string, number>();
+    const stageNameMap = new Map<string, string>();
+    const stageWonMap = new Map<string, boolean>();
+    const stageLostMap = new Map<string, boolean>();
+    let stageSnapshotSource: "rd_api" | "deal_snapshot" | "unavailable" = "unavailable";
+    let stageSyncWarning: string | null = null;
+    let stagesPersisted = 0;
+    try {
+      const sr = await fetchWithRetry(
+        `https://crm.rdstation.com/api/v1/deal_stages?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&limit=200`,
+      );
+      if (sr.ok) {
+        const sjson = await sr.json();
+        const stagesArr: any[] = sjson?.deal_stages || sjson || [];
+        const rows = stagesArr.map((s, idx) => {
+          const name = String(s?.name || "");
+          const lname = name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const isWon =
+            Boolean(s?.win ?? s?.is_won ?? s?.won) ||
+            lname.includes("ganho") ||
+            /^(venda|vendas|sale|sales)$/.test(lname) ||
+            /\b(vendid[oa]s?|venda real|venda concl|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(lname);
+          const isLost =
+            Boolean(s?.loss ?? s?.is_lost ?? s?.lost) ||
+            lname.includes("perdido") ||
+            lname.includes("perda") ||
+            lname.includes("lost");
+          const ord = Number(s?.order ?? s?.position ?? idx);
+          const sid = String(s?.id || s?._id);
+          stageOrderMap.set(sid, ord);
+          stageNameMap.set(sid, name);
+          stageWonMap.set(sid, isWon);
+          stageLostMap.set(sid, isLost);
+          return {
+            rd_funnel_id: funnel.id,
+            ad_account_id: funnel.ad_account_id,
+            user_id: userId!,
+            rd_stage_id: sid,
+            name,
+            nickname: s?.nickname || null,
+            order: ord,
+            is_won: isWon,
+            is_lost: isLost,
+            updated_at: new Date().toISOString(),
+          };
+        });
+        if (rows.length > 0) {
+          const { error: stagesUpsertError } = await admin
+            .from("rd_funnel_stages")
+            .upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          if (stagesUpsertError) throw stagesUpsertError;
+          stageSnapshotSource = "rd_api";
+          stagesPersisted = rows.length;
+          // A pipeline can be edited directly in RD Station. Retaining a
+          // deleted or renamed stage locally makes the CRM render columns that
+          // no longer exist in RD, so remove only stages absent from a
+          // successful, non-empty authoritative response.
+          const activeStageIds = new Set(rows.map((row) => row.rd_stage_id));
+          const { data: storedStages, error: storedStagesError } = await admin
+            .from("rd_funnel_stages")
+            .select("rd_stage_id")
+            .eq("rd_funnel_id", funnel!.id);
+          if (storedStagesError) {
+            console.warn(`[stages] não foi possível conferir etapas antigas do funil ${funnel.name}: ${storedStagesError.message}`);
+          } else {
+            const staleStageIds = (storedStages || [])
+              .map((stage) => String(stage.rd_stage_id || ""))
+              .filter((stageId) => stageId && !activeStageIds.has(stageId));
+            if (staleStageIds.length > 0) {
+              const { error: deleteStagesError } = await admin
+                .from("rd_funnel_stages")
+                .delete()
+                .eq("rd_funnel_id", funnel!.id)
+                .in("rd_stage_id", staleStageIds);
+              if (deleteStagesError) {
+                console.warn(`[stages] não foi possível remover etapas obsoletas do funil ${funnel.name}: ${deleteStagesError.message}`);
+              } else {
+                console.log(`[stages] removidas ${staleStageIds.length} etapa(s) obsoleta(s) do funil ${funnel.name}`);
+              }
+            }
+          }
+          console.log(`[stages] sincronizadas ${rows.length} etapas reais do funil ${funnel.name}`);
+        } else {
+          stageSyncWarning = "O RD respondeu sem etapas para este funil.";
+        }
+      } else {
+        stageSyncWarning = `A API de etapas do RD respondeu HTTP ${sr.status}.`;
+        console.log(`[stages] fetch failed status=${sr.status}`);
+      }
+    } catch (e) {
+      stageSyncWarning = `Falha ao buscar etapas do RD: ${(e as Error).message}`;
+      console.log(`[stages] erro: ${(e as Error).message}`);
+    }
+
+    // The RD deals snapshot carries the provider's real current stage id,
+    // label, order and won/lost status. Use it as a safe recovery source when
+    // the separate stages endpoint fails or returns an empty payload, rather
+    // than reporting a successful CRM refresh with no Kanban columns.
+    if (stageSnapshotSource === "unavailable") {
+      try {
+        const snapshotDeals: any[] = [];
+        const pageSize = 1_000;
+        for (let page = 0; ; page++) {
+          const { data, error } = await admin
+            .from("rd_deals")
+            .select("rd_stage_id,rd_stage_name,rd_stage_order,stage_bucket,win")
+            .eq("rd_funnel_id", funnel.id)
+            .range(page * pageSize, page * pageSize + pageSize - 1);
+          if (error) throw error;
+          const batch = data || [];
+          snapshotDeals.push(...batch);
+          if (batch.length < pageSize) break;
+        }
+        const fallbackRows = stagesFromRDDealSnapshot(funnel, snapshotDeals);
+        if (fallbackRows.length) {
+          const { error } = await admin.from("rd_funnel_stages")
+            .upsert(fallbackRows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          if (error) throw error;
+          stageSnapshotSource = "deal_snapshot";
+          stagesPersisted = fallbackRows.length;
+          console.warn(`[stages] ${fallbackRows.length} etapas restauradas do snapshot de negócios do RD para ${funnel.name}`);
+        } else {
+          stageSyncWarning ||= "Não há etapas nem negócios com estágio conhecido para reconstruir o pipeline.";
+        }
+      } catch (e) {
+        stageSyncWarning = `${stageSyncWarning ? `${stageSyncWarning} ` : ""}Não foi possível reconstruir etapas das negociações: ${(e as Error).message}`;
+        console.warn(`[stages] fallback de negócios falhou: ${(e as Error).message}`);
+      }
+    }
+
+    let totalCreated = 0,
+      totalUpdated = 0,
+      totalSkipped = 0,
+      totalDeals = 0;
+    let reconciledDeleted = 0;
+    let analyticsRangeComplete = false;
+    let fullHistoryRequested = false;
+    let pagesProcessed = 0;
+    const seenAnalyticsDealIds = new Set<string>();
+    // A deal can occur in more than one RD status segment. Deduplicate only
+    // when both occurrences have the same stage; a changed stage must be
+    // persisted so the mirror follows the current RD pipeline column.
+    const seenAnalyticsDealStages = new Map<string, string | null>();
+    let snapshotMissingIds: string[] = [];
+    let snapshotDuplicateCount = 0;
+    // A resumed segment only sees the pages after its stored cursor. It is
+    // still safe to upsert those pages, but it is not safe to delete local
+    // rows that were seen by a previous invocation during reconciliation.
+    let resumedFromCursor = false;
+
+    async function processDeal(d: any) {
+      const id = String(d.id || d._id);
+      if (effectiveSkipEnrichment) return { ...d, _contacts: [] };
+      let detail: any = d;
+      let detailOk = false;
+      try {
+        const dr = await fetchWithRetry(
+          `https://crm.rdstation.com/api/v1/deals/${id}?token=${encodeURIComponent(token)}`,
+          RD_REQUEST_ATTEMPTS,
+          runtimeDeadline,
+        );
+        if (dr.ok) {
+          detail = { ...d, ...(await dr.json()) };
+          metrics.details++;
+          detailOk = true;
+        } else {
+          console.log(`[deal ${id}] detail FAILED status=${dr.status}`);
+          metrics.errors++;
+        }
+      } catch (e) {
+        console.log(`[deal ${id}] detail threw: ${(e as Error).message}`);
+        metrics.errors++;
+      }
+      let dealContacts: any[] = [];
+      try {
+        const cr = await fetchWithRetry(
+          `https://crm.rdstation.com/api/v1/deals/${id}/contacts?token=${encodeURIComponent(token)}`,
+          RD_REQUEST_ATTEMPTS,
+          runtimeDeadline,
+        );
+        if (cr.ok) {
+          const cj = await cr.json();
+          dealContacts = asArray(cj?.contacts ?? cj?.data ?? cj);
+          metrics.contacts++;
+        } else {
+          console.log(`[deal ${id}] /contacts FAILED status=${cr.status}`);
+        }
+      } catch (e) {
+        console.log(`[deal ${id}] /contacts threw: ${(e as Error).message}`);
+      }
+
+      // Fallback: enriquecer contatos inline do detalhe via /contacts/{id} quando não vier nome
+      const inlineContacts: any[] = asArray(
+        detail.contacts ?? detail.set_contacts ?? detail.deal_contacts,
+      );
+      const haveNamed = dealContacts.some((c) => cleanContactName(c?.name ?? c?.contact?.name));
+      if (!haveNamed && inlineContacts.length > 0) {
+        const enriched: any[] = [];
+        for (const c of inlineContacts.slice(0, 3)) {
+          const cid = c?.id || c?._id || c?.contact_id || c?.contact?.id || c?.contact?._id;
+          if (!cid) {
+            if (c?.name) enriched.push(c);
+            continue;
+          }
+          try {
+            const r = await fetchWithRetry(
+              `https://crm.rdstation.com/api/v1/contacts/${cid}?token=${encodeURIComponent(token)}`,
+              RD_REQUEST_ATTEMPTS,
+              runtimeDeadline,
+            );
+            if (r.ok) {
+              const cj = await r.json();
+              enriched.push(cj || c);
+            } else enriched.push(c);
+          } catch {
+            enriched.push(c);
+          }
+        }
+        if (enriched.length > 0) dealContacts = enriched;
+      }
+
+      return { ...detail, _contacts: dealContacts };
+    }
+
+    async function persistDeal(d: any, existingProfile: any = null) {
+      const rdDealId = String(d.id || d._id);
+      const amountTotal = parseLocaleAmount(d.amount_total ?? d.amount);
+      const stageId = rdDealStageId(d);
+      const stageName = rdDealStageName(d) || (stageId ? stageNameMap.get(stageId) : null) || null;
+      const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
+      // A API do RD envia `win: false` também para negócios ainda abertos.
+      // Portanto, perda só pode ser inferida pela etapa de perda ou por um
+      // motivo de perda explícito; caso contrário o funil inteiro fica errado.
+      const lost =
+        !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
+      const bucket = bucketFromStage(stageName, won, lost);
+      const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
+
+      // The bounded worker receives the provider list snapshot without the
+      // expensive detail/contact calls. If the provider timestamp and all
+      // fields that drive the CRM card are unchanged, the local row is already
+      // current. Skipping that upsert also skips the canonical-sales and
+      // attribution triggers, which is what keeps a large funnel below the
+      // database statement timeout during automatic cycles.
+      const providerUpdatedAt = d.stage_updated_at || d.updated_at || d.last_activity_at || null;
+      const providerStageKnown = stageId != null || stageName != null;
+      const providerAmountKnown = d.amount_total != null || d.amount != null;
+      const providerClosedAtKnown = Object.prototype.hasOwnProperty.call(d, "closed_at");
+      const providerWinKnown = d.win != null || stageId != null;
+      const sameProviderSnapshot = Boolean(
+        boundedRealtime && existingProfile && providerUpdatedAt
+          && String(existingProfile.stage_updated_at || "") === String(providerUpdatedAt)
+          && (!providerStageKnown || String(existingProfile.rd_stage_id || "") === String(stageId || ""))
+          && (!providerStageKnown || String(existingProfile.rd_stage_name || "") === String(stageName || ""))
+          && (!providerAmountKnown || amountTotal === null || Number(existingProfile.amount_total || 0) === amountTotal)
+          && (!providerClosedAtKnown || String(existingProfile.closed_at || "") === String(d.closed_at || ""))
+          && (!providerWinKnown || Boolean(existingProfile.win) === Boolean(won)),
+      );
+      if (sameProviderSnapshot) {
+        totalSkipped++;
+        return;
+      }
+
+      const baseContact = d.contact || d.deal_contact || {};
+      const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
+      const inline = inlineContacts.length > 0 ? inlineContacts[0] : {};
+      const firstContact =
+        Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
+      const nestedContact = firstContact.contact || inline.contact || baseContact.contact || {};
+      const contact = { ...inline, ...firstContact, ...baseContact };
+      const phones =
+        (baseContact.phones?.length
+          ? baseContact.phones
+          : firstContact.phones?.length
+            ? firstContact.phones
+            : nestedContact.phones?.length
+              ? nestedContact.phones
+              : inline.phones) || [];
+      const emails =
+        (baseContact.emails?.length
+          ? baseContact.emails
+          : firstContact.emails?.length
+            ? firstContact.emails
+            : nestedContact.emails?.length
+              ? nestedContact.emails
+              : inline.emails) || [];
+
+      const rawName = firstString(
+        baseContact.name,
+        firstContact.name,
+        nestedContact.name,
+        inline.name,
+        d.contact_name,
+        d.deal_lead?.name,
+        d.name,
+      );
+      const contactName = cleanContactName(rawName);
+      const contactPhone = firstString(
+        contactPhoneFrom(baseContact),
+        contactPhoneFrom(firstContact),
+        contactPhoneFrom(nestedContact),
+        contactPhoneFrom(inline),
+        phones[0]?.phone,
+        phones[0],
+      );
+      const contactEmail = firstString(
+        contactEmailFrom(baseContact),
+        contactEmailFrom(firstContact),
+        contactEmailFrom(nestedContact),
+        contactEmailFrom(inline),
+        emails[0]?.email,
+        emails[0],
+      );
+
+      const contactCustomFields =
+        firstContact?.contact_custom_fields || baseContact?.contact_custom_fields || [];
+      const dealCustomFields = d.deal_custom_fields || d.custom_fields || d.cf_custom_fields || [];
+      const allCfSources = [dealCustomFields, contactCustomFields];
+
+      const waPhone = phones?.[0]?.whatsapp_full_internacional || null;
+      const contactState =
+        contact.state ||
+        contact.address_state ||
+        findCustomField(allCfSources, ["state", "estado", "uf", "lead_state", "estadouf"]) ||
+        phoneToUF(waPhone) ||
+        phoneToUF(contactPhone) ||
+        null;
+      const contactCity =
+        contact.city ||
+        contact.address_city ||
+        findCustomField(allCfSources, ["city", "cidade", "lead_city", "cidadelead"]) ||
+        null;
+
+      // Nunca use "agora" como data de uma venda histórica. O fechamento é
+      // a fonte oficial; os fallbacks preservam a data original do negócio.
+      const saleTimestamp =
+        d.closed_at || d.stage_updated_at || d.updated_at || d.last_activity_at || d.created_at || new Date().toISOString();
+      const saleDate = toBrtDateString(saleTimestamp);
+
+      let productId: string | null = null;
+      let rdProductName: string | null = null;
+      if (d.deal_products?.length > 0) rdProductName = d.deal_products[0].name || null;
+      let taxAmount = 0;
+      let netRevenue = amountTotal;
+      if (rdProductName && productList.length > 0) {
+        const norm = normalize(rdProductName);
+        let match = productList.find((p) => normalize(p.name) === norm);
+        if (!match && norm.includes("online"))
+          match = productList.find((p) => normalize(p.name).includes("online"));
+        if (!match && norm.includes("presencial"))
+          match = productList.find((p) => normalize(p.name).includes("presencial"));
+        if (!match) match = productList.find((p) => norm.includes(normalize(p.name)));
+        if (match) {
+          productId = match.id;
+          if (match.tax_rate && amountTotal !== null) {
+            taxAmount = amountTotal * (match.tax_rate / 100);
+            netRevenue = amountTotal - taxAmount;
+          }
+        }
+      }
+
+      const rdCampaignName =
+        d.campaign?.name ||
+        (typeof d.campaign === "string" ? d.campaign : null) ||
+        d.deal_source?.name ||
+        null;
+      const rdSourceName =
+        d.deal_source?.name ||
+        (typeof d.deal_source === "string" ? d.deal_source : null) ||
+        d.source?.name ||
+        (typeof d.source === "string" ? d.source : null) ||
+        null;
+
+      const cfSources = [dealCustomFields, contactCustomFields];
+      const trackingSources = mergeUtmSources([d.utms, d.utm, baseContact?.utms, firstContact?.utms, d.deal_source, d.lead_origin]);
+      const pickUtm = (name: string, aliases: string[]) => pickTrackingValue(d[`utm_${name}`], trackingSources, cfSources, aliases);
+      const utm_source = pickUtm("source", ["source", "utmsource", "utm_source", "fonte"]);
+      const utm_medium = pickUtm("medium", ["medium", "utmmedium", "utm_medium", "midia", "mídia"]);
+      const utm_campaign = pickUtm("campaign", ["campaign", "utmcampaign", "utm_campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha"]);
+      const utm_term = pickUtm("term", ["term", "utmterm", "utm_term", "termo"]);
+      const utm_content = pickUtm("content", ["content", "utmcontent", "utm_content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]);
+      const utm_id = pickUtm("id", ["id", "utmid", "utm_id", "adid", "ad_id", "gd_ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]);
+      const meta_campaign_id = pickTrackingValue(d.meta_campaign_id, trackingSources, cfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]);
+      const meta_adset_id = pickTrackingValue(d.meta_adset_id, trackingSources, cfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]);
+      const meta_ad_id = pickTrackingValue(d.meta_ad_id, trackingSources, cfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || utm_id;
+      const meta_form_id = pickTrackingValue(d.meta_form_id, trackingSources, cfSources, ["form_id", "gd_form_id", "meta_form_id"]);
+      const meta_campaign_name = pickTrackingValue(d.meta_campaign_name, trackingSources, cfSources, ["meta_campaign_name", "campaign_name", "utm_campaign", "nome campanha", "nome da campanha"]);
+      const meta_adset_name = pickTrackingValue(d.meta_adset_name, trackingSources, cfSources, ["meta_adset_name", "adset_name", "utm_term", "nome conjunto", "nome do conjunto"]);
+      const meta_ad_name = pickTrackingValue(d.meta_ad_name, trackingSources, cfSources, ["meta_ad_name", "ad_name", "utm_content", "nome anuncio", "nome anúncio"]);
+      const meta_form_name = pickTrackingValue(d.meta_form_name, trackingSources, cfSources, ["meta_form_name", "form_name", "nome formulario", "nome formulário"]);
+      const meta_platform = pickTrackingValue(d.meta_platform, trackingSources, cfSources, ["meta_platform", "platform", "publisher_platform", "site_source_name", "plataforma"]);
+      const meta_placement = pickTrackingValue(d.meta_placement, trackingSources, cfSources, ["meta_placement", "placement", "platform_position", "posicionamento"]);
+
+      const leadEntryDate = d.created_at
+        ? new Date(d.created_at).toISOString().split("T")[0]
+        : null;
+
+      const dealOwnerName = d.user?.name || d.deal_user?.name || d.owner?.name || null;
+
+      const customFieldsExtracted = extractConfiguredFields(
+        fieldConfigs,
+        dealCustomFields,
+        contactCustomFields,
+      );
+      const allCustomFields = extractAllCustomFields(dealCustomFields, contactCustomFields);
+      observeCustomFields(observedFields, "deal", dealCustomFields);
+      observeCustomFields(observedFields, "contact", contactCustomFields);
+      const customFields = sanitizeTrackingCustomFields({ ...allCustomFields, ...customFieldsExtracted });
+
+      // Upsert rd_deals (todos os deals, não apenas ganhos)
+      try {
+        const { error: dealUpsertError } = await admin.from("rd_deals").upsert(
+          {
+            user_id: userId!,
+            rd_connection_id: funnel!.rd_connection_id || null,
+            ad_account_id: funnel!.ad_account_id,
+            rd_funnel_id: funnel!.id,
+            rd_deal_id: rdDealId,
+            rd_stage_id: stageId,
+            rd_stage_name: stageName,
+            rd_stage_order:
+              stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
+            deal_owner_name: dealOwnerName,
+            rd_product_name: rdProductName,
+            source: rdSourceName,
+            campaign: rdCampaignName,
+            stage_bucket: bucket,
+            win: won,
+            lost_reason: lostReason,
+            amount_total: amountTotal,
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            utm_content,
+            utm_term,
+            utm_id,
+            meta_form_id,
+            meta_campaign_id,
+            meta_adset_id,
+            meta_ad_id,
+            meta_campaign_name,
+            meta_adset_name,
+            meta_ad_name,
+            meta_form_name,
+            meta_platform,
+            meta_placement,
+            contact_name: contactName,
+            contact_phone: contactPhone,
+            contact_email: contactEmail,
+            lead_state: contactState,
+            lead_city: contactCity,
+            lead_created_at: d.created_at || null,
+            stage_updated_at: d.stage_updated_at || d.updated_at || d.last_activity_at || null,
+            closed_at: d.closed_at || null,
+            raw: d,
+            custom_fields: customFields,
+          },
+          { onConflict: "rd_connection_id,rd_deal_id" },
+        );
+        if (dealUpsertError) throw dealUpsertError;
+      } catch (e) {
+        console.log(`[rd_deals upsert] ${rdDealId} failed: ${(e as Error).message}`);
+        metrics.errors++;
+        throw e;
+      }
+
+      // A identidade canônica da receita é (rd_connection_id, rd_deal_id).
+      // Sem a conexão, dois negócios com o mesmo ID em contas diferentes
+      // sobrescrevem a receita uma da outra.
+      const salesConnectionId = funnel!.rd_connection_id ?? null;
+      const scopeSalesToDeal = (query: any) => {
+        const scoped = query.eq("user_id", userId!).eq("rd_deal_id", rdDealId);
+        return salesConnectionId
+          ? scoped.eq("rd_connection_id", salesConnectionId)
+          : scoped.is("rd_connection_id", null);
+      };
+
+      // Se o negócio foi reaberto/perdido, a receita anteriormente realizada
+      // deve sair de todos os painéis sem apagar o vínculo de auditoria.
+      if (!won) {
+        const { error: cancelError } = await scopeSalesToDeal(
+          admin
+            .from("sales")
+            .update({ status: "cancelled", attribution_reason: "rd_deal_not_won" }),
+        );
+        if (cancelError) throw cancelError;
+        return;
+      }
+
+      const { data: existing, error: existingSalesError } = await scopeSalesToDeal(
+        admin
+          .from("sales")
+          .select(
+            "id, rd_connection_id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
+          ),
+      ).maybeSingle();
+      if (existingSalesError) throw existingSalesError;
+
+      const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
+      const hasFinancialData = amountTotal !== null || netRevenue !== null || taxAmount > 0;
+
+      // Um negócio ganho no RD representa uma venda. Mesmo quando o RD não
+      // informa valor, a venda deve existir no Growdash para que a contagem
+      // de conversão e o funil de vendas reflitam a realidade do CRM.
+      if (!existing && !hasFinancialData) {
+        // Cria venda com valor zero: não é pagamento confirmado, é apenas
+        // o registro da conversão. O usuário pode preencher o valor manualmente
+        // posteriormente no dashboard de vendas.
+      } else if (!hasFinancialData) return;
+
+      // Constrói payload preservando valores manuais já preenchidos.
+      // Regra: campos vindos do RD só são gravados quando o registro existente
+      // estiver vazio. Pagamento: RD sobrescreve, exceto se usuário marcou manual.
+      const preserve = <T>(
+        current: T | null | undefined,
+        incoming: T | null | undefined,
+      ): T | null => (current != null && current !== "" ? current : (incoming ?? null)) as T | null;
+
+      const baseData: Record<string, any> = {
+        user_id: userId!,
+        rd_deal_id: rdDealId,
+        rd_connection_id: salesConnectionId,
+        ad_account_id: funnel!.ad_account_id,
+        gross_revenue: amountTotal,
+        net_revenue: netRevenue,
+        tax_amount: taxAmount,
+        status: "confirmed",
+        sale_date: saleDate,
+        product_id: productId,
+        // Um negócio ganho no RD representa uma venda. A quantidade de
+        // produtos do negócio não pode multiplicar vendas, conversão ou
+        // ticket médio nos painéis da Growdash.
+        quantity: 1,
+        rd_product_name: rdProductName,
+        rd_campaign_name: rdCampaignName,
+        rd_funnel_id: funnel!.id,
+        custom_fields: customFields,
+        source_provider: "rd_station",
+        source_record_id: rdDealId,
+        source_closed_at: d.closed_at || null,
+      };
+
+      if (existing) {
+        const update: Record<string, any> = {
+          ...baseData,
+          lead_entry_date: preserve(existing.lead_entry_date, leadEntryDate),
+          lead_state: preserve(existing.lead_state, contactState),
+          lead_city: preserve(existing.lead_city, contactCity),
+          contact_name: preserve(existing.contact_name, contactName),
+          contact_phone: preserve(existing.contact_phone, contactPhone),
+          contact_email: preserve(existing.contact_email, contactEmail),
+          utm_source: preserve(existing.utm_source, utm_source),
+          utm_medium: preserve(existing.utm_medium, utm_medium),
+          utm_campaign: preserve(existing.utm_campaign, utm_campaign),
+          utm_term: preserve(existing.utm_term, utm_term),
+          utm_content: preserve(existing.utm_content, utm_content),
+          ad_id: preserve((existing as any).ad_id, utm_id),
+        };
+        if (rdPayment && (existing as any).payment_method_source !== "manual") {
+          update.payment_method = rdPayment;
+          update.payment_method_source = "rd";
+        }
+        const { error: salesUpdateError } = await scopeSalesToDeal(
+          admin.from("sales").update(update),
+        );
+        if (salesUpdateError) throw salesUpdateError;
+        totalUpdated++;
+      } else {
+        const { error: salesInsertError } = await admin.from("sales").insert({
+          ...baseData,
+          lead_entry_date: leadEntryDate,
+          lead_state: contactState,
+          lead_city: contactCity,
+          contact_name: contactName,
+          contact_phone: contactPhone,
+          contact_email: contactEmail,
+          utm_source,
+          utm_medium,
+          utm_campaign,
+          utm_term,
+          utm_content,
+          ad_id: utm_id,
+          payment_method: rdPayment ?? "pix",
+          payment_method_source: rdPayment ? "rd" : "default",
+          notes: null,
+        });
+        if (salesInsertError) throw salesInsertError;
+        totalCreated++;
+      }
+    }
+
+    async function persistAnalyticsBatch(items: any[]) {
+      if (!items.length) return;
+      // The paginated endpoint can return an old or abbreviated amount after
+      // a negotiation is edited in RD. On an explicit user refresh, hydrate
+      // each item with the authoritative deal endpoint before updating the
+      // CRM record. The rd_deals trigger then propagates the same amount to
+      // canonical sales, which is what Comercial displays.
+      const hydratedItems: any[] = [];
+      if (analytics_mode) {
+        const hydrateByDefault = shouldHydrateRDAnalyticsDeal({
+          analyticsMode: analytics_mode,
+          skipEnrichment: effectiveSkipEnrichment,
+          fullHistoryRequested,
+        });
+        // Reuse local profiles in both bounded and full-history cycles. The
+        // full-history path is intentionally list-first: it must not rewrite
+        // every unchanged deal and retrigger attribution/sales work on every
+        // manual refresh. Bounded analytics may still hydrate incomplete or
+        // newly changed deals when the policy below requests it.
+        const existingProfiles = new Map<string, any>();
+        const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
+        if (ids.length) {
+          const { data: profiles, error: profilesError } = await admin.from("rd_deals")
+            .select("rd_deal_id,contact_name,contact_email,contact_phone,lead_city,lead_state,custom_fields,raw,rd_stage_id,amount_total,closed_at,stage_updated_at,win")
+            .eq("rd_funnel_id", funnel!.id).in("rd_deal_id", ids);
+          if (profilesError) throw profilesError;
+          for (const profile of profiles || []) existingProfiles.set(String(profile.rd_deal_id), profile);
+        }
+        const HYDRATION_BATCH_SIZE = 4;
+        for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
+          // A hidratação consome orçamento do gateway. Sem esta checagem, uma
+          // página cheia de negócios mata a função antes do checkpoint e o
+          // cursor fica na página anterior com a página corrente sem persistir.
+          if (Date.now() >= runtimeDeadline - 5000) {
+            hydratedItems.push(...items.slice(index));
+            break;
+          }
+          const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
+          const resolved = await Promise.all(batch.map((item) => {
+            const id = String(item?.id || item?._id || "");
+            const profile = existingProfiles.get(id);
+            // A profile with only a name/custom fields is not complete for
+            // attribution: RD may expose the contact e-mail/phone only on the
+            // authoritative detail/contacts response. Rehydrate those rows
+            // so a Meta lead can be matched instead of being left blank.
+            const hasContactIdentity = Boolean(profile?.contact_email || profile?.contact_phone);
+            const complete = Boolean(profile?.raw) && hasContactIdentity && Boolean(profile.contact_name || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
+            // A list snapshot with the same provider timestamp/stage/value is
+            // already authoritative for the mirror. Rewriting every won deal
+            // on every historical pass made otherwise harmless syncs compete
+            // on the rd_deals triggers and could time out before later pages
+            // were persisted. Changed rows are reconciled by identity below.
+            const stageId = rdDealStageId(item);
+            const likelyWon = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(item);
+            const needsAuthoritativeClose = shouldHydrateRDAnalyticsItem({
+              analyticsMode: analytics_mode,
+              skipEnrichment: effectiveSkipEnrichment,
+              fullHistoryRequested,
+              likelyWon,
+              hasClosedAt: Boolean(item?.closed_at),
+            });
+            const shouldHydrate = hydrateByDefault || needsAuthoritativeClose;
+            return complete && !shouldHydrate ? { ...item, _storedProfile: profile } : shouldHydrate ? processDeal(item) : { ...item, _storedProfile: profile };
+          }));
+          hydratedItems.push(...resolved);
+          if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
+        }
+      } else if (refresh_amounts && !effectiveSkipEnrichment) {
+        const HYDRATION_BATCH_SIZE = 4;
+        for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
+          const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
+          const resolved = await Promise.all(batch.map(async (item) => {
+            const id = String(item?.id || item?._id || "");
+            if (!id) return item;
+            try {
+              const response = await fetchWithRetry(
+                `https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,
+              );
+              if (!response.ok) return item;
+              metrics.details++;
+              return { ...item, ...(await response.json()) };
+            } catch {
+              // Keep the list payload if one detail request fails; the sync
+              // remains usable and the next manual refresh retries it.
+              metrics.errors++;
+              return item;
+            }
+          }));
+          hydratedItems.push(...resolved);
+          if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
+        }
+      } else {
+        hydratedItems.push(...items);
+      }
+
+      // Analytics refreshes use the paginated endpoint and retain the complete
+      // RD history, including stages imported from previous operations.
+      const operationalItems = hydratedItems;
+
+      const rows = operationalItems.map((d) => {
+        const rdDealId = String(d.id || d._id);
+        seenAnalyticsDealIds.add(rdDealId);
+        const stageId = rdDealStageId(d);
+        const stageName = rdDealStageName(d) || (stageId ? stageNameMap.get(stageId) : null) || null;
+        const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
+        const lost =
+          !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
+        const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
+        const inline = inlineContacts[0]?.contact || inlineContacts[0] || {};
+        const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
+        const baseContact = d.contact || d.deal_contact || {};
+        const storedProfile = d._storedProfile || {};
+        const contactEmail = firstString(
+          contactEmailFrom(baseContact),
+          contactEmailFrom(firstContact),
+          contactEmailFrom(inline),
+          d.contact_email,
+          storedProfile.contact_email,
+        );
+        const contactPhone = firstString(
+          contactPhoneFrom(baseContact),
+          contactPhoneFrom(firstContact),
+          contactPhoneFrom(inline),
+          d.contact_phone,
+          storedProfile.contact_phone,
+        );
+        const providerUpdatedAt = d.updated_at || d.last_activity_at || null;
+        const storedRaw = storedProfile.raw && typeof storedProfile.raw === "object" ? storedProfile.raw : null;
+        const sameProviderSnapshot = Boolean(
+          storedRaw && providerUpdatedAt && storedRaw.updated_at === providerUpdatedAt
+            && String(storedProfile.rd_stage_id || "") === String(stageId || "")
+            && Number(storedProfile.amount_total || 0) === (parseFloat(d.amount_total || d.amount || "0") || 0)
+            && String(storedProfile.closed_at || "") === String(d.closed_at || "")
+            && Boolean(storedProfile.win) === Boolean(won)
+            && (!contactEmail || Boolean(storedProfile.contact_email))
+            && (!contactPhone || Boolean(storedProfile.contact_phone)),
+        );
+        // Existing non-won profiles are already the canonical row when RD
+        // returns the same provider timestamp/stage/value. Avoid rewriting
+        // hundreds of unchanged deals during a manual reconciliation; the
+        // IDs still count towards the complete snapshot through the set above.
+        // Do not issue an UPDATE for an unchanged provider snapshot. Besides
+        // avoiding needless writes, this prevents the canonical sales
+        // triggers from recalculating the same row during a resumable
+        // historical reconciliation. The provider identity is still added
+        // to seenAnalyticsDealIds, so completeness and stale-row removal are
+        // unaffected.
+        if (sameProviderSnapshot) return null;
+        const contact = { ...inline, ...firstContact, ...baseContact };
+        const contactFields = firstContact.contact_custom_fields || contact.contact_custom_fields || baseContact.contact_custom_fields || [];
+        const dealFields = Array.isArray(d.deal_custom_fields || d.custom_fields) ? (d.deal_custom_fields || d.custom_fields) : [];
+        observeCustomFields(observedFields, "deal", dealFields);
+        observeCustomFields(observedFields, "contact", contactFields);
+        const customFields = sanitizeTrackingCustomFields(
+          Object.keys(storedProfile.custom_fields || {}).length && !dealFields.length
+            ? storedProfile.custom_fields
+            : {
+            ...extractAllCustomFields(dealFields, contactFields),
+            ...extractConfiguredFields(fieldConfigs, dealFields, contactFields),
+            },
+        );
+        const allCfSources = [dealFields, contactFields];
+        const contactState =
+          contact.state ||
+          contact.address_state ||
+          findCustomField(
+            [dealFields, contactFields],
+            ["state", "estado", "uf", "lead_state", "estadouf"],
+          ) || storedProfile.lead_state || null;
+        const contactCity =
+          contact.city ||
+          contact.address_city ||
+          findCustomField(
+            [dealFields, contactFields],
+            ["city", "cidade", "lead_city", "cidadelead"],
+          ) || storedProfile.lead_city || null;
+        const trackingSources = mergeUtmSources([d.utms, d.utm, contact.utms, d.deal_source, d.lead_origin]);
+        const pickUtm = (name: string, aliases: string[]) => pickTrackingValue(d[`utm_${name}`], trackingSources, allCfSources, aliases);
+        const row: Record<string, unknown> = {
+          user_id: userId!,
+          rd_connection_id: funnel!.rd_connection_id || null,
+          ad_account_id: funnel!.ad_account_id,
+          rd_funnel_id: funnel!.id,
+          rd_deal_id: rdDealId,
+          rd_stage_id: stageId,
+          rd_stage_name: stageName,
+          rd_stage_order: stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
+          stage_bucket: bucketFromStage(stageName, won, lost),
+          win: won,
+          amount_total: parseLocaleAmount(d.amount_total ?? d.amount),
+          lead_created_at: d.created_at || null,
+          stage_updated_at: d.stage_updated_at || d.updated_at || null,
+          closed_at: d.closed_at || null,
+          contact_email: contactEmail,
+          contact_phone: contactPhone,
+          raw: d,
+          custom_fields: customFields,
+          utm_source: pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]),
+          utm_medium: pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]),
+          utm_campaign: pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha", "id campanha", "campaign_id"]),
+          utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
+          utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]),
+          utm_id: pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]),
+          meta_form_id: pickTrackingValue(d.meta_form_id, trackingSources, allCfSources, ["form_id", "gd_form_id", "meta_form_id"]),
+          meta_campaign_id: pickTrackingValue(d.meta_campaign_id, trackingSources, allCfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]),
+          meta_adset_id: pickTrackingValue(d.meta_adset_id, trackingSources, allCfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]),
+          meta_ad_id: pickTrackingValue(d.meta_ad_id, trackingSources, allCfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "gd_ad_id"]),
+          meta_campaign_name: pickTrackingValue(d.meta_campaign_name, trackingSources, allCfSources, ["meta_campaign_name", "campaign_name", "utm_campaign", "nome campanha", "nome da campanha"]),
+          meta_adset_name: pickTrackingValue(d.meta_adset_name, trackingSources, allCfSources, ["meta_adset_name", "adset_name", "utm_term", "nome conjunto", "nome do conjunto"]),
+          meta_ad_name: pickTrackingValue(d.meta_ad_name, trackingSources, allCfSources, ["meta_ad_name", "ad_name", "utm_content", "nome anuncio", "nome anúncio"]),
+          meta_form_name: pickTrackingValue(d.meta_form_name, trackingSources, allCfSources, ["meta_form_name", "form_name", "nome formulario", "nome formulário"]),
+          meta_platform: pickTrackingValue(d.meta_platform, trackingSources, allCfSources, ["meta_platform", "platform", "publisher_platform", "site_source_name", "plataforma"]),
+          meta_placement: pickTrackingValue(d.meta_placement, trackingSources, allCfSources, ["meta_placement", "placement", "platform_position", "posicionamento"]),
+        };
+        if (contactState) row.lead_state = contactState;
+        if (contactCity) row.lead_city = contactCity;
+        if (contact.name || d.contact_name || storedProfile.contact_name) row.contact_name = cleanContactName(contact.name || d.contact_name || storedProfile.contact_name);
+        if (d.deal_lost_reason?.name || d.deal_lost_reason)
+          row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
+        if (d.user?.name || d.deal_user?.name || d.owner?.name)
+          row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
+        if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
+        return row;
+      }).filter(Boolean) as Record<string, unknown>[];
+      // Do not send an entire RD page (and its raw payloads) in one request.
+      // Large pipelines routinely contain verbose custom fields; one 200-row
+      // upsert can exceed the Edge Function CPU/memory budget even though the
+      // remote pagination itself succeeded. Micro-batches preserve the full
+      // history while bounding peak serialization and PostgREST work.
+      // Cada upsert dispara triggers de atribuição/valores em rd_deals.
+      // Lotes grandes estouram o statement_timeout em funis volumosos;
+      // micro-lotes mantêm o mesmo snapshot e reduzem lock/tempo por comando.
+      const PERSIST_BATCH_SIZE = 5;
+      for (let offset = 0; offset < rows.length; offset += PERSIST_BATCH_SIZE) {
+        const batch = rows.slice(offset, offset + PERSIST_BATCH_SIZE);
+        const { error } = await admin
+          .from("rd_deals")
+          .upsert(batch, { onConflict: "rd_connection_id,rd_deal_id" });
+        if (error) throw error;
+        totalUpdated += batch.length;
+        if (offset + PERSIST_BATCH_SIZE < rows.length) await sleep(20);
+      }
+    }
+
+    const BATCH_SIZE = 10;
+    const BATCH_PAUSE_MS = 200;
+
+    if (isReprocess) {
+      // Buscar diretamente cada deal informado
+      for (let i = 0; i < deal_ids.length; i += BATCH_SIZE) {
+        const batch = deal_ids.slice(i, i + BATCH_SIZE);
+        const enriched = await Promise.all(batch.map((id: string) => processDeal({ id })));
+        totalDeals += enriched.length;
+        for (const d of enriched) await persistDeal(d);
+        await sleep(BATCH_PAUSE_MS);
+      }
+    } else {
+      const requestedPages = Number(max_pages);
+      // Full-history reconciliation is explicitly initiated by the user in
+      // CRM. Do not silently reduce it to the daily/interactive limits. The
+      // regular realtime and date-range paths intentionally stay bounded.
+      // A CRM refresh always carries the visible calendar interval. Honour
+      // that scope even if an older frontend also sends full_history=true;
+      // otherwise every account refresh unnecessarily drains the entire RD
+      // archive and frequently times out before persisting the final stages.
+      fullHistoryRequested = analytics_mode && full_history === true && !(start_date && end_date);
+      const maxPages = fullHistoryRequested
+        // Historical backfills pass a small page budget and resume through
+        // rd_sync_cursors. Manual CRM refreshes omit it and still drain the
+        // complete provider history in one request when the runtime allows.
+        ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
+        // Analytics mode is the exact multi-status path. Respect its page
+        // budget even when triggered by the near-realtime orchestrator;
+        // limiting it to one page silently dropped older deals in every
+        // funnel as soon as a pipeline exceeded 200 records.
+        : boundedRealtime
+          ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
+          : analytics_mode
+            ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
+            : 50;
+      const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
+      const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
+      // A full-history reconciliation must drain every RD page. The API itself
+      // is the boundary; an arbitrary page/deal ceiling silently loses leads.
+      const maxAnalyticsDeals = analytics_mode
+        ? (boundedRealtime ? Math.max(1, Math.min(Number(max_deals) || 60, 200)) : Number.POSITIVE_INFINITY)
+        : Math.max(1, Math.min(Number(max_deals) || 10_000, 10_000));
+      const periodParams =
+        analytics_mode && !fullHistoryRequested && start_date && end_date
+          ? `&created_at_period=true&start_date=${encodeURIComponent(`${start_date}T00:00:00-03:00`)}&end_date=${encodeURIComponent(`${end_date}T23:59:59-03:00`)}`
+          : "";
+      // A API v1 do RD não devolve "Todas as negociações" em uma única
+      // chamada. Sem o parâmetro `win`, ela retorna somente as negociações em
+      // aberto. Para reproduzir o filtro "Todos os status" do CRM precisamos
+      // percorrer também ganhas, perdidas e pausadas, consolidando pelos IDs.
+      // https://developers.rdstation.com/reference/crm-v1-list-deals
+      const analyticsSegments = analytics_mode
+        ? [
+            // Prioritize terminal status so a long open pipeline cannot
+            // consume the whole runtime before the authoritative sales list
+            // is persisted.
+            { name: "won", stageId: null, params: "&win=true", won: true },
+            // Terminal stages get a targeted pass as a complement to the
+            // status endpoint. This catches old deals whose `win` flag was
+            // not backfilled while keeping the request count bounded.
+            ...Array.from(stageWonMap.entries())
+              .filter(([, won]) => won)
+              .map(([stageId]) => ({
+              name: `stage:${stageId}`,
+              stageId,
+              params: `&deal_stage_id=${encodeURIComponent(stageId)}`,
+              won: true,
+            })),
+            // The unfiltered list is authoritative for open/lost records and
+            // already carries each deal's native stage. Some RD accounts
+            // silently ignore `deal_stage_id`, so walking every stage must
+            // never stop at the first page that happens not to contain the
+            // requested stage.
+            { name: "ongoing", stageId: null, params: "", won: false },
+            { name: "lost", stageId: null, params: "&win=false", won: false },
+            { name: "paused", stageId: null, params: "&hold=true", won: false },
+          ]
+        : [{ name: "ongoing", stageId: null, params: "", won: false }];
+      analyticsRangeComplete = analytics_mode;
+
+      // A chave do cursor precisa incluir a conexão RD. Sem isso, um funil
+      // reconectado a outra conta reaproveita o next_page da conexão anterior
+      // e pula as primeiras páginas do novo histórico.
+      const cursorPrefix = `${funnel.id}|${funnel.rd_connection_id || "no-connection"}|${start_date || ""}|${end_date || ""}`;
+      const { data: storedCursors } = analytics_mode
+        ? await admin.from("rd_sync_cursors").select("scope_key,segment,next_page").eq("funnel_id", funnel.id).like("scope_key", `${cursorPrefix}|%`)
+        : { data: [] as Array<{ scope_key: string; segment: string; next_page: number }> };
+      // Cursors de versões antigas da chave (sem conexão) não podem ser
+      // reaproveitados: eles não provam qual conta foi percorrida.
+      if (analytics_mode) {
+        await admin.from("rd_sync_cursors").delete().eq("funnel_id", funnel.id).not("scope_key", "like", `${cursorPrefix}|%`);
+      }
+      const cursorBySegment = new Map((storedCursors || []).map((row: any) => [String(row.segment), Number(row.next_page) || 1]));
+
+      // Persist the current segment and every segment that has not started yet
+      // whenever the invocation budget ends. Without this checkpoint a worker
+      // that processes `won` and then reaches max_pages/runtime before
+      // `ongoing` starts leaves no cursor for the remaining statuses; the next
+      // invocation then restarts at the first segment forever and the RD mirror
+      // never reaches older sales.
+      async function persistPendingCursors(startIndex: number, currentPage: number) {
+        if (!analytics_mode) return;
+        const pending = buildPendingRDSyncCursors(analyticsSegments, startIndex, currentPage);
+        for (const pendingSegment of pending) {
+          const scopeKey = `${cursorPrefix}|${pendingSegment.segment}`;
+          const { error } = await admin.from("rd_sync_cursors").upsert({
+            scope_key: scopeKey,
+            funnel_id: funnel.id,
+            rd_connection_id: funnel.rd_connection_id,
+            start_date: start_date || null,
+            end_date: end_date || null,
+            segment: pendingSegment.segment,
+            next_page: pendingSegment.nextPage,
+            status: "partial",
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "scope_key" });
+          if (error) throw error;
+        }
+      }
+
+      segmentLoop: for (let segmentIndex = 0; segmentIndex < analyticsSegments.length; segmentIndex++) {
+        const segment = analyticsSegments[segmentIndex];
+        const cursorKey = `${cursorPrefix}|${segment.name}`;
+        let page = cursorBySegment.get(segment.name) || 1;
+        if (page > 1) resumedFromCursor = true;
+        let segmentComplete = false;
+
+        while (page <= maxPages) {
+          // Backfill workers can request a global page budget. Without this
+          // guard, max_pages=1 was applied independently to every status
+          // segment (won/open/lost/paused), still making one edge request too
+          // large for the gateway. Cursors keep the remaining segments for
+          // the next invocation.
+          if (analytics_mode && Number.isFinite(requestedPages) && requestedPages > 0 && pagesProcessed >= requestedPages) {
+            analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
+            break segmentLoop;
+          }
+          if (analytics_mode && Number.isFinite(maxAnalyticsDeals) && totalDeals >= maxAnalyticsDeals) {
+            analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
+            break segmentLoop;
+          }
+          if (Date.now() >= runtimeDeadline) {
+            analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
+            break segmentLoop;
+          }
+          pagesProcessed++;
+          scopePagesProcessed = pagesProcessed;
+          // O CRM replica o filtro "Data de criação" do RD. Todos os status
+          // usam o mesmo intervalo; varrer o histórico inteiro para o
+          // segmento ganho a cada ciclo de cinco minutos causava 429 e ainda
+          // podia deixar o snapshot incompleto. Vendas por closed_at são
+          // calculadas separadamente pela reconciliação de métricas.
+          const segmentPeriodParams = periodParams;
+          const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${segmentPeriodParams}${segment.params}`;
+          const r = await fetchWithRetry(url, RD_REQUEST_ATTEMPTS, runtimeDeadline);
+          if (!r.ok) {
+            const txt = await r.text();
+            // Keep the exact page that failed so a transient RD/429 response
+            // resumes from this segment instead of replaying an earlier one.
+            await persistPendingCursors(segmentIndex, page);
+            await finishRun({
+              status: "failed",
+              deals: totalDeals,
+              created: totalCreated,
+              updated: totalUpdated,
+              skipped: totalSkipped,
+              errorMessage: `RD API ${r.status}: ${txt.slice(0, 200)}`,
+              funnelName: funnel.name,
+            });
+            return new Response(
+              JSON.stringify({
+                error: `RD API ${r.status}: ${txt.slice(0, 200)}`,
+                page,
+                segment: segment.name,
+              }),
+              {
+                status: r.status === 429 ? 429 : 502,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              },
+            );
+          }
+          const payload = await r.json();
+          const deals = payload.deals || payload || [];
+          if (!Array.isArray(deals) || deals.length === 0) {
+            segmentComplete = true;
+            if (analytics_mode) {
+              const { error } = await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              if (error) throw error;
+            }
+            break;
+          }
+
+          if (analytics_mode) {
+            // Some RD workspaces ignore deal_stage_id and return the regular
+            // list. In that case scanning every page for every stage is both
+            // redundant and a common cause of gateway timeouts. The status
+            // segments above remain the authoritative recovery path.
+            const stageQueryIgnored = Boolean(
+              segment.stageId
+              && deals.some((deal: any) => {
+                const returnedStageId = rdDealStageId(deal) || "";
+                return returnedStageId && returnedStageId !== String(segment.stageId);
+              }),
+            );
+            if (stageQueryIgnored) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              console.warn(`[rd] RD ignorou deal_stage_id para ${segment.name}; status segments serão usados.`);
+              continue segmentLoop;
+            }
+            const rangedDeals = deals
+              .filter((deal: any) => {
+                const rdDealId = String(deal.id || deal._id || "");
+                const returnedStageId = rdDealStageId(deal);
+                const previousStageId = rdDealId ? seenAnalyticsDealStages.get(rdDealId) : undefined;
+                if (!rdDealId || (previousStageId !== undefined && previousStageId === returnedStageId)) return false;
+                // The RD API may return the same unfiltered page even when a
+                // deal_stage_id query parameter is supplied. Never attribute
+                // that page to the first stage: enforce the stage locally so
+                // each native RD column gets its own records and later
+                // terminal-stage segments can still contribute their deals.
+                if (segment.stageId) {
+                  if (returnedStageId !== String(segment.stageId)) return false;
+                }
+                // The RD `win=true` segment is not exhaustive: older deals
+                // can remain flagged as open in the API even while their
+                // current stage is terminal (for example "Venda Realizada").
+                // Classify the stage before applying the calendar so those
+                // deals use the won date and are not dropped by an old
+                // creation date.
+                // CRM replica scope follows the RD "Data de criação" filter
+                // for every current stage, including won/lost columns.
+                const rawDate = deal.created_at || deal.updated_at;
+                if (!rawDate) return true;
+                const timestamp = new Date(rawDate).getTime();
+                return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
+              })
+              .slice(0, Math.max(0, maxAnalyticsDeals - totalDeals));
+            // Some RD accounts ignore one or more pagination/status query
+            // parameters and repeat a page already consumed by the previous
+            // segment. Stop that segment when it contributes no new IDs;
+            // otherwise a full-history run can loop forever at page 2+.
+          if (rangedDeals.length === 0) {
+            // For a stage-specific query, an empty filtered page is not proof
+            // that the stage is exhausted: RD can return another stage when
+            // it ignores the filter, and the requested stage may be on a
+            // later page. Continue pagination until the provider ends it or
+            // the selected calendar is completely behind us.
+            const timestamps = deals
+              .filter((deal: any) => !segment.stageId || String(rdDealStageId(deal) || "") === String(segment.stageId))
+              .map((deal: any) => new Date((deal.created_at || deal.updated_at) || 0).getTime())
+              .filter((value: number) => Number.isFinite(value) && value > 0);
+            const pageBeforeRange = Boolean(
+              startMs && timestamps.length > 0 && timestamps.every((value: number) => value < startMs),
+            );
+            if (!segment.stageId || deals.length < 200 || pageBeforeRange) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              break;
+            }
+            page++;
+            await admin.from("rd_sync_cursors").upsert({
+              scope_key: cursorKey,
+              funnel_id: funnel.id,
+              rd_connection_id: funnel.rd_connection_id,
+              start_date: start_date || null,
+              end_date: end_date || null,
+              segment: segment.name,
+              next_page: page,
+              status: "partial",
+              last_error: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "scope_key" });
+            continue;
+          }
+            await persistAnalyticsBatch(rangedDeals);
+            for (const deal of rangedDeals) {
+              const rdDealId = String(deal.id || deal._id || "");
+              if (rdDealId) seenAnalyticsDealStages.set(rdDealId, rdDealStageId(deal));
+            }
+            totalDeals += rangedDeals.length;
+
+            const timestamps = deals
+              .filter((deal: any) => !segment.stageId || String(rdDealStageId(deal) || "") === String(segment.stageId))
+              .map((deal: any) => {
+                return new Date((deal.created_at || deal.updated_at) || 0).getTime();
+              })
+              .filter((value: number) => Number.isFinite(value) && value > 0);
+            // The RD endpoint is ordered by created_at desc. Once a complete
+            // page is older than the requested start, later pages cannot
+            // contain records in this CRM snapshot. Stopping here is what
+            // makes the five-minute incremental cycle bounded and prevents
+            // rate-limit storms while preserving every in-range deal.
+            const pageBeforeRange = Boolean(
+              startMs && timestamps.length > 0 && timestamps.every((value) => value < startMs),
+            );
+            if (deals.length < 200) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              break;
+            }
+            if (pageBeforeRange) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              break;
+            }
+            if (totalDeals >= maxAnalyticsDeals) {
+              analyticsRangeComplete = false;
+              await persistPendingCursors(segmentIndex, page);
+              break segmentLoop;
+            }
+            page++;
+            await admin.from("rd_sync_cursors").upsert({
+              scope_key: cursorKey,
+              funnel_id: funnel.id,
+              rd_connection_id: funnel.rd_connection_id,
+              start_date: start_date || null,
+              end_date: end_date || null,
+              segment: segment.name,
+              next_page: page,
+              status: "partial",
+              last_error: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "scope_key" });
+            continue;
+          }
+
+          const realtimeLimit = Math.max(1, Math.min(Number(max_deals) || 60, 200));
+          const dealsToProcess = boundedRealtime
+            ? deals.slice(0, Math.max(0, realtimeLimit - totalDeals))
+            : deals;
+          totalDeals += dealsToProcess.length;
+
+          const existingRealtimeProfiles = new Map<string, any>();
+          if (boundedRealtime) {
+            const realtimeIds = dealsToProcess
+              .map((deal: any) => String(deal?.id || deal?._id || ""))
+              .filter(Boolean);
+            if (realtimeIds.length) {
+              const { data: profiles, error: profilesError } = await admin
+                .from("rd_deals")
+                .select("rd_deal_id,rd_stage_id,rd_stage_name,stage_updated_at,closed_at,amount_total,win")
+                .eq("rd_funnel_id", funnel.id)
+                .in("rd_deal_id", realtimeIds);
+              if (profilesError) throw profilesError;
+              for (const profile of profiles || []) {
+                existingRealtimeProfiles.set(String(profile.rd_deal_id), profile);
+              }
+            }
+          }
+
+          for (let i = 0; i < dealsToProcess.length; i += BATCH_SIZE) {
+            const batch = dealsToProcess.slice(i, i + BATCH_SIZE);
+            const details = await Promise.all(batch.map(processDeal));
+            for (const d of details) {
+              const id = String(d.id || d._id || "");
+              await persistDeal(d, existingRealtimeProfiles.get(id) || null);
+            }
+            await sleep(BATCH_PAUSE_MS);
+          }
+
+          if (deals.length < 200 || (boundedRealtime && totalDeals >= realtimeLimit)) break;
+          page++;
+        }
+
+        if (analytics_mode && !segmentComplete) analyticsRangeComplete = false;
+      }
+
+      // Um upsert isolado não remove negociações que foram excluídas ou
+      // transferidas para outro funil no RD. Só depois de percorrer todo o
+      // intervalo com sucesso reconciliamos esses registros locais antigos.
+      // Assim, a contagem por etapa representa o snapshot atual exibido pelo
+      // RD para a mesma conta e o mesmo filtro de data.
+      if (analytics_mode && analyticsRangeComplete && !resumedFromCursor && (fullHistoryRequested || (start_date && end_date && !fullHistoryRequested))) {
+        const localIds: string[] = [];
+        const pageSize = 1000;
+        // Paginate until PostgREST returns a short page. A fixed page count
+        // silently left stale records above 50k deals and made reconciliation
+        // report a false snapshot for large funnels.
+        for (let localPage = 0; ; localPage++) {
+          let localQuery = admin
+            .from("rd_deals")
+            .select("rd_deal_id")
+            .eq("rd_funnel_id", funnel.id);
+          if (!fullHistoryRequested && start_date && end_date) {
+            localQuery = localQuery
+              .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
+              .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`);
+          }
+          const { data: localRows, error: localError } = await localQuery
+            .order("rd_deal_id", { ascending: true })
+            .range(localPage * pageSize, localPage * pageSize + pageSize - 1);
+          if (localError) throw localError;
+          const batch = (localRows || []).map((row: any) => String(row.rd_deal_id));
+          localIds.push(...batch);
+          if (batch.length < pageSize) break;
+        }
+
+        const staleIds = localIds.filter((id) => !seenAnalyticsDealIds.has(id));
+        for (let index = 0; index < staleIds.length; index += 200) {
+          const chunk = staleIds.slice(index, index + 200);
+          const { error: deleteError } = await admin
+            .from("rd_deals")
+            .delete()
+            .eq("rd_funnel_id", funnel.id)
+            .in("rd_deal_id", chunk);
+          if (deleteError) throw deleteError;
+          reconciledDeleted += chunk.length;
+        }
+      }
+    }
+
+    // A successful API walk is not enough: verify that every RD ID selected
+    // for this snapshot exists in the local table before reporting success.
+    // This is the guard that prevents a partial page/status segment from
+    // masquerading as a complete CRM mirror.
+    // A resumed historical run has already checkpointed and persisted earlier
+    // pages. Re-scanning the entire local funnel at the end of that run adds a
+    // large, lock-prone read without improving the upsert guarantee (every
+    // page write already fails the run on error). Keep the completeness audit
+    // for bounded/first-pass snapshots and let the next full reconciliation
+    // handle stale-row cleanup without blocking the resumable worker.
+    if (analytics_mode && analyticsRangeComplete && !(fullHistoryRequested && resumedFromCursor)) {
+      let localQuery = admin
+        .from("rd_deals")
+        .select("rd_deal_id")
+        .eq("rd_funnel_id", funnel.id);
+      if (start_date && end_date) {
+        localQuery = localQuery
+          .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
+          .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`);
+      }
+      const localIds: string[] = [];
+      const pageSize = 1000;
+      for (let localPage = 0; ; localPage++) {
+        const { data: localSnapshot, error: localSnapshotError } = await localQuery
+          .range(localPage * pageSize, localPage * pageSize + pageSize - 1);
+        if (localSnapshotError) throw localSnapshotError;
+        const batch = (localSnapshot || []).map((row: any) => String(row.rd_deal_id || "")).filter(Boolean);
+        localIds.push(...batch);
+        if (batch.length < pageSize) break;
+      }
+      const localIdSet = new Set(localIds);
+      snapshotMissingIds = Array.from(seenAnalyticsDealIds).filter((id) => !localIdSet.has(id));
+      snapshotDuplicateCount = localIds.length - localIdSet.size;
+      if (snapshotMissingIds.length || snapshotDuplicateCount > 0) {
+        analyticsRangeComplete = false;
+      }
+    }
+
+    // Reconciliar negociações que chegaram sem meta_lead_id contra os meta_leads existentes
+    if (funnel.rd_connection_id) {
+      try {
+        const { data: unattributedDeals } = await admin
+          .from("rd_deals")
+          .select("rd_deal_id")
+          .eq("rd_connection_id", funnel.rd_connection_id)
+          .is("meta_lead_id", null)
+          .or("contact_email.not.is.null,contact_phone.not.is.null")
+          .order("updated_at", { ascending: false })
+          .limit(30);
+        for (const unattributed of unattributedDeals || []) {
+          if (Date.now() >= runtimeDeadline - 5000) break;
+          await syncRDDealToMeta(admin, funnel.rd_connection_id, String(unattributed.rd_deal_id));
+        }
+      } catch (attError) {
+        console.warn("[rd-sync-deals] Falha ao tentar reconciliação tardia com meta_leads:", attError);
+      }
+    }
+
+    const fieldCatalog = await syncObservedFieldCatalog();
+    const status = metrics.errors > 0 || (analytics_mode && !analyticsRangeComplete) || Boolean(stageSyncWarning) ? "partial" : "success";
+    await finishRun({
+      status,
+      deals: totalDeals,
+      created: totalCreated,
+      updated: totalUpdated,
+      skipped: totalSkipped,
+      funnelName: funnel.name,
+      errorMessage: [
+        snapshotMissingIds.length || snapshotDuplicateCount > 0
+          ? `Snapshot RD incompleto: ${snapshotMissingIds.length} ID(s) ausente(s), ${snapshotDuplicateCount} duplicidade(s)`
+          : null,
+        stageSyncWarning,
+      ].filter(Boolean).join(" ") || undefined,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: status === "success",
+        success: status === "success",
+        partial: status === "partial",
+        created: totalCreated,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        deals: totalDeals,
+        reconciled_deleted: reconciledDeleted,
+        details_fetched: metrics.details,
+        contacts_fetched: metrics.contacts,
+        retries: metrics.retries,
+        errors: metrics.errors,
+        fields_discovered: observedFields.size,
+        fields_created: fieldCatalog.created,
+        fields_updated: fieldCatalog.updated,
+        complete: analytics_mode ? analyticsRangeComplete : undefined,
+        stage_snapshot_source: stageSnapshotSource,
+        stages_persisted: stagesPersisted,
+        stage_sync_warning: stageSyncWarning,
+        pages_processed: pagesProcessed,
+        snapshot_missing_ids: snapshotMissingIds,
+        snapshot_duplicate_count: snapshotDuplicateCount,
+        next_action: status === "partial" ? "Reexecutar a sincronização histórica para processar as páginas restantes." : undefined,
+        full_history: fullHistoryRequested,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  } catch (err) {
+    const msg = (err as Error).message;
+    const errorCode = classifySyncErrorCode(err);
+    await finishRun({
+      status: "failed",
+      deals: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errorMessage: msg,
+    });
+    return new Response(JSON.stringify({ error: msg, error_code: errorCode, retryable: [SYNC_ERROR_CODES.PROVIDER_TIMEOUT, SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE].includes(errorCode) }), {
+      status: errorCode === SYNC_ERROR_CODES.PROVIDER_TIMEOUT ? 504 : errorCode === SYNC_ERROR_CODES.PROVIDER_UNAVAILABLE ? 503 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

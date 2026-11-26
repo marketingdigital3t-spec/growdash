@@ -1,0 +1,98 @@
+import { DatePreset } from "@/hooks/useDateFilter";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { MetaDateRangePicker } from "./MetaDateRangePicker";
+import { CampaignMultiSelect } from "./CampaignMultiSelect";
+import { AccountMultiSelect } from "./AccountMultiSelect";
+import { businessCalendarDate } from "@/lib/businessDate";
+
+interface DateFilterBarProps {
+  preset: DatePreset;
+  onPresetChange: (preset: DatePreset) => void;
+  customRange: { from: Date; to: Date };
+  onCustomRangeChange: (range: { from: Date; to: Date }) => void;
+  startDate: Date;
+  endDate: Date;
+  adAccounts: { id: string; name: string }[];
+  selectedAccount: string;
+  onAccountChange: (id: string) => void;
+  selectedAccountIds?: string[];
+  onAccountIdsChange?: (ids: string[]) => void;
+  campaigns?: { id: string; name: string }[];
+  selectedCampaignIds?: string[];
+  onCampaignIdsChange?: (ids: string[]) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  showSummary?: boolean;
+}
+
+export function DateFilterBar({
+  preset,
+  onPresetChange,
+  customRange,
+  onCustomRangeChange,
+  startDate,
+  endDate,
+  adAccounts,
+  selectedAccount,
+  onAccountChange,
+  selectedAccountIds,
+  onAccountIdsChange,
+  campaigns = [],
+  selectedCampaignIds = [],
+  onCampaignIdsChange,
+  onRefresh,
+  isRefreshing,
+  showSummary = true,
+}: DateFilterBarProps) {
+  return (
+    <div className="gd-filter-strip w-full min-w-0">
+      <MetaDateRangePicker
+        preset={preset}
+        onPresetChange={onPresetChange}
+        customRange={customRange}
+        onCustomRangeChange={onCustomRangeChange}
+        startDate={startDate}
+        endDate={endDate}
+        className="gd-filter-control gd-filter-date"
+      />
+
+      {adAccounts.length > 0 && selectedAccountIds && onAccountIdsChange ? <AccountMultiSelect accounts={adAccounts} selectedIds={selectedAccountIds} onChange={onAccountIdsChange} /> : adAccounts.length > 0 && (
+        <Select value={selectedAccount} onValueChange={onAccountChange}>
+          <SelectTrigger aria-label="Selecionar conta de anúncio" className="gd-filter-control gd-filter-account min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
+            <SelectValue placeholder="Todas as contas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as contas</SelectItem>
+            {adAccounts.map((acc) => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {campaigns.length > 0 && onCampaignIdsChange && (
+        <CampaignMultiSelect
+          campaigns={campaigns}
+          selectedIds={selectedCampaignIds}
+          onChange={onCampaignIdsChange}
+          className="gd-filter-control gd-filter-campaign"
+        />
+      )}
+
+      {onRefresh && (
+        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} aria-label="Atualizar dados da Meta" className="gd-filter-refresh min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
+        </Button>
+      )}
+
+      {showSummary && <span className="min-w-0 text-xs text-muted-foreground sm:ml-auto">
+        {format(businessCalendarDate(startDate), "dd MMM", { locale: ptBR })} — {format(businessCalendarDate(endDate), "dd MMM yyyy", { locale: ptBR })}
+      </span>}
+    </div>
+  );
+}

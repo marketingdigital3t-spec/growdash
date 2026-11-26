@@ -1,0 +1,545 @@
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, formatDistanceToNow, subDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, TriangleAlert, Upload } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { PageHeading } from "./shared";
+import { cn } from "@/lib/utils";
+import { mapWithConcurrency, isProviderRateLimited } from "@/lib/concurrency";
+import { recordRuntimeDiagnostic, withRequestTimeout } from "@/lib/resilience";
+import { useAdAccounts, countMetaAccountsByStatus, filterMetaAccountsByStatus } from "@/hooks/useAdAccounts";
+import { useRDIntegration } from "@/hooks/useRDIntegration";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useMetaOAuth } from "@/hooks/useMetaOAuth";
+import { useSyncMeta } from "@/hooks/useSyncMeta";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { RDIntegrationCard } from "@/components/settings/RDIntegrationCard";
+import { RDFunnelsSection } from "@/components/settings/RDFunnelsSection";
+import { RDCustomFieldsCard } from "@/components/settings/RDCustomFieldsCard";
+import { RDHealthCheckCard } from "@/components/settings/RDHealthCheckCard";
+import { RDReconcileCard } from "@/components/settings/RDReconcileCard";
+import { RDUTMDiagnosticsCard } from "@/components/settings/RDUTMDiagnosticsCard";
+import { RDObservabilityCard } from "@/components/settings/RDObservabilityCard";
+import { UTMConventionCard } from "@/components/settings/UTMConventionCard";
+import { UTMMappingCard } from "@/components/settings/UTMMappingCard";
+import { PlatformRulesSection } from "@/components/settings/PlatformRulesSection";
+import { CustomMetricsSection } from "@/components/settings/CustomMetricsSection";
+import { AccountConnectionStatus } from "@/components/settings/AccountConnectionStatus";
+import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGoogleWorkspaceOAuth } from "@/hooks/useGoogleWorkspaceOAuth";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
+import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
+import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
+import { neverSyncedRDConnections, ca02NeverSynced } from "@/lib/rdNeverSyncedAccounts";
+import { useHubSpotOAuth } from "@/hooks/useHubSpotOAuth";
+import { CRMLeadWebhookCard } from "@/components/settings/CRMLeadWebhookCard";
+import { parsePlausibleDate } from "@/lib/safeDate";
+
+const tabs = [
+  ["paid", "Tráfego pago"], ["social", "Mídia social"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
+  ["payments", "Pagamentos"], ["files", "Arquivos"], ["developers", "API & Webhooks"], ["health", "Saúde & Logs"],
+] as const;
+
+
+function safeText(value: unknown, fallback = "") {
+  return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
+}
+
+function relativeDate(value?: unknown) {
+  const normalizedValue = safeText(value);
+  if (!normalizedValue) return "Nunca sincronizado";
+  const date = parsePlausibleDate(normalizedValue);
+  return date ? formatDistanceToNow(date, { locale: ptBR, addSuffix: true }) : "Data indisponível";
+}
+
+function rdConnectionPresentation(connection: { status?: string | null; last_success_at?: string | null; last_error?: string | null } | null) {
+  if (!connection) return { label: "Não configurada", tone: "muted" as const };
+  if (connection.last_error) return { label: "Erro de sincronização", tone: "danger" as const };
+  if (connection.status !== "connected") return { label: "Desconectada", tone: "danger" as const };
+  if (!connection.last_success_at) return { label: "Autorizada · nunca sincronizada", tone: "warning" as const };
+  const elapsed = Date.now() - new Date(connection.last_success_at).getTime();
+  if (!Number.isFinite(elapsed) || elapsed > 24 * 60 * 60 * 1_000) return { label: "Conectada · atualização atrasada", tone: "warning" as const };
+  return { label: "Conectada e sincronizada", tone: "success" as const };
+}
+
+type SafeAdAccount = {
+  id: string;
+  name: string;
+  account_id: string;
+  connection_status: string;
+  last_sync_error: string | null;
+  last_sync_error_code: number | null;
+  last_sync_attempt_at: string | null;
+  last_sync_success_at: string | null;
+  token_expires_at: string | null;
+  oauth_health_status: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+function normalizeAdAccounts(value: unknown): SafeAdAccount[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Record<string, unknown>;
+    const id = safeText(source.id);
+    if (!id) return [];
+    return [{
+      id,
+      name: safeText(source.name, "Conta Meta sem nome"),
+      account_id: safeText(source.account_id, "ID indisponível"),
+      connection_status: safeText(source.connection_status, "unknown"),
+      last_sync_error: safeText(source.last_sync_error) || null,
+      last_sync_error_code: typeof source.last_sync_error_code === "number" ? source.last_sync_error_code : null,
+      last_sync_attempt_at: safeText(source.last_sync_attempt_at) || null,
+      last_sync_success_at: safeText(source.last_sync_success_at) || null,
+      token_expires_at: safeText(source.token_expires_at) || null,
+      oauth_health_status: safeText(source.oauth_health_status) || null,
+      metadata: source.metadata && typeof source.metadata === "object" ? source.metadata as Record<string, unknown> : null,
+    }];
+  });
+}
+
+/**
+ * The integrations screen brings together several independently evolving
+ * connectors. Keep an unexpected render error inside this screen instead of
+ * letting it escape to the layout boundary (which previously replaced the
+ * complete screen with the generic "módulo" error state).
+ */
+export default function IntegrationsPage() {
+  const [attempt, setAttempt] = useState(0);
+
+  return (
+    <IntegrationRouteGuard key={attempt} onRetry={() => setAttempt((current) => current + 1)}>
+      <IntegrationsContent />
+    </IntegrationRouteGuard>
+  );
+}
+
+function IntegrationsContent() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // Browsers and password managers sometimes autofill an account email into
+    // the first text-like field despite autocomplete="off". This is a filter,
+    // never an identity field, so discard any value injected before hydration.
+    const input = searchInputRef.current;
+    if (input && !search) input.value = "";
+  }, [search]);
+  const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
+  const [metaStatusFilter, setMetaStatusFilter] = useState<"all" | "active" | "disconnected">("active");
+  const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
+  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
+  const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
+  const { data: rdConnections = [], isLoading: loadingRDConnections, isError: rdConnectionsFailed, error: rdConnectionsError, refetch: refetchRDConnections } = useRDAccountConnections();
+  // Keep funnel inventory visible while RD authorization is blocked. The UI
+  // must show what needs reconnection instead of rendering an empty state.
+  const { data: rdFunnelsData } = useRDFunnels(undefined, !!user);
+  const connectMeta = useMetaOAuth();
+  const connectInstagram = useInstagramOAuth();
+  const connectGoogle = useGoogleWorkspaceOAuth();
+  const connectHubSpot = useHubSpotOAuth();
+  const syncMeta = useSyncMeta();
+
+  const reconnectStoredMetaToken = useMutation({
+    mutationFn: async (account: { id: string; name: string }) => {
+      const { data, error } = await supabase.functions.invoke("meta-reconnect-stored-token", { body: { account_id: account.id } });
+      if (error) throw new Error(data?.error || "Não foi possível validar o último token da Meta.");
+      if (!data?.ok) throw new Error(data?.error || "A Meta não confirmou o último token.");
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      toast({ title: "Conta reconectada", description: `${data.account.name} foi validada com o último token salvo.` });
+    },
+    onError: (error: Error) => toast({ title: "É necessário reconectar", description: error.message, variant: "destructive" }),
+  });
+
+  const { data: socialAccountsData, isLoading: loadingSocial } = useQuery({
+    queryKey: ["social_accounts", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await withRequestTimeout(supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false }), 12_000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    retry: false,
+  });
+  const { data: googleIntegration } = useQuery<{ id: string; is_active: boolean; updated_at?: string; permission_health?: string | null; last_permission_check_at?: string | null; last_health_error?: string | null; token_refreshed_at?: string | null } | null>({
+    queryKey: ["google_workspace_integration"], enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await withRequestTimeout(supabase.from("integrations").select("id,provider,is_active,updated_at,permission_health,last_permission_check_at,last_health_error").eq("provider", "google_workspace").maybeSingle(), 12_000);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const latestRDConnectionSuccess = useMemo(
+    () => rdConnections.map((connection) => connection.last_success_at).filter(Boolean).sort().at(-1) ?? null,
+    [rdConnections],
+  );
+  const latestRDStatusAt = latestRDConnectionSuccess ?? rdIntegration?.last_success_at ?? null;
+  // Kept as a compatibility shape for the compact health/integration markup;
+  // its value is now the scoped connection watermark, never a global deal row.
+  const latestRDDeal = { updated_at: latestRDStatusAt };
+
+  // Supabase normally returns arrays for select queries. Normalize at the
+  // screen boundary as a final safeguard: a malformed/legacy response must
+  // not take the whole integrations route down.
+  const rawAdAccounts = useMemo(() => normalizeAdAccounts(adAccountsData), [adAccountsData]);
+  const metaStatusCounts = useMemo(() => countMetaAccountsByStatus(rawAdAccounts), [rawAdAccounts]);
+  const activeMetaCount = metaStatusCounts.active;
+  const disconnectedMetaCount = metaStatusCounts.disconnected;
+  const adAccounts = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return filterMetaAccountsByStatus(rawAdAccounts, metaStatusFilter)
+      .filter((account) => !query || `${account.name} ${account.account_id}`.toLocaleLowerCase().includes(query))
+      .sort((a, b) => accountOrder === "name-desc" ? b.name.localeCompare(a.name, "pt-BR") : accountOrder === "status" ? Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected") || a.name.localeCompare(b.name, "pt-BR") : a.name.localeCompare(b.name, "pt-BR"));
+  }, [accountOrder, metaStatusFilter, rawAdAccounts, search]);
+  const rdFunnels = useMemo(
+    () => (Array.isArray(rdFunnelsData) ? rdFunnelsData.filter(isPresent) : []),
+    [rdFunnelsData],
+  );
+  const rdAccountRows = useMemo(() => {
+    const byExternalId = new Map(rdConnections
+      .filter((connection) => connection.external_account_id)
+      .map((connection) => [String(connection.external_account_id).replace(/^act_/i, ""), connection] as const));
+    const filteredAdAccounts = metaStatusFilter === "active"
+      ? rawAdAccounts.filter((account) => account.connection_status !== "disconnected")
+      : metaStatusFilter === "disconnected"
+      ? rawAdAccounts.filter((account) => account.connection_status === "disconnected")
+      : rawAdAccounts;
+    const rows = filteredAdAccounts.map((account) => ({
+      account,
+      connection: byExternalId.get(account.account_id.replace(/^act_/i, "")) ?? null,
+    }));
+    const knownIds = new Set(rows.map(({ connection }) => connection?.id).filter(Boolean));
+    if (metaStatusFilter !== "active") {
+      rdConnections
+        .filter((connection) => !knownIds.has(connection.id) && connection.external_account_id)
+        .forEach((connection) => rows.push({ account: null, connection }));
+    }
+    return rows;
+  }, [metaStatusFilter, rawAdAccounts, rdConnections]);
+
+  const rdNeverSynced = useMemo(
+    () => neverSyncedRDConnections(rdConnections),
+    [rdConnections],
+  );
+  const rdCa02NeverSynced = useMemo(
+    () => ca02NeverSynced(rdConnections),
+    [rdConnections],
+  );
+  const socialAccounts = useMemo(
+    () => (Array.isArray(socialAccountsData) ? socialAccountsData.filter((account) => isPresent(account) && account.connection_status !== "disconnected") : []),
+    [socialAccountsData],
+  );
+  const syncableMetaAccounts = useMemo(
+    () => adAccounts.filter((account) => account.connection_status === "connected" && !["permission_removed", "expired", "invalid"].includes(String(account.oauth_health_status || ""))),
+    [adAccounts],
+  );
+  const metaConnected = syncableMetaAccounts.length > 0;
+  const rdConnected = !!rdIntegration?.is_active;
+  const activeRDFunnels = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
+  const latestMetaSync = useMemo(() => adAccounts.map((account) => account.last_sync_success_at).filter(Boolean).sort().at(-1) ?? null, [adAccounts]);
+
+  const syncAll = useMutation({
+    mutationFn: async () => {
+      if (!metaConnected && !rdConnected) throw new Error("Conecte ao menos uma fonte antes de sincronizar.");
+      const completed: string[] = [];
+      const failures: string[] = [];
+
+      if (metaConnected) {
+        try {
+          const syncStart = format(subDays(new Date(), 30), "yyyy-MM-dd");
+          const syncEnd = format(new Date(), "yyyy-MM-dd");
+          // A função percorre cada conta sequencialmente e consulta catálogo
+          // + Insights. Enviar dezenas de contas numa única invocação excede
+          // o limite da Edge Function. Lotes pequenos preservam o snapshot
+          // de cada conta e permitem que uma conta lenta não invalide as
+          // demais.
+          const accountIds = syncableMetaAccounts.map((account) => account.id);
+          const batchSize = 3;
+          let syncedMetaAccounts = 0;
+          for (let index = 0; index < accountIds.length; index += batchSize) {
+            const batch = accountIds.slice(index, index + batchSize);
+            await syncMeta.mutateAsync({
+              adAccountIds: batch,
+              startDate: syncStart,
+              endDate: syncEnd,
+              includeBreakdowns: false,
+              fast: true,
+              force: true,
+            });
+            syncedMetaAccounts += batch.length;
+          }
+          completed.push(`Meta Ads (${syncedMetaAccounts} conta${syncedMetaAccounts === 1 ? "" : "s"})`);
+        } catch (error) {
+          failures.push(`Meta Ads: ${error instanceof Error ? error.message : "falha na sincronização"}`);
+        }
+      }
+
+      if (rdConnected) {
+        if (!activeRDFunnels.length) {
+          failures.push("RD Station: conecte e ative ao menos um funil para sincronizar negócios.");
+        } else {
+          let syncedFunnels = 0;
+          // Funis diferentes são escopos independentes. Sincronizar dois por
+          // vez reduz o tempo total sem abrir uma rajada ilimitada contra o
+          // mesmo token RD nem sobrecarregar os triggers do Postgres.
+          const funnelResults = await mapWithConcurrency(activeRDFunnels, 2, async (funnel) => {
+            try {
+              const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
+                body: {
+                  funnel_id: funnel.id,
+                  analytics_mode: true,
+                  // The interactive action must finish within the Edge
+                  // runtime. Full historical pagination remains available in
+                  // the dedicated backfill/reconciliation jobs.
+                  full_history: false,
+                  refresh_amounts: false,
+                  trigger_source: "integrations_realtime",
+                },
+              });
+              if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
+              if (data?.error || data?.success === false) throw new Error(data?.error || `Não foi possível concluir a sincronização do funil ${funnel.name}.`);
+              // A bounded realtime cycle may legitimately persist the newest
+              // page and leave older pages for the reconciliation worker. Do
+              // not turn that useful snapshot into a hard failure or show
+              // zero data; surface the incomplete coverage as a warning.
+              return { funnel, ok: true, partial: data?.partial === true || data?.status === "partial", error: null };
+            } catch (error) {
+              return { funnel, ok: false, partial: false, error: error instanceof Error ? error.message : "falha na sincronização" };
+            }
+          });
+          for (const result of funnelResults) {
+            if (result.ok) {
+              syncedFunnels += 1;
+              if (result.partial) failures.push(`RD Station (${result.funnel.name}) foi atualizado parcialmente; a reconciliação histórica continuará em segundo plano.`);
+            } else failures.push(`RD Station (${result.funnel.name}): ${result.error}`);
+          }
+          if (syncedFunnels) completed.push(`RD Station (${syncedFunnels} funil${syncedFunnels > 1 ? "is" : ""})`);
+        }
+      }
+
+      if (!completed.length) throw new Error(failures.join(" "));
+      return { completed, failures };
+    },
+    onSuccess: ({ completed, failures }) => {
+      void queryClient.invalidateQueries({ queryKey: ["rd_latest_sync"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_funnels"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_health_check"] });
+      void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      toast({
+        title: failures.length ? "Sincronização concluída com alertas" : "Sincronização concluída",
+        description: failures.length ? `${completed.join(" e ")} foi atualizado. ${failures.join(" ")}` : `${completed.join(" e ")} foi atualizado.`,
+        variant: failures.length ? "destructive" : "default",
+      });
+    },
+    onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
+  });
+
+  const toggleMetaAccount = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase.from("ad_accounts").update(active
+        ? { connection_status: "connected", oauth_health_status: "unchecked", oauth_checked_at: null, oauth_permissions: [] }
+        : { connection_status: "disconnected" }).eq("id", id);
+      if (error) throw error;
+      return { id, active };
+    },
+    onSuccess: ({ active }) => {
+      queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      toast({ title: active ? "Conta ativada" : "Conta desativada", description: active ? "A conta voltará a aparecer nos módulos e nas sincronizações." : "A conta permanece conectada à Meta, mas foi retirada dos módulos da Growdash." });
+    },
+    onError: (error: Error) => toast({ title: "Não foi possível alterar a conta", description: error.message, variant: "destructive" }),
+  });
+
+  const disconnectMeta = useMutation({
+    mutationFn: async () => {
+      const response = await supabase.functions.invoke("delete-integration-account", {
+        body: { provider: "meta", confirmation: "DESCONECTAR META" },
+      });
+      // Older deployments use the same non-destructive profile marker so
+      // every account disappears from the integration inventory immediately.
+      if (response.error || response.data?.error) {
+        const { error: fallbackError } = await supabase
+          .from("ad_accounts")
+          .update({ access_token: "", connection_status: "disconnected", last_sync_error: null, last_sync_error_code: null, metadata: { connection_method: "disconnected", profile_disconnected: true, disconnected_at: new Date().toISOString() } })
+          .eq("user_id", user?.id ?? "");
+        if (fallbackError) throw response.error || new Error(response.data.error);
+        return { ok: true, message: "Perfil Meta desconectado. Todas as contas foram removidas da integração; os dados históricos foram preservados." };
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      toast({ title: "Meta desconectada", description: data?.message || "Você já pode conectar outro perfil Meta." });
+    },
+    onError: (error: Error) => toast({ title: "Não foi possível desconectar a Meta", description: error.message, variant: "destructive" }),
+  });
+
+  const disconnectInstagram = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("delete-integration-account", { body: { provider: "instagram", account_id: id, confirmation: "DESCONECTAR INSTAGRAM" } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["social_accounts"] });
+      toast({ title: "Instagram desconectado", description: data?.message || "Você já pode conectar outro perfil." });
+    },
+    onError: (error: Error) => toast({ title: "Não foi possível desconectar o Instagram", description: error.message, variant: "destructive" }),
+  });
+
+  const providerFilter = (name: string) => name.toLowerCase().includes(debouncedSearch.toLowerCase().trim());
+  const changeTab = (value: string) => {
+    setSearch("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
+    setParams({ tab: value });
+  };
+
+  return (
+    <div className="integrations-page mx-auto max-w-[1500px]">
+      <PageHeading eyebrow="Administração" title="Central de integrações" description="Conecte mídia, CRM, IA, mensageria e dados com credenciais protegidas e saúde monitorada." actions={<Button onClick={() => syncAll.mutate()} disabled={syncAll.isPending || (!metaConnected && !rdConnected)}><RefreshCw className={cn("mr-2 h-4 w-4", syncAll.isPending && "animate-spin")} />{syncAll.isPending ? "Sincronizando…" : "Sincronizar tudo"}</Button>} />
+
+      {(metaLoadFailed || rdLoadFailed) && <section className="mb-4 flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="min-w-0"><b className="text-destructive">Não foi possível verificar todas as integrações.</b><p className="mt-1 break-words text-xs text-muted-foreground">{metaLoadFailed ? `Meta Ads: ${metaLoadError instanceof Error ? metaLoadError.message : "erro de consulta"}. ` : ""}{rdLoadFailed ? `RD Station: ${rdLoadError instanceof Error ? rdLoadError.message : "erro de consulta"}.` : ""}</p></div>
+        <div className="flex shrink-0 gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { if (metaLoadFailed) void refetchMeta(); if (rdLoadFailed) void refetchRD(); if (rdConnectionsFailed) void refetchRDConnections(); }}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button></div>
+      </section>}
+
+      <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <form role="search" autoComplete="off" onSubmit={(event) => event.preventDefault()} className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input ref={searchInputRef} aria-label="Buscar provedor ou recurso" name="integration-resource-filter" type="text" inputMode="search" autoComplete="new-password" autoCorrect="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)} onFocus={(event) => { if (!search && event.currentTarget.value.includes("@")) event.currentTarget.value = ""; }} className="pl-9" placeholder="Buscar provedor ou recurso…" /></form>
+        <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><StatusDot tone={metaLoadFailed ? "available" : "connected"} label={metaLoadFailed ? "Meta indisponível" : `${activeMetaCount} conta(s) Meta ativa(s)`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /><label className="flex items-center gap-2">Contas<select aria-label="Filtrar contas de anúncio por status" value={metaStatusFilter} onChange={(event) => setMetaStatusFilter(event.target.value as typeof metaStatusFilter)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="active">Apenas ativas ({activeMetaCount})</option><option value="all">Todas ({rawAdAccounts.length})</option><option value="disconnected">Desativadas ({disconnectedMetaCount})</option></select></label><label className="flex items-center gap-2">Ordenar<select aria-label="Ordenar contas de anúncio" value={accountOrder} onChange={(event) => setAccountOrder(event.target.value as typeof accountOrder)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="name-asc">A–Z</option><option value="name-desc">Z–A</option><option value="status">Ativas</option></select></label></div>
+      </div>
+
+      <Tabs value={tab} onValueChange={changeTab} className="space-y-4">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-muted/70 p-1">
+          {tabs.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
+        </TabsList>
+
+        <TabsContent value="paid" className="space-y-4">
+          <IntegrationPanelGuard name="Meta Ads e atribuição">
+          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaLoadFailed ? "Indisponível" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected && !metaLoadFailed} /><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2.5"><div className="flex items-center gap-1.5"><span className="text-xs font-bold text-muted-foreground">Filtro de contas:</span><button type="button" onClick={() => setMetaStatusFilter("active")} className={cn("rounded-lg px-2.5 py-1 text-xs font-bold transition", metaStatusFilter === "active" ? "bg-emerald-500 text-white shadow-sm" : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground")}>Apenas Ativas ({activeMetaCount})</button><button type="button" onClick={() => setMetaStatusFilter("all")} className={cn("rounded-lg px-2.5 py-1 text-xs font-bold transition", metaStatusFilter === "all" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground")}>Todas ({rawAdAccounts.length})</button><button type="button" onClick={() => setMetaStatusFilter("disconnected")} className={cn("rounded-lg px-2.5 py-1 text-xs font-bold transition", metaStatusFilter === "disconnected" ? "bg-muted text-foreground border border-border" : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground")}>Desativadas ({disconnectedMetaCount})</button></div><p className="text-[11px] text-muted-foreground">{metaStatusFilter === "active" ? "Exibindo somente contas ativas nos módulos e no CRM." : metaStatusFilter === "disconnected" ? "Exibindo contas pausadas ou desativadas." : "Exibindo todo o catálogo da Meta."}</p></div><div className="growdash-scrollbar max-h-[420px] overflow-y-auto p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-lg border p-3 transition", active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-2"><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-4 w-4 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-2">{active ? <AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} tokenExpiresAt={account.token_expires_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Desativada</span>{account.last_sync_success_at && <span>Última sync preservada</span>}</div>}</div><p className="mt-2 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !metaLoadFailed && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}{!loadingMeta && metaLoadFailed && !adAccounts.length && <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"><b className="text-destructive">Não foi possível consultar as contas Meta.</b><p className="mt-1 text-xs text-muted-foreground">Os dados não foram convertidos em zero. Tente novamente ou reconecte o perfil Meta.</p><Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void refetchMeta()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar consultar novamente</Button></div>}</div></div><div className="p-4"><MetaManualConnectionCard onConnected={() => queryClient.invalidateQueries({ queryKey: ["ad_accounts"] })} /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><Button type="button" variant="outline" onClick={() => disconnectMeta.mutate()} disabled={disconnectMeta.isPending || !adAccounts.length}>{disconnectMeta.isPending ? "Desconectando…" : "Desconectar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
+          <div className="grid gap-4 md:grid-cols-2">{providerFilter("Google Ads") && <ProviderCard name="Google Ads" description="Pesquisa, Performance Max, vídeo, conversões e orçamento." status="Preparar OAuth" />}{providerFilter("TikTok Ads") && <ProviderCard name="TikTok Ads" description="Campanhas, criativos, conversões e custo por resultado." status="Preparar OAuth" />}</div>
+          <IntegrationAccordion title="Padrão de UTMs" description="Padronize a identificação de campanhas e origens." defaultOpen={false}><IntegrationPanelGuard name="Padrão de UTMs"><UTMConventionCard /></IntegrationPanelGuard></IntegrationAccordion>
+          <IntegrationAccordion title="Mapeamento de UTMs" description="Revise como os parâmetros são associados aos dados." defaultOpen={false}><IntegrationPanelGuard name="Mapeamento de UTMs"><UTMMappingCard /></IntegrationPanelGuard></IntegrationAccordion>
+          <IntegrationAccordion title="Plataformas e origens" description="Gerencie as regras de identificação por plataforma." defaultOpen={false}><IntegrationPanelGuard name="Plataformas e origens"><PlatformRulesSection /></IntegrationPanelGuard></IntegrationAccordion>
+          <IntegrationAccordion title="Métricas personalizadas" description="Crie e ajuste métricas adicionais somente quando necessário." defaultOpen={false}><IntegrationPanelGuard name="Métricas personalizadas"><CustomMetricsSection /></IntegrationPanelGuard></IntegrationAccordion>
+          </IntegrationPanelGuard>
+        </TabsContent>
+
+        <TabsContent value="social" className="space-y-4">
+          <section className="gd-panel overflow-hidden">
+            <SectionHeader icon={<Instagram />} title="Instagram profissional" description="Conteúdos, Reels, alcance, interações, salvamentos, compartilhamentos e crescimento de audiência via OAuth oficial." status={socialAccounts.length ? `${socialAccounts.length} conectado(s)` : "Disponível"} connected={socialAccounts.length > 0} />
+            <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+              {socialAccounts.map((account) => <article key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span><div className="min-w-0"><b className="block truncate text-sm">{account.display_name}</b><p className="truncate text-xs text-muted-foreground">@{account.username || "perfil"}</p></div><CheckCircle2 className="h-5 w-5 text-emerald-500" /><Button type="button" size="sm" variant="outline" onClick={() => disconnectInstagram.mutate(account.id)} disabled={disconnectInstagram.isPending}>Desconectar</Button></div></article>)}
+              {loadingSocial ? <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground" role="status" aria-live="polite">Verificando perfis conectados…</div> : !socialAccounts.length && <EmptyState text="Nenhum perfil profissional conectado." />}
+            </div>
+            <div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Somente contas Business ou Creator são suportadas pela API oficial.</span></div>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="crm" className="space-y-4">
+          {providerFilter("RD Station") && <><section className="gd-panel overflow-hidden"><SectionHeader icon={<DatabaseZap />} title="RD Station CRM" description="OAuth, funis, etapas, negócios, campos personalizados e reconciliação." status={loadingRD ? "Verificando" : rdConnected ? "Conectado" : "Disponível"} connected={rdConnected} /><div className="p-5"><IntegrationPanelGuard name="Conexão com RD Station"><RDIntegrationCard /></IntegrationPanelGuard></div><div className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground">Última atualização: {relativeDate(latestRDDeal?.updated_at ?? rdIntegration?.updated_at)}</div></section><IntegrationAccordion title="Conexões RD por conta" description="Autorização, sincronização e último erro são estados independentes."><div className="grid gap-2 md:grid-cols-2">{loadingRDConnections ? <div className="p-3 text-sm text-muted-foreground">Carregando conexões RD…</div> : rdConnectionsFailed ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/[.04] p-3 text-sm text-destructive"><span className="min-w-0"><b className="block">Não foi possível carregar as conexões RD.</b><small className="mt-1 block break-words text-xs text-muted-foreground">{rdConnectionsError instanceof Error ? rdConnectionsError.message : "A consulta excedeu o tempo limite. Os vínculos já salvos continuam intactos."}</small></span><Button size="sm" variant="outline" onClick={() => void refetchRDConnections()}>Tentar novamente</Button></div> : rdAccountRows.length ? rdAccountRows.map(({ account, connection }) => { const presentation = rdConnectionPresentation(connection); const toneClass = presentation.tone === "success" ? "bg-emerald-500/10 text-emerald-600" : presentation.tone === "danger" ? "bg-rose-500/10 text-rose-600" : presentation.tone === "warning" ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"; const neverSynced = connection && !connection.last_success_at && connection.status === "connected"; return <article key={connection?.id ?? account?.id} className={cn("rounded-xl border border-border bg-muted/20 p-3", neverSynced && "border-amber-500/30 bg-amber-500/5")}><div className="flex items-center justify-between gap-3"><div className="min-w-0"><b className="block truncate text-sm">{account?.name ?? connection?.account_name ?? "Conta Meta"}</b><p className="text-xs text-muted-foreground">{account?.account_id ?? connection?.external_account_id ?? "ID externo não informado"}</p></div><span className={cn("rounded-full px-2 py-1 text-[10px] font-black uppercase", toneClass)}>{presentation.label}</span>{neverSynced && <span className="rounded-full px-2 py-1 text-[10px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/30">Nunca sincronizado</span>}</div>{connection?.last_error && <p className="mt-2 text-xs text-destructive">{connection.last_error}</p>}<p className="mt-2 text-[10px] text-muted-foreground">{connection ? `Último sucesso: ${relativeDate(connection.last_success_at)}` : "Aguardando a criação da conexão RD para esta conta."}</p>{neverSynced && <p className="mt-1 text-xs text-amber-600">Esta conta está autorizada mas nunca teve uma sincronização bem-sucedida. Disparar sincronização para popular negócios e estágios.</p>}</article>; }) : <div className="p-3 text-sm text-muted-foreground">Nenhuma conta Meta conectada encontrada.</div>}{rdCa02NeverSynced.length > 0 && <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"><p className="text-xs font-medium text-amber-700">Contas CA02 nunca sincronizadas: {rdCa02NeverSynced.map((c) => c.account_name).join(", ")}.</p><p className="text-[10px] text-muted-foreground mt-1">Sincronize essas contas para zerar o backlog de negócios sem estado.</p></div>}</div></IntegrationAccordion><IntegrationAccordion title="Funis RD por conta" description="Vincule e acompanhe os funis que alimentam a Growdash."><IntegrationPanelGuard name="Funis RD por conta"><RDFunnelsSection /></IntegrationPanelGuard></IntegrationAccordion><IntegrationAccordion title="Campos personalizados do RD" description="Descoberta, faixas e exibição no dashboard." defaultOpen={false}><IntegrationPanelGuard name="Campos personalizados do RD"><RDCustomFieldsCard /></IntegrationPanelGuard></IntegrationAccordion></>}
+          <div className="grid gap-4 md:grid-cols-2">{providerFilter("HubSpot") && <ProviderCard name="HubSpot" description="Contatos, negócios, pipelines e propriedades via OAuth." status="Configuração pendente" action="Conectar HubSpot" onAction={() => connectHubSpot.mutate()} pending={connectHubSpot.isPending} />}{providerFilter("Pipedrive") && <ProviderCard name="Pipedrive" description="Negócios, etapas, atividades e receita via OAuth." status="Planejado" />}</div>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-4">
+          {providerFilter("Growdash AI") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Bot />} title="Growdash AI — Analista de Tráfego" description="Cruza Meta Ads, vendas, período anterior, campanhas, conjuntos e anúncios sem expor credenciais no navegador." status="Ativo" connected /><div className="grid gap-3 p-5 md:grid-cols-3"><Feature label="Escopo seguro" text="Exige uma conta específica e respeita o período global." /><Feature label="Dados verificáveis" text="Não inventa público, posicionamento ou métricas ausentes." /><Feature label="Saída acionável" text="Resumo, rankings, plano de ação e projeções por cenário." /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button asChild><Link to="/campanhas"><Sparkles className="mr-2 h-4 w-4" />Abrir analista</Link></Button><span className="text-[10px] text-muted-foreground">Processamento protegido pela função backend ask-ai.</span></div></section>}
+          <ProviderGrid search={search} providers={[['OpenAI', 'Provedor adicional para análises e agentes com franquia de tokens.'], ['Claude', 'Provedor adicional para síntese extensa e raciocínio operacional.'], ['Gemini', 'Gateway atual usado pelo analista; conexão direta poderá ser adicionada por workspace.']]} icon={<Bot />} />
+        </TabsContent>
+        <TabsContent value="messaging"><ProviderGrid search={search} providers={[['WhatsApp Cloud API', 'Relatórios automáticos, alertas e mensagens transacionais.'], ['E-mail transacional', 'Recuperação, convites e alertas da operação.'], ['n8n', 'Automações via API e webhooks, respeitando licença comercial.']]} icon={<MessageCircle />} /></TabsContent>
+        <TabsContent value="payments" className="space-y-4"><SalesWebhookGatewayCard /><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
+        <TabsContent value="files" className="space-y-4">
+          {providerFilter("Google Drive") && <GoogleWorkspaceCard integration={googleIntegration} pending={connectGoogle.isPending} onConnect={() => connectGoogle.mutate()} onOpen={() => setGoogleDialogOpen(true)} />}
+          {providerFilter("Google Sheets") && <GoogleSheetsSalesIntegration />}
+          <ProviderGrid search={search} providers={[['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} />
+        </TabsContent>
+        <TabsContent value="developers" className="space-y-4"><CRMLeadWebhookCard /><SalesWebhookGatewayCard /><ProviderGrid search={search} providers={[['API Growdash', 'Chaves com escopo, rotação e auditoria.'], ['Webhooks', 'Eventos assinados, tentativas e fila de falhas.'], ['MCP', 'Métricas Meta com escopo, cobertura e timestamp; CRM/RD ainda dependem de conectores próprios.']]} icon={<Code2 />} /></TabsContent>
+        <TabsContent value="health" className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><HealthCard title="Meta Ads" value={metaConnected ? relativeDate(latestMetaSync as string | null) : "Não conectado"} ok={metaConnected} /><HealthCard title="RD Station" value={rdConnected ? relativeDate(latestRDDeal?.updated_at) : "Não conectado"} ok={rdConnected} /><HealthCard title="Filas e sincronizações" value="Monitoramento por execução" ok /></div>{rdConnected && <><IntegrationAccordion title="Diagnóstico do RD" description="Verifique a saúde, credenciais e sincronizações." defaultOpen={false}><RDHealthCheckCard /></IntegrationAccordion><IntegrationAccordion title="Reconciliação de vendas" description="Compare os dados de vendas importados e do RD." defaultOpen={false}><RDReconcileCard /></IntegrationAccordion><IntegrationAccordion title="Diagnóstico de UTMs" description="Identifique falhas de identificação de origem e campanha." defaultOpen={false}><RDUTMDiagnosticsCard /></IntegrationAccordion><IntegrationAccordion title="Observabilidade do RD" description="Consulte eventos e o histórico operacional da integração." defaultOpen={false}><RDObservabilityCard /></IntegrationAccordion></>}</TabsContent>
+      </Tabs>
+
+      <Dialog open={googleDialogOpen} onOpenChange={setGoogleDialogOpen}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Google Drive e Gmail</DialogTitle></DialogHeader><GoogleWorkspaceManager /></DialogContent></Dialog>
+    </div>
+  );
+}
+
+import { SalesWebhookGatewayCard } from "@/components/settings/SalesWebhookGatewayCard";
+import { GoogleSheetsSalesIntegration } from "@/components/settings/GoogleSheetsSalesIntegration";
+
+function SectionHeader({ icon, title, description, status, connected }: { icon: React.ReactNode; title: string; description: string; status: string; connected: boolean }) { return <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span><div className="grow"><h2 className="font-black">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div><span className={cn("w-fit rounded-full px-2 py-1 text-[9px] font-black uppercase", connected ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}>{status}</span></div>; }
+function IntegrationAccordion({ title, description, defaultOpen = true, children }: { title: string; description: string; defaultOpen?: boolean; children: ReactNode }) { return <details className="gd-panel overflow-hidden" open={defaultOpen}><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><div className="min-w-0 grow"><h2 className="text-sm font-black">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{description}</p></div><span className="shrink-0 text-xs font-semibold text-primary">Mostrar / recolher</span></summary><div className="border-t border-border p-4">{children}</div></details>; }
+const AVAILABLE_PROVIDER_ROUTES: Record<string, { href: string; action: string }> = {
+  "WhatsApp Cloud API": { href: "/campanhas?aba=campaigns&analise=intelligence&intelligence=whatsapp", action: "Configurar relatórios" },
+  Stripe: { href: "/perfil?tab=plans", action: "Gerenciar assinatura" },
+};
+
+function ProviderCard({ name, description, status, icon, href, action, onAction, pending = false }: { name: string; description: string; status: string; icon?: React.ReactNode; href?: string; action?: string; onAction?: () => void; pending?: boolean }) { return <article className="gd-panel flex min-h-40 flex-col p-5"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">{icon ?? <Cloud className="h-5 w-5" />}</span><span className={cn("rounded-full px-2 py-1 text-[9px] font-black", href ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}>{status}</span></div><h3 className="mt-4 font-black">{name}</h3><p className="mt-1 grow text-xs text-muted-foreground">{description}</p>{href ? <Button asChild className="mt-4" variant="outline"><Link to={href}>{action || "Abrir configuração"}</Link></Button> : onAction ? <Button className="mt-4" variant="outline" onClick={onAction} disabled={pending}>{pending ? "Abrindo HubSpot…" : action || "Conectar"}</Button> : <Button className="mt-4" variant="outline" disabled title="O conector ainda exige implementação do backend e credenciais oficiais.">Em preparação — requer backend/OAuth</Button>}</article>; }
+function ProviderGrid({ providers, search, icon }: { providers: string[][]; search: string; icon: React.ReactNode }) { const visible = providers.filter(([name]) => name.toLowerCase().includes(search.toLowerCase().trim())); return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visible.map(([name, description]) => { const available = AVAILABLE_PROVIDER_ROUTES[name]; return <ProviderCard key={name} name={name} description={description} status={available ? "Disponível" : "Planejado"} icon={icon} href={available?.href} action={available?.action} />; })}{!visible.length && <EmptyState text="Nenhuma integração corresponde à busca." />}</div>; }
+function EmptyState({ text }: { text: string }) { return <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground">{text}</div>; }
+function isPresent<T>(value: T | null | undefined): value is T { return value !== null && value !== undefined; }
+type IntegrationRouteGuardState = { error: Error | null };
+class IntegrationRouteGuard extends Component<{ children: ReactNode; onRetry: () => void }, IntegrationRouteGuardState> {
+  state: IntegrationRouteGuardState = { error: null };
+  static getDerivedStateFromError(error: Error): IntegrationRouteGuardState { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Growdash integrations route error", error, info.componentStack);
+    recordRuntimeDiagnostic("integrations-route", error);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <section className="gd-panel grid min-h-[52vh] place-items-center p-6 text-center" role="alert" aria-live="assertive"><div className="max-w-md"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-destructive/25 bg-destructive/10 text-destructive"><TriangleAlert className="h-5 w-5" /></span><h1 className="mt-4 text-lg font-black">Uma integração precisa de atenção</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">A Central de integrações não foi fechada nem apagada. Tente abrir os conectores novamente; se a falha persistir, o diagnóstico já fica registrado no navegador para correção.</p><div className="mt-5 flex justify-center"><Button type="button" onClick={this.props.onRetry}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></div></section>;
+  }
+}
+type IntegrationPanelGuardState = { failed: boolean };
+class IntegrationPanelGuard extends Component<{ children: ReactNode; name: string }, IntegrationPanelGuardState> {
+  state: IntegrationPanelGuardState = { failed: false };
+  static getDerivedStateFromError(): IntegrationPanelGuardState { return { failed: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`Growdash integration panel error: ${this.props.name}`, error, info.componentStack);
+    recordRuntimeDiagnostic(`integrations-panel:${this.props.name}`, error);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"><b className="text-destructive">{this.props.name} não pôde ser exibido.</b><p className="mt-1 text-xs text-muted-foreground">Os demais conectores continuam disponíveis. Atualize esta página para tentar novamente.</p></div>;
+  }
+}
+function StatusDot({ tone, label }: { tone: "connected" | "available"; label: string }) { return <span className="inline-flex items-center gap-1.5"><i className={cn("h-2 w-2 rounded-full", tone === "connected" ? "bg-emerald-500" : "bg-muted-foreground")} />{label}</span>; }
+function HealthCard({ title, value, ok }: { title: string; value: string; ok: boolean }) { return <div className="gd-panel p-4"><div className="flex items-center gap-2">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <TriangleAlert className="h-4 w-4 text-amber-500" />}<b className="text-sm">{title}</b></div><p className="mt-2 text-xs text-muted-foreground">{value}</p></div>; }
+function Feature({ label, text }: { label: string; text: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-4"><b className="text-xs">{label}</b><p className="mt-1 text-[11px] text-muted-foreground">{text}</p></div>; }
+
+function GoogleWorkspaceCard({ integration, pending, onConnect, onOpen }: { integration?: { id: string; is_active: boolean; updated_at?: string; permission_health?: string | null; last_permission_check_at?: string | null; last_health_error?: string | null; token_refreshed_at?: string | null }; pending: boolean; onConnect: () => void; onOpen: () => void }) {
+  const connected = Boolean(integration?.is_active);
+  const needsReauth = integration?.permission_health === "reauthorization_required";
+  const healthLabel = needsReauth ? "Reconexão necessária" : integration?.permission_health === "expiring" ? "Renovação automática" : integration?.permission_health === "error" ? "Falha temporária" : connected ? "Saudável" : "Disponível";
+  return <section className="gd-panel overflow-hidden"><SectionHeader icon={<FolderOpen />} title="Google Drive e Gmail" description="Acesse arquivos do seu Drive e envie e-mails pelo Gmail usando a autorização oficial do Google." status={connected ? healthLabel : "Disponível"} connected={connected && !needsReauth} /><div className="grid gap-3 p-5 md:grid-cols-3"><Feature label="Drive" text="Listar e enviar arquivos da conta Google conectada." /><Feature label="Gmail" text="Enviar e-mails pela conta autorizada, sem compartilhar senha." /><Feature label="Segurança" text="Tokens ficam no servidor e podem ser revogados no Google a qualquer momento." /></div>{needsReauth && <div className="border-t border-amber-500/30 bg-amber-500/10 px-5 py-3 text-xs text-amber-700 dark:text-amber-300"><b>A conta Google precisa ser reconectada.</b><span className="ml-1">{integration?.last_health_error || "O Google exige uma nova autorização."}</span></div>}<div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={onConnect} disabled={pending}>{connected ? <Mail className="mr-2 h-4 w-4" /> : <FolderOpen className="mr-2 h-4 w-4" />}{pending ? "Abrindo Google…" : needsReauth ? "Reconectar Google" : connected ? "Reconectar Google" : "Conectar Google"}</Button>{connected && !needsReauth && <Button variant="outline" onClick={onOpen}><FolderOpen className="mr-2 h-4 w-4" />Abrir Drive e Gmail</Button>}<span className="ml-auto self-center text-[10px] text-muted-foreground">{connected ? `Verificado ${relativeDate(integration?.last_permission_check_at || integration?.updated_at)}` : "Requer OAuth configurado no Google Cloud"}</span></div></section>;
+}
+
+function GoogleWorkspaceManager() {
+  const { toast } = useToast();
+  const [files, setFiles] = useState<Array<{ id: string; name: string; mimeType?: string; size?: string; webViewLink?: string; modifiedTime?: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [mail, setMail] = useState({ to: "", subject: "", html: "" });
+  const loadFiles = async () => { setLoading(true); try { const { data, error } = await supabase.functions.invoke("google-drive-files", { body: { action: "list" } }); if (error || data?.error) throw error ?? new Error(data.error); setFiles(data.files ?? []); } catch (error) { toast({ title: "Não foi possível abrir o Drive", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setLoading(false); } };
+  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { toast({ title: "Arquivo muito grande", description: "Envie arquivos de até 10 MB.", variant: "destructive" }); return; } setUploading(true); try { const contentBase64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error("Não foi possível ler o arquivo.")); reader.onload = () => resolve(String(reader.result).split(",")[1] || ""); reader.readAsDataURL(file); }); const { data, error } = await supabase.functions.invoke("google-drive-files", { body: { action: "upload", name: file.name, mimeType: file.type || "application/octet-stream", contentBase64 } }); if (error || data?.error) throw error ?? new Error(data.error); toast({ title: "Arquivo enviado", description: `${file.name} foi salvo no Google Drive.` }); await loadFiles(); } catch (error) { toast({ title: "Falha no envio", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setUploading(false); event.target.value = ""; } };
+  const send = async () => { setSending(true); try { const { data, error } = await supabase.functions.invoke("google-gmail-send", { body: mail }); if (error || data?.error) throw error ?? new Error(data.error); toast({ title: "E-mail enviado", description: `Mensagem enviada por ${data.from || "sua conta Google"}.` }); setMail({ to: "", subject: "", html: "" }); } catch (error) { toast({ title: "Falha no envio", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setSending(false); } };
+  return <Tabs defaultValue="drive" className="mt-2"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="drive">Google Drive</TabsTrigger><TabsTrigger value="gmail">Gmail</TabsTrigger></TabsList><TabsContent value="drive" className="space-y-4 pt-4"><div className="flex flex-wrap gap-2"><Button onClick={loadFiles} disabled={loading}><RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />{loading ? "Carregando…" : "Atualizar arquivos"}</Button><Button asChild variant="outline" disabled={uploading}><label className="cursor-pointer"><Upload className="mr-2 h-4 w-4" />{uploading ? "Enviando…" : "Enviar para o Drive"}<input className="sr-only" type="file" onChange={upload} /></label></Button></div><div className="max-h-[380px] space-y-2 overflow-y-auto">{files.map((file) => <a key={file.id} href={file.webViewLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 p-3 transition hover:border-primary/40"><FolderOpen className="h-4 w-4 text-primary" /><span className="min-w-0 grow truncate text-sm font-semibold">{file.name}</span><span className="text-[10px] text-muted-foreground">{file.mimeType || "arquivo"}</span></a>)}{!files.length && !loading && <EmptyState text="Atualize para listar os arquivos do Drive conectado." />}</div></TabsContent><TabsContent value="gmail" className="space-y-3 pt-4"><Input value={mail.to} onChange={(event) => setMail((current) => ({ ...current, to: event.target.value }))} placeholder="Destinatário" type="email" /><Input value={mail.subject} onChange={(event) => setMail((current) => ({ ...current, subject: event.target.value }))} placeholder="Assunto" /><Textarea value={mail.html} onChange={(event) => setMail((current) => ({ ...current, html: event.target.value }))} placeholder="Mensagem" className="min-h-40" /><Button onClick={send} disabled={sending || !mail.to || !mail.subject || !mail.html}><Mail className="mr-2 h-4 w-4" />{sending ? "Enviando…" : "Enviar pelo Gmail"}</Button><p className="text-[10px] text-muted-foreground">O e-mail é enviado pela conta Google que você autorizou nesta plataforma.</p></TabsContent></Tabs>;
+}

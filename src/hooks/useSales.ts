@@ -1,0 +1,291 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toLocalDateString } from "@/lib/dateRange";
+import { withRequestTimeout } from "@/lib/resilience";
+import { canonicalSaleKey, dedupeCanonicalSales } from "@/lib/canonicalSales";
+import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+
+
+export interface Sale {
+  id: string;
+  user_id: string;
+  product_id: string | null;
+  ad_account_id: string | null;
+  campaign_ids: string[];
+  sale_date: string;
+  gross_revenue: number;
+  net_revenue: number;
+  tax_amount: number;
+  refund_amount: number;
+  chargeback_amount: number;
+  payment_method: string;
+  payment_method_source?: string | null;
+  custom_fields?: Record<string, string> | null;
+  status: string;
+  quantity: number;
+  notes: string | null;
+  lead_state: string | null;
+  lead_formation: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  lead_city: string | null;
+  lead_entry_date: string | null;
+  adset_id: string | null;
+  ad_id: string | null;
+  rd_deal_id: string | null;
+  rd_campaign_name: string | null;
+  rd_product_name: string | null;
+  rd_funnel_id: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  manual_platform: string | null;
+  matched_campaign_id: string | null;
+  match_method: string | null;
+  manual_campaign_id: string | null;
+  manual_adset_id: string | null;
+  manual_ad_id: string | null;
+  manual_override: boolean;
+  workspace_id: string | null;
+  business_unit_id: string | null;
+  source_provider: string | null;
+  source_record_id: string | null;
+  source_closed_at: string | null;
+  attribution_confidence: number | null;
+  attribution_reason: string | null;
+  meta_lead_id: string | null;
+  meta_form_id: string | null;
+  meta_attribution_method: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UseSalesParams {
+  startDate?: Date;
+  endDate?: Date;
+  productId?: string;
+  adAccountId?: string;
+  adAccountIds?: string[];
+  funnelIds?: string[];
+  enabled?: boolean;
+}
+
+/**
+ * A venda consolidada tem uma identidade de origem quando ela vem do RD ou
+ * de um checkout. Em reprocessamentos de webhook e sincronizações antigas,
+ * a mesma venda pode aparecer mais de uma vez na leitura antes de uma
+ * reconciliação de banco. Nunca deixamos isso inflar um KPI no cliente.
+ *
+ * Vendas manuais sem identidade externa preservam o próprio UUID: duas
+ * vendas manuais iguais continuam sendo duas operações legítimas.
+ */
+export { canonicalSaleKey, dedupeCanonicalSales };
+
+export function useSales(params?: UseSalesParams) {
+  const { user } = useAuth();
+  const rdScope = useResolvedRDAccountFunnelScope({
+    adAccountId: params?.adAccountId,
+    adAccountIds: params?.adAccountIds,
+    funnelIds: params?.funnelIds,
+  });
+  const selectedAccountIds = Array.from(new Set([...(params?.adAccountIds ?? []), ...(params?.adAccountId ? [params.adAccountId] : [])].filter((id) => id && id !== "all")));
+  const queryKey = ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, selectedAccountIds.slice().sort().join(","), rdScope.funnelIds?.slice().sort().join(",")];
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = user?.id && rdScope.ready
+    ? `growdash:sales-snapshot:${user.id}:${encodeURIComponent(snapshotScopeKey)}`
+    : "";
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<Sale[]>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: Sale[]) => {
+    if (snapshotCacheKey) writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    return value;
+  };
+  return useQuery({
+    queryKey,
+    enabled: params?.enabled !== false && rdScope.ready,
+    queryFn: async () => {
+      if (rdScope.error) throw rdScope.error;
+      const resolvedFunnelIds = rdScope.funnelIds?.filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID) ?? [];
+      let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
+
+      if (params?.startDate) {
+        query = query.gte("sale_date", toLocalDateString(params.startDate));
+      }
+      if (params?.endDate) {
+        query = query.lte("sale_date", toLocalDateString(params.endDate));
+      }
+
+      if (params?.productId && params.productId !== "all") {
+        query = query.eq("product_id", params.productId);
+      }
+      // RD materialization can link a sale through the selected account OR
+      // its resolved funnel. Requiring both columns incorrectly drops sales
+      // imported from a connection, where ad_account_id is legitimately null.
+      if (selectedAccountIds.length) {
+        const scopeFilters = [
+          `ad_account_id.in.(${selectedAccountIds.join(",")})`,
+          ...(resolvedFunnelIds.length ? [`rd_funnel_id.in.(${resolvedFunnelIds.join(",")})`] : []),
+        ];
+        query = query.or(scopeFilters.join(","));
+      } else if (resolvedFunnelIds.length) {
+        query = query.in("rd_funnel_id", resolvedFunnelIds);
+      }
+
+      // Paginar para evitar o corte de 1000 linhas do Supabase.
+      const PAGE = 1000;
+      let all: Sale[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE;
+        const to = from + PAGE - 1;
+        const { data, error } = await withRequestTimeout(query.range(from, to), 2_500);
+        if (error) throw error;
+        const batch = (data || []).map((row) => ({ ...row, campaign_ids: row.campaign_ids || [] })) as Sale[];
+        all = all.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+      const scoped = selectedAccountIds.length
+        ? all.filter((sale) => isDealInRDAccountOrFunnelScope(sale, selectedAccountIds, resolvedFunnelIds))
+        : all;
+      return persistSnapshot(dedupeCanonicalSales(scoped));
+    },
+    staleTime: 2 * 60 * 1000,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData ?? persistedSnapshot,
+    // The near-realtime coordinator and the next invalidation are the recovery
+    // path. Retrying a 2.5s RD read here made every route wait up to 15s.
+    retry: 0,
+  });
+}
+
+export interface CreateSaleInput {
+  product_id?: string | null;
+  ad_account_id?: string | null;
+  campaign_ids?: string[];
+  sale_date: string;
+  gross_revenue: number;
+  net_revenue: number;
+  tax_amount: number;
+  refund_amount?: number;
+  chargeback_amount?: number;
+  payment_method: string;
+  status: string;
+  quantity: number;
+  notes?: string;
+  lead_state?: string | null;
+  lead_formation?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  lead_city?: string | null;
+  adset_id?: string | null;
+  ad_id?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
+  manual_platform?: string | null;
+}
+
+export function useCreateSale() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async (input: CreateSaleInput) => {
+      const { data, error } = await supabase
+        .from("sales")
+        .insert({ ...input, user_id: session!.user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),
+  });
+}
+
+export function useUpdateSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: Partial<CreateSaleInput> & { id: string }) => {
+      const payload: Record<string, any> = { ...input };
+      if (Object.prototype.hasOwnProperty.call(input, "payment_method")) {
+        payload.payment_method_source = "manual";
+      }
+      const { data, error } = await supabase
+        .from("sales")
+        .update(payload as any)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),
+  });
+}
+
+export function useDeleteSale() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("sales").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),
+  });
+}
+
+export function aggregateSales(sales: Sale[]) {
+  const canonicalSales = dedupeCanonicalSales(sales);
+  const confirmed = canonicalSales.filter((s) => s.status === "confirmed");
+  const totalGross = confirmed.reduce((sum, s) => sum + s.gross_revenue, 0);
+  const totalNet = confirmed.reduce((sum, s) => sum + s.net_revenue, 0);
+  const totalTax = confirmed.reduce((sum, s) => sum + s.tax_amount, 0);
+  const totalRefund = canonicalSales.reduce((sum, s) => sum + s.refund_amount, 0);
+  const totalChargeback = canonicalSales.reduce((sum, s) => sum + s.chargeback_amount, 0);
+  const totalQuantity = confirmed.reduce((sum, s) => sum + s.quantity, 0);
+
+  const pendingRevenue = canonicalSales
+    .filter((s) => s.status === "pending" || (s.payment_method === "boleto" && s.status !== "confirmed"))
+    .reduce((sum, s) => sum + s.net_revenue, 0);
+
+  const byPayment = { pix: 0, cartao: 0, boleto: 0, outros: 0 };
+  confirmed.forEach((sale) => {
+    byPayment[normalizePaymentMethod(sale.payment_method)] += sale.net_revenue;
+  });
+
+  const receivables = canonicalSales
+    .filter((s) => s.payment_method === "boleto" && s.status === "pending")
+    .reduce((sum, s) => sum + s.net_revenue, 0);
+
+  const refundRate = totalGross > 0 ? (totalRefund / totalGross) * 100 : 0;
+  const chargebackRate = totalGross > 0 ? (totalChargeback / totalGross) * 100 : 0;
+  const arpu = totalQuantity > 0 ? totalNet / totalQuantity : 0;
+
+  return {
+    totalGross, totalNet, totalTax, totalRefund, totalChargeback,
+    totalQuantity, pendingRevenue, byPayment, receivables,
+    refundRate, chargebackRate, arpu,
+  };
+}
+
+/** Normalizes provider labels ("credit_card", "Card", etc.) for reporting. */
+export function normalizePaymentMethod(value: string | null | undefined): "pix" | "cartao" | "boleto" | "outros" {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized.includes("pix")) return "pix";
+  if (normalized.includes("boleto") || normalized.includes("bank_slip")) return "boleto";
+  if (normalized.includes("cart") || normalized.includes("card") || normalized.includes("credit") || normalized.includes("debit")) return "cartao";
+  return "outros";
+}

@@ -1,0 +1,273 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+import {
+  decideWorkspaceBootstrapFallback,
+  isWorkspaceTimeoutError,
+  WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+  WORKSPACE_BOOTSTRAP_TOTAL_TIMEOUT_MS,
+} from "@/lib/workspaceBootstrapPolicy";
+
+const fallbackPlans = [
+  {
+    code: "starter",
+    name: "Starter",
+    monthly_price: 97,
+    description: "Operação enxuta para validar a gestão.",
+    sort_order: 1,
+    entitlements: {
+      ad_accounts: 2,
+      users: 2,
+      ai_credits: 150,
+      automations: 3,
+      whatsapp_reports: 100,
+      storage_bytes: 5368709120,
+    },
+  },
+  {
+    code: "growth",
+    name: "Growth",
+    monthly_price: 197,
+    description: "Crescimento com mais contas, IA e histórico.",
+    sort_order: 2,
+    entitlements: {
+      ad_accounts: 6,
+      users: 5,
+      ai_credits: 600,
+      automations: 15,
+      whatsapp_reports: 500,
+      storage_bytes: 26843545600,
+    },
+  },
+  {
+    code: "scale",
+    name: "Scale",
+    monthly_price: 397,
+    description: "Operação avançada para equipes e unidades.",
+    sort_order: 3,
+    entitlements: {
+      ad_accounts: 15,
+      users: 12,
+      ai_credits: 2000,
+      automations: 50,
+      whatsapp_reports: 2000,
+      storage_bytes: 107374182400,
+    },
+  },
+  {
+    code: "agency",
+    name: "Agency",
+    monthly_price: 797,
+    description: "Alto volume com limites ampliados.",
+    sort_order: 4,
+    entitlements: {
+      ad_accounts: 40,
+      users: 30,
+      ai_credits: 6000,
+      automations: 150,
+      whatsapp_reports: 6000,
+      storage_bytes: 536870912000,
+    },
+  },
+];
+
+function schemaIsPending(error: { code?: string; message?: string } | null) {
+  return (
+    !!error &&
+    (error.code === "PGRST202" ||
+      error.code === "42P01" ||
+      /does not exist|schema cache/i.test(error.message ?? ""))
+  );
+}
+
+export interface WorkspaceUnit {
+  id: string;
+  workspace_id: string;
+  kind: "infoproduto" | "saas";
+  name: string;
+  is_active: boolean;
+}
+
+export interface WorkspaceFoundation {
+  id: string;
+  name: string;
+  currency: string;
+  timezone: string;
+  role: string;
+  units: WorkspaceUnit[];
+}
+
+export interface WorkspaceAccessState {
+  workspace_id: string;
+  plan_code: string;
+  subscription_status: string;
+  access_allowed: boolean;
+  reason: string;
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  entitlements: Record<string, number>;
+}
+
+export function useWorkspace() {
+  const { user, setBootstrapStep } = useAuth();
+  const cacheKey = user?.id ? `growdash:workspace:${user.id}` : "";
+  const cachedWorkspace = readLocalCache<WorkspaceFoundation>(cacheKey);
+
+  return useQuery({
+    queryKey: ["workspace", user?.id],
+    enabled: !!user,
+    retry: false,
+    // A fundação do workspace não muda durante a navegação normal. Cachear evita
+    // reexecutar o bootstrap e três consultas a cada troca de módulo.
+    staleTime: 5 * 60_000,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedWorkspace)),
+    refetchOnWindowFocus: false,
+    // Paint the last known workspace immediately while the authenticated
+    // request revalidates. Cached data is never used as authorization.
+    placeholderData: cachedWorkspace,
+    queryFn: async (): Promise<WorkspaceFoundation> => withRequestTimeout((async () => {
+      setBootstrapStep("workspace");
+      const cached = (): WorkspaceFoundation | null => {
+        const value = readLocalCache<WorkspaceFoundation>(cacheKey);
+        return value?.id && !value.id.startsWith("legacy-") ? value : null;
+      };
+      try {
+        const { data: workspaceId, error: bootstrapError } = await withRequestTimeout(
+          (supabase as any).rpc("ensure_current_workspace"),
+          WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+        );
+        if (bootstrapError) {
+          throw bootstrapError;
+        }
+
+        // These reads are independent once the workspace id is known. Running
+        // them together avoids making the shell wait for three sequential
+        // network round trips on every cold session.
+        const [{ data: workspace, error: workspaceError }, { data: membership, error: memberError }, { data: units, error: unitsError }] = await Promise.all([
+          withRequestTimeout(
+            (supabase as any)
+              .from("workspaces")
+              .select("id, name, currency, timezone")
+              .eq("id", workspaceId)
+              .single(),
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+          ),
+          withRequestTimeout(
+            (supabase as any)
+              .from("workspace_members")
+              .select("role")
+              .eq("workspace_id", workspaceId)
+              .eq("user_id", user!.id)
+              .single(),
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+          ),
+          withRequestTimeout(
+            (supabase as any)
+              .from("business_units")
+              .select("id, workspace_id, kind, name, is_active")
+              .eq("workspace_id", workspaceId)
+              .eq("is_active", true)
+              .order("kind"),
+            WORKSPACE_BOOTSTRAP_READ_TIMEOUT_MS,
+          ),
+        ]);
+
+        if (workspaceError) throw workspaceError;
+        if (memberError) throw memberError;
+        if (unitsError) throw unitsError;
+        const foundation = { ...workspace, role: membership.role, units: units ?? [] };
+        setBootstrapStep("permissions");
+        writeLocalCache(cacheKey, foundation);
+        return foundation;
+      } catch (err: any) {
+        // Do not invent a legacy owner workspace after an authorization or
+        // network error. A fabricated owner role can make a removed member
+        // appear to have access while requests are failing. React Query keeps
+        // the last successful value itself; otherwise surface the failure.
+        console.warn("Workspace bootstrap failed:", err);
+        const previous = cached();
+        const decision = decideWorkspaceBootstrapFallback({
+          timedOut: isWorkspaceTimeoutError(err),
+          hasCache: Boolean(previous),
+        });
+        // A cached foundation is a confirmed past state, not a fabricated
+        // authorization. It keeps the shell usable while the provider recovers.
+        if (decision.action === "use-cache" && previous) return previous;
+        throw err;
+      }
+    })(), WORKSPACE_BOOTSTRAP_TOTAL_TIMEOUT_MS),
+  });
+}
+
+export function usePlans() {
+  return useQuery({
+    queryKey: ["plan-catalog"],
+    staleTime: 30 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("plan_catalog")
+        .select("code, name, monthly_price, description, entitlements, sort_order")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) {
+        if (schemaIsPending(error)) return fallbackPlans;
+        throw error;
+      }
+      return data ?? fallbackPlans;
+    },
+  });
+}
+
+export function useWorkspaceSubscription(workspaceId?: string) {
+  return useQuery({
+    queryKey: ["workspace-subscription", workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("workspace_subscriptions")
+          .select("workspace_id, plan_code, status, trial_ends_at, current_period_ends_at")
+          .eq("workspace_id", workspaceId)
+          .single();
+        if (error) {
+          throw error;
+        }
+        return data;
+      } catch (err) {
+        console.warn("Failsafe subscription loaded:", err);
+        return {
+          workspace_id: workspaceId,
+          plan_code: "starter",
+          status: "configuring",
+          trial_ends_at: null,
+          current_period_ends_at: null,
+        };
+      }
+    },
+  });
+}
+
+/**
+ * Estado efetivo de acesso calculado no banco. Componentes que iniciam uma
+ * operação limitada devem consultar este estado; o catálogo de planos sozinho
+ * não é uma autorização.
+ */
+export function useWorkspaceAccessState(workspaceId?: string) {
+  return useQuery<WorkspaceAccessState | null>({
+    queryKey: ["workspace-access-state", workspaceId],
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .rpc("get_workspace_access_state", { _workspace_id: workspaceId });
+      if (error) {
+        if (schemaIsPending(error)) return null;
+        throw error;
+      }
+      return Array.isArray(data) ? (data[0] ?? null) : data;
+    },
+  });
+}

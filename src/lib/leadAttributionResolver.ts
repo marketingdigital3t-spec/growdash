@@ -1,0 +1,196 @@
+import type { InsightRow } from "@/hooks/useInsights";
+import { mergeManualTracking, type ManualTracking } from "@/lib/leadTracking";
+import { normalizeMetaPlatform, normalizeMetaPlacement } from "@/lib/metaDeliveryNormalization";
+
+export type LeadAttributionMethod = "meta_id" | "utm" | "name" | "touch" | "manual" | "unmatched";
+export type LeadAttributionStatus = "attributed" | "partial" | "unavailable";
+export type AttributionMatchMethod = "id" | "utm" | "nome" | "sem_vinculo";
+export type AttributionGranularity = "campanha" | "conjunto" | "anuncio";
+export type AttributionCoverage = "confirmada" | "parcial" | "sem_vinculo";
+
+export interface LeadAttribution {
+  source: string | null;
+  platform: string | null;
+  placement: string | null;
+  formId: string | null;
+  formName: string | null;
+  isOrganic: boolean | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  adsetId: string | null;
+  adsetName: string | null;
+  adId: string | null;
+  adName: string | null;
+  method: LeadAttributionMethod;
+  status: LeadAttributionStatus;
+  matchMethod: AttributionMatchMethod;
+  granularity: AttributionGranularity | null;
+  coverage: AttributionCoverage;
+}
+
+type AttributionDeal = {
+  ad_account_id?: string | null;
+  source?: string | null;
+  campaign?: string | null;
+  rd_campaign_name?: string | null;
+  utm_source?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
+  utm_id?: string | null;
+  meta_campaign_id?: string | null;
+  meta_adset_id?: string | null;
+  meta_ad_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_adset_name?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_id?: string | null;
+  meta_form_name?: string | null;
+  meta_platform?: string | null;
+  meta_placement?: string | null;
+  meta_is_organic?: boolean | null;
+  meta_attribution_method?: string | null;
+  manual_tracking?: ManualTracking | null;
+};
+
+const text = (value: unknown) => {
+  const valueText = String(value ?? "").trim();
+  if (!valueText || /^\{\{[^{}]+\}\}$/.test(valueText) || /^\$\{[^{}]+\}$/.test(valueText)) return "";
+  return valueText;
+};
+const same = (a: unknown, b: unknown) => text(a).toLocaleLowerCase("pt-BR") === text(b).toLocaleLowerCase("pt-BR") && text(a) !== "";
+
+export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightRow[]): LeadAttribution {
+  // IDs persistidos identificam o lead independentemente do recorte de insights;
+  // só enriquecemos nível mais granular se o snapshot confirmar a mesma conta.
+  const rows = insights.filter((row) => !deal.ad_account_id || row.ad_account_id === deal.ad_account_id);
+  const adId = text(deal.meta_ad_id) || text(deal.utm_id) || null;
+  const campaignId = text(deal.meta_campaign_id) || null;
+  const adsetId = text(deal.meta_adset_id) || null;
+  const byAd = adId ? rows.find((row) => row.ad_id === adId) : undefined;
+  const byIds = campaignId || adsetId || adId
+    ? rows.find((row) =>
+      (!campaignId || row.campaign_id === campaignId) &&
+      (!adsetId || row.adset_id === adsetId) &&
+      (!adId || row.ad_id === adId))
+    : undefined;
+  const campaign = text(deal.utm_campaign);
+  const adset = text(deal.utm_term);
+  const creative = text(deal.utm_content);
+  const source = text(deal.utm_source) || text(deal.source) || null;
+  const rdCampaign = text(deal.campaign) || text(deal.rd_campaign_name) || null;
+  const byNames = campaign && adset && creative
+    ? rows.find((row) => same(row.campaign_name, campaign) && same(row.adset_name, adset) && same(row.ad_name, creative))
+    : undefined;
+  const byCampaignCreative = campaign && creative
+    ? rows.find((row) => same(row.campaign_name, campaign) && same(row.ad_name, creative))
+    : undefined;
+  const byCampaign = campaign
+    ? rows.find((row) => same(row.campaign_name, campaign) || same(row.campaign_id, campaign))
+    : undefined;
+  const byName = !byCampaign && rdCampaign
+    ? rows.find((row) => same(row.campaign_name, rdCampaign) || same(row.campaign_id, rdCampaign))
+    : undefined;
+  const hit = byAd || byIds || byNames || byCampaignCreative || byCampaign || byName;
+  const matchMethod: AttributionMatchMethod = (byAd || byIds || campaignId || adsetId || adId)
+    ? "id"
+    : (byNames || byCampaignCreative) ? "utm"
+      : (byCampaign || byName || rdCampaign) ? "nome" : "sem_vinculo";
+  const granularity: AttributionGranularity | null = (adId || byAd || byIds || byNames || byCampaignCreative) ? "anuncio"
+    : (adsetId || (byCampaign && adset)) ? "conjunto"
+      : campaignId || byCampaign || byName || campaign || rdCampaign ? "campanha" : null;
+  const coverage: AttributionCoverage = !hit && !campaignId ? "sem_vinculo"
+    : (hit ? Boolean(hit.campaign_id && hit.adset_id && hit.ad_id)
+      : Boolean(campaignId && adsetId && adId)) ? "confirmada" : "parcial";
+  const quality = { matchMethod, granularity, coverage };
+  const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId || source || rdCampaign);
+  const manual = deal.manual_tracking && typeof deal.manual_tracking === "object" ? deal.manual_tracking : null;
+  const hasManual = !!manual && Object.keys(manual).length > 0;
+  const applyManual = (automatic: LeadAttribution): LeadAttribution => {
+    if (!hasManual) return automatic;
+    const draft = mergeManualTracking({
+      source: automatic.source,
+      campaign: automatic.campaignName,
+      adset: automatic.adsetName,
+      creative: automatic.adName,
+      form: automatic.formName || automatic.formId,
+      platform: automatic.platform,
+      placement: automatic.placement,
+      isOrganic: automatic.isOrganic,
+    }, manual);
+    return {
+      ...automatic,
+      source: draft.source == null ? null : String(draft.source),
+      campaignName: draft.campaign == null ? null : String(draft.campaign),
+      adsetName: draft.adset == null ? null : String(draft.adset),
+      adName: draft.creative == null ? null : String(draft.creative),
+      formName: draft.form == null ? null : String(draft.form),
+      formId: manual.form === undefined ? automatic.formId : null,
+      platform: draft.platform == null ? null : String(draft.platform),
+      placement: draft.placement == null ? null : String(draft.placement),
+      isOrganic: typeof draft.isOrganic === "boolean" ? draft.isOrganic : null,
+      method: "manual",
+      status: "attributed",
+      matchMethod: automatic.matchMethod,
+      granularity: automatic.granularity,
+      coverage: automatic.coverage,
+    };
+  };
+  const rawPlatform = text(deal.meta_platform);
+  const rawPlacement = text(deal.meta_placement);
+  const hasMetaLink = Boolean(
+    deal.meta_attribution_method ||
+    deal.meta_ad_id ||
+    deal.meta_form_id ||
+    deal.meta_campaign_id ||
+    deal.meta_campaign_name ||
+    deal.meta_ad_name ||
+    rawPlatform
+  );
+  const normalizedPlatform = normalizeMetaPlatform(rawPlatform) || (hasMetaLink ? "Meta Ads" : null);
+  const normalizedPlacement = normalizeMetaPlacement(rawPlacement);
+
+  if (!hit) {
+    const hasMetaRecorded = Boolean(
+      deal.meta_ad_id ||
+      deal.meta_attribution_method ||
+      (deal.meta_campaign_name && (deal.meta_ad_name || deal.meta_form_name))
+    );
+    const status: LeadAttributionStatus = hasMetaRecorded ? "attributed" : hasAny ? "partial" : "unavailable";
+    const method: LeadAttributionMethod = hasMetaRecorded ? "meta_id" : "unmatched";
+    return applyManual({
+      source,
+      platform: normalizedPlatform,
+      placement: normalizedPlacement,
+      formId: text(deal.meta_form_id) || null,
+      formName: text(deal.meta_form_name) || null,
+      isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
+      campaignId,
+      campaignName: text(deal.meta_campaign_name) || campaign || rdCampaign || null,
+      adsetId,
+      adsetName: text(deal.meta_adset_name) || adset || null,
+      adId,
+      adName: text(deal.meta_ad_name) || creative || null,
+      method,
+      status,
+      ...quality,
+    });
+  }
+  return applyManual({
+    source,
+    platform: normalizedPlatform,
+    placement: normalizedPlacement,
+    formId: text(deal.meta_form_id) || null,
+    formName: text(deal.meta_form_name) || null,
+    isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
+    campaignId: hit.campaign_id ?? campaignId,
+    campaignName: text(deal.meta_campaign_name) || hit.campaign_name || campaign || null,
+    adsetId: hit.adset_id ?? adsetId,
+    adsetName: text(deal.meta_adset_name) || hit.adset_name || adset || null,
+    adId: hit.ad_id || adId,
+    adName: text(deal.meta_ad_name) || hit.ad_name || creative || null,
+    method: byAd || byIds || campaignId || adsetId || adId ? "meta_id" : byNames || byCampaignCreative || byCampaign ? "utm" : "name",
+    status: "attributed",
+    ...quality,
+  });
+}

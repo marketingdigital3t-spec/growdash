@@ -1,0 +1,497 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+import { Activity, AlertTriangle, CalendarRange, Database, KeyRound, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DuplicatesCard } from "@/components/data-health/DuplicatesCard";
+import { RevenueDriftCard } from "@/components/data-health/RevenueDriftCard";
+import { SpendNoLeadsCard } from "@/components/data-health/SpendNoLeadsCard";
+import { JobRunsCard } from "@/components/data-health/JobRunsCard";
+import { MetaValidationCard } from "@/components/data-health/MetaValidationCard";
+import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsReconciliationCard";
+import { SyncAuditCard } from "@/components/data-health/SyncAuditCard";
+import { Inbox } from "lucide-react";
+import { PlatformPerformanceCard } from "@/components/data-health/PlatformPerformanceCard";
+import { SyncExecutionCard } from "@/components/data-health/SyncExecutionCard";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
+import { shouldFetchNextPage } from "@/lib/pagination";
+import { businessDateKey } from "@/lib/businessDate";
+import { withRequestTimeout } from "@/lib/resilience";
+import { dataHealthScopeKey, resolveDataHealthState, throwOnQueryError } from "@/lib/dataHealth";
+import { parsePlausibleDate } from "@/lib/safeDate";
+
+interface HealthData {
+  orphanSales: number;
+  dealsMissingState: number;
+  totalDeals: number;
+  daysSpendNoLeads: number;
+  accountsMissingLpConfig: { id: string; name: string }[];
+  lastSyncs: { id: string; name: string; last_sync_success_at: string | null; connection_status: string }[];
+  oauthIntegrations: { id: string; provider: string; is_active: boolean | null; token_expires_at: string | null; permission_health: string | null; last_permission_check_at: string | null; last_health_error: string | null }[];
+  rdMetricAudits: { id: string; funnel_id: string | null; status: string; rd_won_count: number; linked_sale_count: number; missing_sale_count: number; checked_at: string }[];
+}
+
+const DATA_HEALTH_TIMEOUT_MS = 15_000;
+
+function formatSafeDate(value: string | Date | null | undefined, pattern: string) {
+  if (!value) return "não informada";
+  const date = parsePlausibleDate(value);
+  return date ? format(date, pattern, { locale: ptBR }) : "não informada";
+}
+
+function useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; funnelIds: string[]; startDate: Date; endDate: Date }) {
+  const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
+  return useQuery({
+    queryKey: ["data-health", dataHealthScopeKey({ workspaceId, adAccountIds: scopedAccountIds, funnelIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) })],
+    queryFn: () => withRequestTimeout((async (): Promise<HealthData> => {
+      let linkedFunnelIds = funnelIds.slice();
+      if (!linkedFunnelIds.length && scopedAccountIds.length) {
+        const { data: funnels, error } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
+        throwOnQueryError(error, "rd_funnels");
+        linkedFunnelIds = (funnels ?? []).map((funnel: any) => String(funnel.id)).filter(Boolean);
+      }
+      // Orphan sales: sales with rd_deal_id but no matching rd_deals
+      let salesQuery = supabase
+        .from("sales")
+        .select("rd_deal_id")
+        .eq("status", "confirmed")
+        .not("rd_deal_id", "is", null)
+        .gte("sale_date", businessDateKey(startDate))
+        .lte("sale_date", businessDateKey(endDate));
+      if (scopedAccountIds.length) salesQuery = salesQuery.in("ad_account_id", scopedAccountIds);
+      if (linkedFunnelIds.length) salesQuery = salesQuery.in("rd_funnel_id", linkedFunnelIds);
+      const { data: sales, error: salesError } = await salesQuery;
+      throwOnQueryError(salesError, "sales");
+      const dealIds = (sales || []).map((s: any) => s.rd_deal_id).filter(Boolean);
+      let orphanSales = 0;
+      if (dealIds.length > 0) {
+        const CHUNK = 200;
+        const matched = new Set<string>();
+        for (let i = 0; i < dealIds.length; i += CHUNK) {
+          const slice = dealIds.slice(i, i + CHUNK);
+          let rdQuery = supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
+          if (scopedAccountIds.length) rdQuery = rdQuery.in("ad_account_id", scopedAccountIds);
+          if (linkedFunnelIds.length) rdQuery = rdQuery.in("rd_funnel_id", linkedFunnelIds);
+          const { data: rd, error: rdError } = await rdQuery;
+          throwOnQueryError(rdError, "rd_deals por vínculo");
+          for (const r of (rd || []) as any[]) matched.add(r.rd_deal_id);
+        }
+        orphanSales = dealIds.filter((id) => !matched.has(id)).length;
+      }
+
+      // Deals missing state
+      let missingQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true }).is("lead_state", null);
+      let totalQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true });
+      if (scopedAccountIds.length) {
+        missingQuery = missingQuery.in("ad_account_id", scopedAccountIds);
+        totalQuery = totalQuery.in("ad_account_id", scopedAccountIds);
+      }
+      if (linkedFunnelIds.length) {
+        missingQuery = missingQuery.in("rd_funnel_id", linkedFunnelIds);
+        totalQuery = totalQuery.in("rd_funnel_id", linkedFunnelIds);
+      }
+      const { count: missing, error: missingError } = await missingQuery;
+      throwOnQueryError(missingError, "rd_deals sem estado");
+      const { count: total, error: totalError } = await totalQuery;
+      throwOnQueryError(totalError, "rd_deals total");
+
+      // Days with spend > 0 but no leads in the selected calendar scope.
+      const since = businessDateKey(startDate);
+      let insightsQuery = supabase
+        .from("insights")
+        .select("date, spend, form_leads, site_leads, conversations")
+        .gte("date", since)
+        .lte("date", businessDateKey(endDate))
+        .gt("spend", 0);
+      if (scopedAccountIds.length) insightsQuery = insightsQuery.in("ad_account_id", scopedAccountIds);
+      const { data: ins, error: insightsError } = await insightsQuery;
+      throwOnQueryError(insightsError, "insights");
+      const byDate = new Map<string, { spend: number; leads: number }>();
+      for (const r of (ins || []) as any[]) {
+        const cur = byDate.get(r.date) || { spend: 0, leads: 0 };
+        cur.spend += Number(r.spend || 0);
+        cur.leads += Number(r.form_leads || 0) + Number(r.site_leads || 0) + Number(r.conversations || 0);
+        byDate.set(r.date, cur);
+      }
+      const daysSpendNoLeads = Array.from(byDate.values()).filter((v) => v.spend > 0 && v.leads === 0).length;
+
+      // Accounts and LP config status
+      let accountsQuery = supabase
+        .from("ad_accounts")
+        .select("id, name, last_sync_success_at, connection_status")
+        .eq("connection_status", "connected");
+      if (workspaceId) accountsQuery = accountsQuery.eq("workspace_id", workspaceId);
+      if (scopedAccountIds.length) accountsQuery = accountsQuery.in("id", scopedAccountIds);
+      const { data: accounts, error: accountsError } = await accountsQuery;
+      throwOnQueryError(accountsError, "ad_accounts");
+      let oauthQuery = supabase
+        .from("integrations")
+        .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
+        .order("updated_at", { ascending: false });
+      // Integrations are owned by the authenticated user and do not carry a
+      // workspace_id column. RLS provides the user boundary here; applying a
+      // workspace filter would make the entire data-health query fail.
+      const { data: oauthIntegrations, error: oauthError } = await oauthQuery;
+      throwOnQueryError(oauthError, "integrations");
+      let lpQuery = supabase.from("account_lp_config").select("ad_account_id, action_type");
+      if (scopedAccountIds.length) lpQuery = lpQuery.in("ad_account_id", scopedAccountIds);
+      const { data: lpRows, error: lpError } = await lpQuery;
+      throwOnQueryError(lpError, "account_lp_config");
+      let rdAuditQuery = (supabase as any)
+        .from("rd_metric_reconciliation_audits")
+        .select("id, funnel_id, status, rd_won_count, linked_sale_count, missing_sale_count, checked_at")
+        .order("checked_at", { ascending: false })
+        .limit(100);
+      if (scopedAccountIds.length) rdAuditQuery = rdAuditQuery.in("account_id", scopedAccountIds);
+      const { data: rdMetricAudits, error: rdAuditError } = await rdAuditQuery;
+      throwOnQueryError(rdAuditError, "rd_metric_reconciliation_audits");
+      const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
+      const accountsMissingLpConfig = (accounts || [])
+        .filter((a: any) => !lpMap.get(a.id))
+        .map((a: any) => ({ id: a.id, name: a.name }));
+
+      return {
+        orphanSales,
+        dealsMissingState: missing || 0,
+        totalDeals: total || 0,
+        daysSpendNoLeads,
+        accountsMissingLpConfig,
+        lastSyncs: (accounts || []) as any,
+        oauthIntegrations: (oauthIntegrations || []) as any,
+        rdMetricAudits: (rdMetricAudits || []) as any,
+      };
+    })(), DATA_HEALTH_TIMEOUT_MS),
+  });
+}
+
+function useOperationalAudit(adAccountId: string, adAccountIds: string[], funnelIds: string[], startDate: Date, endDate: Date) {
+  const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
+  return useQuery({
+    queryKey: ["rd-operational-audit", dataHealthScopeKey({ adAccountIds: scopedAccountIds, funnelIds, startDate: startDate.toISOString(), endDate: endDate.toISOString() })],
+    queryFn: async () => {
+      const pageSize = 1000;
+      let rows: any[] = [];
+      for (let page = 0; ; page += 1) {
+        let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at");
+        if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+        if (funnelIds.length) query = query.in("rd_funnel_id", funnelIds);
+        const start = startDate.toISOString();
+        const end = endDate.toISOString();
+        query = query.or(`and(closed_at.gte.${start},closed_at.lte.${end}),and(stage_updated_at.gte.${start},stage_updated_at.lte.${end})`);
+        const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as any[];
+        rows = rows.concat(batch);
+        if (!shouldFetchNextPage(batch.length, pageSize)) break;
+      }
+      const ids = new Set<string>();
+      const sales = rows.filter((deal) => {
+        if (!isCanonicalWonDeal(deal)) return false;
+        const effective = canonicalWonDate(deal);
+        if (!effective) return false;
+        const timestamp = new Date(effective).getTime();
+        const inRange = timestamp >= startDate.getTime() && timestamp <= endDate.getTime();
+        if (inRange && deal.rd_deal_id) ids.add(String(deal.rd_deal_id));
+        return inRange;
+      });
+      const duplicateIds = rows.map((deal) => String(deal.rd_deal_id || "")).filter(Boolean).filter((id, index, all) => all.indexOf(id) !== index);
+      return { rows, ids: Array.from(ids), salesCount: sales.length, duplicateIds: Array.from(new Set(duplicateIds)) };
+    },
+    staleTime: 30_000,
+  });
+}
+
+export default function DataHealth() {
+  const { adAccountId, adAccountIds, funnelIds, startDate, endDate, workspaceId } = useGlobalFilters();
+  const { data, isLoading, isFetching, error: healthError, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, funnelIds, startDate, endDate });
+  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, adAccountIds, funnelIds, startDate, endDate);
+  const [enriching, setEnriching] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [syncingLeads, setSyncingLeads] = useState(false);
+  const [checkingOAuth, setCheckingOAuth] = useState(false);
+
+  const runOAuthCheck = async () => {
+    setCheckingOAuth(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke("monitor-oauth-health", { body: {} });
+      if (error) throw error;
+      toast({ title: "Saúde OAuth verificada", description: `${(result as any)?.checked ?? 0} integração(ões) auditada(s), sem expor tokens no navegador.` });
+      refetch();
+    } catch (error) {
+      toast({ title: "Falha na auditoria OAuth", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setCheckingOAuth(false);
+    }
+  };
+
+  const runSyncMetaLeads = async () => {
+    setSyncingLeads(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-meta-leads", { body: {} });
+      if (error) throw error;
+      toast({
+        title: "Sync de Meta Leads concluído",
+        description: `Processados: ${(data as any)?.processed ?? "-"} • Novos: ${(data as any)?.inserted ?? "-"}`,
+      });
+      refetch();
+    } catch (e) {
+      toast({ title: "Erro no sync", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSyncingLeads(false);
+    }
+  };
+
+  const runEnrich = async () => {
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("rd-enrich-states", { body: {} });
+      if (error) throw error;
+      toast({ title: "Enriquecimento concluído", description: `Processados: ${data?.processed} • Enriquecidos: ${data?.enriched} • Pulados: ${data?.skipped}` });
+      refetch();
+    } catch (e) {
+      toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  const runReconcile = async () => {
+    setReconciling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reconcile-sales-rd", { body: {} });
+      if (error) throw error;
+      toast({ title: "Reconciliação concluída", description: `Resultado: ${JSON.stringify(data).slice(0, 160)}` });
+      refetch();
+    } catch (e) {
+      toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const healthState = resolveDataHealthState({ isLoading, hasData: Boolean(data), error: healthError });
+  if (healthState === "loading") {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (healthState === "error" || !data) {
+    return (
+      <div className="container mx-auto space-y-4 p-4 md:p-6">
+        <Card>
+          <CardContent className="flex flex-col items-start gap-3 p-6">
+            <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-5 w-5" /><h1 className="text-lg font-bold">Saúde dos Dados indisponível</h1></div>
+            <p className="text-sm text-muted-foreground">A consulta falhou e não foi convertida em contagens vazias. Tente novamente para validar o escopo selecionado.</p>
+            <p className="text-xs text-destructive">{healthError instanceof Error ? healthError.message : "Falha ao consultar as fontes de dados."}</p>
+            <Button variant="outline" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const missingPct = data.totalDeals > 0 ? Math.round((data.dealsMissingState / data.totalDeals) * 100) : 0;
+
+  return (
+    <div className="container mx-auto space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Saúde dos Dados</h1>
+          <p className="text-sm text-muted-foreground">Diagnóstico e reparo das fontes Meta Ads + RD Station</p>
+        </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          {isFetching ? "Atualizando…" : "Atualizar"}
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Diagnóstico por conta e período</span><p className="mt-1 text-sm font-bold">{adAccountId === "all" ? "Todas as contas" : data.lastSyncs.find((item) => item.id === adAccountId)?.name || "Conta selecionada"}</p></div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{formatSafeDate(startDate, "dd/MM/yyyy")} — {formatSafeDate(endDate, "dd/MM/yyyy")}</div>
+        </CardContent>
+      </Card>
+
+      <PlatformPerformanceCard workspaceId={workspaceId} />
+
+      <SyncExecutionCard />
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Auditoria operacional por conta e período</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {auditLoading ? <p className="text-sm text-muted-foreground">Consultando IDs RD do escopo selecionado…</p> : auditError ? <p className="text-sm text-destructive">Falha ao consultar o escopo: {(auditError as Error).message}</p> : operationalAudit ? <>
+            <div className="grid gap-3 text-sm sm:grid-cols-3"><div><span className="text-muted-foreground">Negócios carregados</span><p className="text-xl font-black">{operationalAudit.rows.length}</p></div><div><span className="text-muted-foreground">Vendas no período</span><p className="text-xl font-black">{operationalAudit.salesCount}</p></div><div><span className="text-muted-foreground">Duplicidades</span><p className="text-xl font-black">{operationalAudit.duplicateIds.length}</p></div></div>
+            <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">IDs RD usados no escopo ({operationalAudit.ids.length})</summary><p className="mt-2 break-all text-xs text-muted-foreground">{operationalAudit.ids.join(", ") || "Nenhum ID encontrado"}</p></details>
+          </> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Reconciliação canônica Meta/RD a cada 5 minutos</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {data.rdMetricAudits.length ? data.rdMetricAudits.slice(0, 20).map((audit) => (
+            <div key={audit.id} className="flex flex-col gap-1 border-b border-border/40 py-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2"><Badge variant={audit.status === "failed" ? "destructive" : "outline"}>{audit.status}</Badge><span>{audit.rd_won_count} vendas RD</span></div>
+              <span className="text-xs text-muted-foreground">{audit.linked_sale_count} vinculadas · {audit.missing_sale_count} sem linha financeira · {formatSafeDate(audit.checked_at, "dd/MM HH:mm")}</span>
+            </div>
+          )) : <p className="py-2 text-sm text-muted-foreground">Nenhuma auditoria canônica registrada ainda.</p>}
+          <p className="pt-2 text-xs text-muted-foreground">A contagem operacional usa os negócios ganhos no RD. Lacunas financeiras são exibidas para correção sem fabricar vendas.</p>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Vendas órfãs</CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tabular-nums">{data.orphanSales}</div>
+            <p className="mt-1 text-xs text-muted-foreground">sem RD deal correspondente</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Deals sem estado</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tabular-nums">{data.dealsMissingState}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{missingPct}% de {data.totalDeals}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Dias com spend sem leads</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tabular-nums">{data.daysSpendNoLeads}</div>
+            <p className="mt-1 text-xs text-muted-foreground">período selecionado</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Contas sem LP config</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tabular-nums">{data.accountsMissingLpConfig.length}</div>
+            <p className="mt-1 text-xs text-muted-foreground">action_type vazio</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Ações de reparo</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button onClick={runReconcile} disabled={reconciling || data.orphanSales === 0}>
+            {reconciling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Reconciliar vendas órfãs ({data.orphanSales})
+          </Button>
+          <Button onClick={runEnrich} disabled={enriching || data.dealsMissingState === 0} variant="secondary">
+            {enriching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Enriquecer estados via RD ({Math.min(data.dealsMissingState, 200)})
+          </Button>
+          <Button onClick={runSyncMetaLeads} disabled={syncingLeads} variant="secondary">
+            {syncingLeads ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Inbox className="mr-2 h-4 w-4" />}
+            Sincronizar Meta Leads agora
+          </Button>
+          <Button onClick={runOAuthCheck} disabled={checkingOAuth} variant="secondary">
+            {checkingOAuth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+            Verificar tokens e permissões
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Tokens, expiração e permissões OAuth</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {data.oauthIntegrations.length ? data.oauthIntegrations.map((integration) => {
+            const status = integration.permission_health || "unchecked";
+            const unhealthy = ["expired", "permission_removed", "error"].includes(status);
+            return <div key={integration.id} className="flex flex-col gap-2 border-b border-border/40 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Badge variant={unhealthy ? "destructive" : "outline"}>{status}</Badge><b className="text-sm capitalize">{integration.provider.replaceAll("_", " ")}</b></div><div className="text-xs text-muted-foreground">{integration.token_expires_at ? `Expira ${formatSafeDate(integration.token_expires_at, "dd/MM/yyyy HH:mm")}` : "Expiração não informada"}{integration.last_health_error ? ` · ${integration.last_health_error}` : ""}</div></div>;
+          }) : <p className="py-4 text-sm text-muted-foreground">Nenhuma integração OAuth cadastrada.</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Último sync por conta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {data.lastSyncs.filter((account) => adAccountId === "all" || account.id === adAccountId).map((a) => {
+              const stale = !a.last_sync_success_at || Date.now() - new Date(a.last_sync_success_at).getTime() > 24 * 3600 * 1000;
+              return (
+                <div key={a.id} className="flex items-center justify-between border-b border-border/40 py-2 text-sm last:border-0">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={a.connection_status === "connected" ? "default" : "destructive"} className="text-[10px]">
+                      {a.connection_status || "unknown"}
+                    </Badge>
+                    <span className="font-medium">{a.name}</span>
+                    {stale && <Badge variant="destructive" className="text-[10px]">+24h sem sync</Badge>}
+                  </div>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {a.last_sync_success_at
+                      ? formatSafeDate(a.last_sync_success_at, "dd/MM HH:mm")
+                      : "nunca"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {data.accountsMissingLpConfig.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Contas pendentes de configuração LP</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {data.accountsMissingLpConfig.map((a) => (
+                <Badge key={a.id} variant="outline">{a.name}</Badge>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Configure <code>action_type</code> em Configurações → Atribuição para essas contas captarem leads de LP off-site.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <MetaLeadsReconciliationCard />
+
+      <SyncAuditCard />
+
+      <JobRunsCard />
+
+      <MetaValidationCard adAccountIds={adAccountIds.length ? adAccountIds : adAccountId === "all" ? [] : [adAccountId]} startDate={startDate} endDate={endDate} />
+
+
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DuplicatesCard />
+        <RevenueDriftCard />
+      </div>
+
+      <SpendNoLeadsCard />
+    </div>
+  );
+}

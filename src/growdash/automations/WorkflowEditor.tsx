@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, CheckCircle2, Clock3, Copy, FileSpreadsheet, FolderUp, Globe2, Instagram, Mail, MessageCircle, Pause, Play, Plus, Save, Split, Tag, Trash2, UserPlus, Webhook, Workflow, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { useAuth } from "@/contexts/AuthContext";
+import { emptyWorkflow, type WorkflowDefinition, type WorkflowNode, type WorkflowNodeType } from "./workflowTypes";
+import { validateWorkflowDefinition } from "./workflowValidation";
+import { connectionFromHandles, edgePath, moveWorkflowNode, nodeById, WORKFLOW_NODE_HEIGHT, WORKFLOW_NODE_WIDTH } from "./workflowCanvas";
+import { automationTriggerType } from "./automationRuntime";
+import { withRequestTimeout } from "@/lib/resilience";
+import { safeSetLocalStorage } from "@/lib/localCache";
+
+const labels: Record<WorkflowNodeType, string> = {
+  "webhook.trigger": "Webhook",
+  "manual.trigger": "Manual",
+  "schedule.trigger": "Agendamento",
+  "lead.trigger": "Novo lead",
+  "instagram.message.trigger": "Nova mensagem Instagram",
+  "whatsapp.message.trigger": "Nova mensagem WhatsApp",
+  "google.drive.trigger": "Novo arquivo Drive",
+  "google.sheets.trigger": "Nova linha Sheets",
+  "http.request": "HTTP Request",
+  "google.sheets.append": "Google Sheets",
+  "google.sheets.lookup": "Buscar no Sheets",
+  "instagram.trigger": "Instagram — gatilho",
+  "instagram.reply": "Instagram — resposta",
+  "instagram.send": "Enviar Instagram",
+  "whatsapp.send": "WhatsApp — enviar",
+  "google.drive.upload": "Google Drive — arquivo",
+  "google.drive.lookup": "Buscar arquivo Drive",
+  "gmail.send": "Enviar Gmail",
+  "agent.run": "Agente IA",
+  "crm.contact.upsert": "Criar/atualizar contato",
+  "crm.deal.create": "Criar negociação",
+  "crm.note.create": "Criar anotação",
+  "task.create": "Criar tarefa",
+  "tag.add": "Adicionar tag",
+  "crm.stage.change": "Alterar etapa CRM",
+  "seller.notify": "Notificar vendedor",
+  "condition.if": "Condição IF",
+  "logic.filter": "Filtro",
+  "logic.switch": "Switch",
+  "delay.wait": "Aguardar",
+  "logic.loop": "Loop",
+  "logic.merge": "Merge",
+  "logic.stop": "Parar",
+  "error.retry": "Retry",
+  "error.fallback": "Fallback",
+  "approval.manual": "Aprovação manual",
+};
+const icons: Record<WorkflowNodeType, typeof Webhook> = {
+  "webhook.trigger": Webhook,
+  "manual.trigger": Zap,
+  "schedule.trigger": Clock3,
+  "lead.trigger": UserPlus,
+  "instagram.message.trigger": Instagram,
+  "whatsapp.message.trigger": MessageCircle,
+  "google.drive.trigger": FolderUp,
+  "google.sheets.trigger": FileSpreadsheet,
+  "http.request": Globe2,
+  "google.sheets.append": FileSpreadsheet,
+  "google.sheets.lookup": FileSpreadsheet,
+  "instagram.trigger": Instagram,
+  "instagram.reply": Instagram,
+  "instagram.send": Instagram,
+  "whatsapp.send": MessageCircle,
+  "google.drive.upload": FolderUp,
+  "google.drive.lookup": FolderUp,
+  "gmail.send": Mail,
+  "agent.run": Bot,
+  "crm.contact.upsert": UserPlus,
+  "crm.deal.create": Workflow,
+  "crm.note.create": FileSpreadsheet,
+  "task.create": CheckCircle2,
+  "tag.add": Tag,
+  "crm.stage.change": Workflow,
+  "seller.notify": MessageCircle,
+  "condition.if": Split,
+  "logic.filter": Split,
+  "logic.switch": Split,
+  "delay.wait": Clock3,
+  "logic.loop": Workflow,
+  "logic.merge": Workflow,
+  "logic.stop": Trash2,
+  "error.retry": Zap,
+  "error.fallback": Zap,
+  "approval.manual": CheckCircle2,
+};
+const storageKey = (workspaceId?: string | null) => `growdash:automation-workflow:draft:${workspaceId || "anonymous"}`;
+type AutomationRunRow = { id: string; status: string; created_at: string; error_message?: string | null };
+type WorkflowApprovalRow = { id: string; run_id: string; node_id: string; status: string; requested_at: string };
+
+function newNode(type: WorkflowNodeType, index: number): WorkflowNode {
+  const parameters: Record<string, unknown> = type === "http.request"
+    ? { method: "POST", url: "https://" }
+    : type === "instagram.trigger"
+      ? { event: "comment", keyword: "" }
+      : type === "instagram.reply"
+        ? { message: "" }
+        : type === "whatsapp.send"
+          ? { phone: "", message: "" }
+          : type === "google.drive.upload"
+            ? { fileUrl: "", folderId: "" }
+            : type === "agent.run"
+              ? { prompt: "", output: "text" }
+              : type === "task.create"
+                ? { title: "", description: "", priority: "medium", status: "open", assigneeUserId: "", dueAt: "", entityType: "rd_deal", entityId: "" }
+                : type === "tag.add"
+                  ? { name: "", entityType: "rd_deal", entityId: "", color: "" }
+                  : type === "seller.notify"
+                    ? { recipientUserId: "", title: "Notificação de automação", message: "", link: "" }
+                    : type === "schedule.trigger"
+                      ? { cron: "0 * * * *", timezone: "America/Sao_Paulo" }
+                      : type === "logic.loop"
+                        ? { itemsPath: "lead.items", maxItems: 100 }
+                        : type === "approval.manual"
+                          ? { message: "Revise esta etapa antes de continuar." }
+              : type === "condition.if"
+                ? { field: "", operator: "contains", value: "" }
+                : type === "delay.wait"
+                  ? { seconds: 60 }
+                  : {};
+  return { id: `${type.split(".")[0]}-${Date.now()}-${index}`, type, position: { x: index * 250, y: 80 }, parameters };
+}
+
+export function WorkflowEditor() {
+  const { data: workspace } = useWorkspace();
+  const { user } = useAuth();
+  const [workflow, setWorkflow] = useState<WorkflowDefinition>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey()) || "") as WorkflowDefinition; } catch { return emptyWorkflow(); }
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<{ status?: string; run_id?: string; error?: string } | null>(null);
+  const [runs, setRuns] = useState<Array<{ id: string; status: string; created_at: string; error_message?: string | null }>>([]);
+  const [approvals, setApprovals] = useState<WorkflowApprovalRow[]>([]);
+  const [loadedWorkspace, setLoadedWorkspace] = useState<string | null>(null);
+  const [connectionDraft, setConnectionDraft] = useState({ source: "", target: "", sourcePort: "" });
+  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const selected = workflow.nodes.find((node) => node.id === selectedId) ?? null;
+  const validation = useMemo(() => validateWorkflowDefinition(workflow), [workflow]);
+  const validationErrors = "errors" in validation ? validation.errors : [];
+  const runnableValidation = useMemo(() => validateWorkflowDefinition(workflow, { requireTrigger: true, requireReachability: true, validateParameters: true }), [workflow]);
+  const runnableValidationErrors = "errors" in runnableValidation ? runnableValidation.errors : [];
+  const StatusIcon = workflow.active ? Pause : Play;
+
+  const loadRuns = useCallback(async () => {
+    if (!workspace?.id || workspace.id.startsWith("legacy-")) return;
+    // These tables are newer than the generated Supabase type snapshot.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = supabase as any;
+    const { data, error } = await withRequestTimeout<{ data: AutomationRunRow[] | null; error: { message?: string } | null }>(client.from("growdash_automation_runs").select("id,status,created_at,error_message").eq("automation_id", workflow.id).order("created_at", { ascending: false }).limit(5), 12_000);
+    if (error) { setMessage(error.message || "Não foi possível carregar o histórico."); return; }
+    setRuns((data || []) as AutomationRunRow[]);
+  }, [workflow.id, workspace?.id]);
+  const loadApprovals = useCallback(async () => {
+    if (!workspace?.id || workspace.id.startsWith("legacy-")) return;
+    // These tables are newer than the generated Supabase type snapshot.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = supabase as any;
+    const { data, error } = await withRequestTimeout<{ data: WorkflowApprovalRow[] | null; error: { message?: string } | null }>(client.from("growdash_workflow_approvals").select("id,run_id,node_id,status,requested_at").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", { ascending: false }).limit(10), 12_000);
+    if (error) { setMessage(error.message || "Não foi possível carregar as aprovações."); return; }
+    setApprovals((data || []) as WorkflowApprovalRow[]);
+  }, [workspace?.id]);
+
+  useEffect(() => {
+    if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-") || loadedWorkspace === workspace.id) return;
+    setLoadedWorkspace(workspace.id);
+    void (async () => {
+      // These tables are newer than the generated Supabase type snapshot.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = supabase as any;
+      const { data, error } = await withRequestTimeout<{ data: { workflow_definition?: unknown; status?: string; workflow_version?: number } | null; error: { message?: string } | null }>(client.from("growdash_automations").select("id,name,status,workflow_definition,workflow_version").eq("workspace_id", workspace.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(), 12_000);
+      if (error) { setMessage(error.message || "Não foi possível carregar o workflow salvo."); return; }
+      const saved = data?.workflow_definition;
+      if (saved && validateWorkflowDefinition(saved).ok) {
+        const savedDefinition = saved as WorkflowDefinition;
+        const next = { ...savedDefinition, active: data.status === "active", version: Number(data.workflow_version || savedDefinition.version || 1) } as WorkflowDefinition;
+        setWorkflow(next); safeSetLocalStorage(storageKey(workspace.id), JSON.stringify(next));
+      }
+    })();
+  }, [workspace?.id, user?.id, loadedWorkspace]);
+  useEffect(() => { void loadRuns(); void loadApprovals(); }, [loadRuns, loadApprovals]);
+
+  const addNode = (type: WorkflowNodeType) => {
+    const node = newNode(type, workflow.nodes.length);
+    setWorkflow((current) => ({ ...current, nodes: [...current.nodes, node], connections: current.nodes.length ? [...current.connections, { source: current.nodes[current.nodes.length - 1].id, target: node.id }] : current.connections }));
+    setSelectedId(node.id);
+    setMessage("");
+  };
+  const nodePosition = (node: WorkflowNode, index: number) => node.position || { x: 32 + index * 250, y: 80 };
+  const beginDrag = (event: React.PointerEvent<HTMLDivElement>, node: WorkflowNode, index: number) => {
+    if (event.button !== 0 || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const position = nodePosition(node, index);
+    setSelectedId(node.id);
+    setDragging({ id: node.id, offsetX: event.clientX - rect.left - position.x, offsetY: event.clientY - rect.top - position.y });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveDraggedNode = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    setWorkflow((current) => moveWorkflowNode(current, dragging.id, { x: event.clientX - rect.left - dragging.offsetX, y: event.clientY - rect.top - dragging.offsetY }));
+  };
+  const endDrag = () => setDragging(null);
+  const updateSelected = (parameters: Record<string, unknown>) => setWorkflow((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === selectedId ? { ...node, parameters } : node) }));
+  const removeSelected = () => { if (!selectedId) return; setWorkflow((current) => ({ ...current, nodes: current.nodes.filter((node) => node.id !== selectedId), connections: current.connections.filter((edge) => edge.source !== selectedId && edge.target !== selectedId) })); setSelectedId(null); };
+  const addConnection = () => {
+    const { source, target, sourcePort } = connectionDraft;
+    const connection = connectionFromHandles(source, target, sourcePort);
+    if (!connection) return;
+    setWorkflow((current) => current.connections.some((edge) => edge.source === connection.source && edge.target === connection.target && edge.sourcePort === connection.sourcePort)
+      ? current
+      : { ...current, connections: [...current.connections, connection] });
+  };
+  const connectHandle = (kind: "source" | "target", nodeId: string, sourcePort = "") => {
+    const next = { ...connectionDraft, [kind]: nodeId, ...(kind === "source" ? { sourcePort } : {}) };
+    const connection = connectionFromHandles(next.source, next.target, next.sourcePort);
+    if (!connection) { setConnectionDraft(next); return; }
+    setWorkflow((current) => current.connections.some((edge) => edge.source === connection.source && edge.target === connection.target && edge.sourcePort === connection.sourcePort)
+      ? current
+      : { ...current, connections: [...current.connections, connection] });
+    setConnectionDraft({ source: "", target: "", sourcePort: "" });
+  };
+  const removeConnection = (index: number) => setWorkflow((current) => ({ ...current, connections: current.connections.filter((_, itemIndex) => itemIndex !== index) }));
+  const save = async (nextStatus?: "draft" | "active" | "paused") => {
+    if (!validation.ok) { setMessage(validationErrors.join(" ")); return; }
+    if (nextStatus === "active" && !runnableValidation.ok) { setMessage(runnableValidationErrors.join(" ")); return; }
+    safeSetLocalStorage(storageKey(workspace?.id), JSON.stringify(workflow));
+    if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Rascunho salvo neste navegador; conecte um workspace para persistir na conta."); return; }
+    const client = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<{ error: { message: string } | null }> } };
+    const status = nextStatus || (workflow.active ? "active" : "draft");
+    const nextWorkflow = { ...workflow, active: status === "active" };
+    setWorkflow(nextWorkflow);
+    const trigger = workflow.nodes.find((node) => node.type.endsWith(".trigger"));
+    if (trigger?.type === "webhook.trigger" && status === "active" && !String(trigger.parameters.secret || "").trim()) {
+      setMessage("Para ativar um webhook, informe um segredo de autenticação.");
+      return;
+    }
+    // The legacy column keeps its original check constraint for backwards
+    // compatibility. New trigger kinds are still represented by the full
+    // workflow_definition and use a descriptive value when the column allows
+    // it; the executor always matches the definition first.
+    const triggerType = automationTriggerType(trigger?.type);
+    const triggerConfig = trigger?.parameters || {};
+    const legacyTriggerType = ["new_lead", "instagram_message", "instagram_comment", "manual"].includes(triggerType) ? triggerType : "manual";
+    const { error } = await client.from("growdash_automations").upsert({ id: workflow.id, workspace_id: workspace.id, created_by: user.id, name: workflow.name.trim(), description: "Workflow visual Growdash", trigger_type: legacyTriggerType, trigger_config: triggerConfig, actions: [], status, workflow_definition: nextWorkflow, workflow_version: workflow.version, current_version: workflow.version, published_at: status === "active" ? new Date().toISOString() : null }, { onConflict: "id" });
+    if (!error) {
+      await client.from("growdash_workflow_versions").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, version: workflow.version, definition: nextWorkflow, status: status === "active" ? "published" : "draft", created_by: user.id }, { onConflict: "workflow_id,version" });
+      if (trigger?.type === "webhook.trigger" && status === "active") {
+        const pathToken = String(trigger.parameters.pathToken || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "");
+        const secret = String(trigger.parameters.secret || "").trim() || null;
+        const secretHash = secret ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret))), (byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+        const webhookClient = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<unknown> } };
+        await webhookClient.from("growdash_workflow_webhooks").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, path_token: pathToken, secret_hash: secretHash, status: "active" }, { onConflict: "workflow_id" });
+        setMessage(`Workflow salvo. Webhook: /functions/v1/workflow-webhook/${pathToken}`);
+      }
+      if (trigger?.type === "schedule.trigger") {
+        const scheduleClient = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<{ error?: { message: string } | null }> } };
+        const scheduleResult = await scheduleClient.from("growdash_workflow_schedules").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, cron_expression: String(trigger.parameters.cron || "0 * * * *"), timezone: String(trigger.parameters.timezone || "America/Sao_Paulo"), status: status === "active" ? "active" : "paused" }, { onConflict: "workflow_id" });
+        if (scheduleResult.error) setMessage(`Workflow salvo, mas o agendamento não foi persistido: ${scheduleResult.error.message}`);
+      }
+    }
+    setMessage(error ? `Rascunho local salvo. Banco: ${error.message}` : "Workflow salvo no workspace.");
+  };
+
+  const execute = async () => {
+    if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Conecte um workspace para testar o executor."); return; }
+    if (!runnableValidation.ok) { setMessage(runnableValidationErrors.join(" ")); return; }
+    setRunning(true); setRunResult(null);
+    try {
+      // A execução de teste sempre usa a definição atual, mesmo quando o
+      // usuário ainda não clicou em Salvar. Isso evita o 404 de workflow_id
+      // inexistente e mantém o comportamento esperado de um editor n8n-like.
+      await save("draft");
+      const { data, error } = await supabase.functions.invoke("workflow-execute", { body: { workflow_id: workflow.id, mode: "test", input: { source: "manual_test", timestamp: new Date().toISOString() }, idempotency_key: `manual-test:${Date.now()}` } });
+      if (error || data?.error) throw new Error(error?.message || data?.error);
+      setRunResult(data); setMessage(`Execução ${data?.status === "success" ? "concluída" : "finalizada com erro"}. Run: ${data?.run_id || "-"}`);
+      await loadRuns();
+    } catch (error) { setRunResult({ status: "error", error: error instanceof Error ? error.message : "Falha na execução" }); setMessage(error instanceof Error ? error.message : "Falha na execução"); }
+    finally { setRunning(false); }
+  };
+  const resolveApproval = async (approvalId: string, decision: "approved" | "rejected") => {
+    const { data, error } = await supabase.functions.invoke("workflow-approval", { body: { approval_id: approvalId, decision } });
+    if (error || data?.error) { setMessage(error?.message || data?.error || "Não foi possível resolver a aprovação."); return; }
+    setMessage(decision === "approved" ? "Aprovação confirmada; execução retomada." : "Execução rejeitada.");
+    await loadApprovals(); await loadRuns();
+  };
+  const duplicate = () => { const suffix = `-copy-${Date.now()}`; const idMap = new Map(workflow.nodes.map((node) => [node.id, `${node.id}${suffix}`])); const copy = { ...workflow, id: crypto.randomUUID(), name: `${workflow.name} — cópia`, version: 1, active: false, nodes: workflow.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })), connections: workflow.connections.map((edge) => ({ ...edge, source: idMap.get(edge.source) || edge.source, target: idMap.get(edge.target) || edge.target })) }; safeSetLocalStorage(storageKey(workspace?.id), JSON.stringify(copy)); setWorkflow(copy); setSelectedId(null); setMessage("Cópia criada como rascunho."); };
+
+  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <section className="gd-panel min-h-[560px] overflow-hidden p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3"><div><h2 className="font-black">Editor visual</h2><p className="text-xs text-muted-foreground">Monte o fluxo, teste e publique com histórico de execução.</p></div><div className="flex flex-wrap gap-2"><Input className="h-9 w-44" value={workflow.name} onChange={(event) => setWorkflow((current) => ({ ...current, name: event.target.value }))} aria-label="Nome do workflow" /><Button size="sm" variant="outline" onClick={duplicate}><Copy className="mr-2 h-3.5 w-3.5" />Duplicar</Button><Button size="sm" variant="outline" onClick={execute} disabled={running}><Play className="mr-2 h-3.5 w-3.5" />{running ? "Executando" : "Testar"}</Button><Button size="sm" onClick={() => void save()}><Save className="mr-2 h-3.5 w-3.5" />Salvar</Button><Button size="sm" variant={workflow.active ? "outline" : "default"} onClick={() => void save(workflow.active ? "paused" : "active")}><StatusIcon className="mr-2 h-3.5 w-3.5" />{workflow.active ? "Pausar" : "Ativar"}</Button></div></div>
+      <div className="mt-4 min-h-[440px] overflow-auto rounded-xl border border-dashed border-border bg-background/40 p-2" onPointerMove={moveDraggedNode} onPointerUp={endDrag} onPointerCancel={endDrag}>
+        {workflow.nodes.length === 0 && <div className="flex min-h-[420px] items-center justify-center"><div className="max-w-sm text-center text-sm text-muted-foreground">Adicione um nó à esquerda para começar.</div></div>}
+        {workflow.nodes.length > 0 && <div ref={canvasRef} className="relative min-h-[420px]" style={{ width: Math.max(920, ...workflow.nodes.map((node, index) => nodePosition(node, index).x + WORKFLOW_NODE_WIDTH + 120)), height: Math.max(420, ...workflow.nodes.map((node, index) => nodePosition(node, index).y + WORKFLOW_NODE_HEIGHT + 120)) }}>
+          <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+            <defs><marker id="workflow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="currentColor" /></marker></defs>
+            {workflow.connections.map((edge, index) => { const source = nodeById(workflow.nodes, edge.source); const target = nodeById(workflow.nodes, edge.target); if (!source || !target) return null; return <path key={`${edge.source}-${edge.target}-${index}`} d={edgePath(nodePosition(source, workflow.nodes.indexOf(source)), nodePosition(target, workflow.nodes.indexOf(target)))} fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.45" markerEnd="url(#workflow-arrow)" />; })}
+          </svg>
+          {workflow.nodes.map((node, index) => { const Icon = icons[node.type]; const position = nodePosition(node, index); const branching = node.type === "condition.if" || node.type === "logic.filter" || node.type === "logic.switch"; return <div key={node.id} role="button" tabIndex={0} onClick={() => setSelectedId(node.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedId(node.id); }} onPointerDown={(event) => beginDrag(event, node, index)} className={cn("absolute w-[208px] cursor-grab select-none rounded-xl border bg-card p-4 text-left shadow-sm transition-shadow active:cursor-grabbing", dragging?.id === node.id ? "z-20 shadow-xl ring-2 ring-primary/30" : "z-10", selectedId === node.id ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border hover:border-primary/50")} style={{ left: position.x, top: position.y }}>
+            {branching ? <><button type="button" aria-label={`Saída true de ${labels[node.type]}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); connectHandle("source", node.id, "true"); }} className="absolute -right-2 top-1/3 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-background bg-primary" /><button type="button" aria-label={`Saída false de ${labels[node.type]}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); connectHandle("source", node.id, "false"); }} className="absolute -right-2 top-2/3 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-background bg-amber-500" /></> : <button type="button" aria-label={`Conectar saída de ${labels[node.type]}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); connectHandle("source", node.id); }} className="absolute -right-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-background bg-primary" />}
+            <button type="button" aria-label={`Conectar entrada em ${labels[node.type]}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); connectHandle("target", node.id); }} className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-background bg-muted-foreground" />
+            <span className="flex items-center gap-2 text-xs font-black"><Icon className="h-4 w-4 text-primary" />{labels[node.type]}</span><span className="mt-2 block truncate text-[10px] text-muted-foreground">{node.type === "http.request" ? String(node.parameters.url || "URL não configurada") : node.type === "whatsapp.send" ? "Enviar mensagem" : node.type === "agent.run" ? "Executar instrução" : node.type === "condition.if" ? "Avaliar condição" : node.type === "delay.wait" ? `${String(node.parameters.seconds || 0)} segundos` : node.type.endsWith("trigger") ? "Receber evento" : "Executar ação"}</span>
+          </div>; })}
+        </div>}
+      </div>
+      {message && <p className="mt-3 rounded-lg bg-primary/10 p-3 text-xs text-primary">{message}</p>}
+      {runResult && <div className={cn("mt-3 rounded-lg p-3 text-xs", runResult.status === "success" ? "bg-emerald-500/10 text-emerald-700" : "bg-destructive/10 text-destructive")}><strong>Última execução: {runResult.status}</strong>{runResult.error && <span className="ml-2">{runResult.error}</span>}</div>}
+      {runs.length > 0 && <div className="mt-3 rounded-lg border border-border p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Histórico recente</span><button type="button" className="text-[10px] text-primary" onClick={() => void loadRuns()}>Atualizar</button></div><div className="grid gap-1.5">{runs.map((run) => <div key={run.id} className="flex items-center justify-between gap-2 text-[10px]"><span className={cn("rounded px-1.5 py-0.5 font-bold", run.status === "success" ? "bg-emerald-500/15 text-emerald-700" : run.status === "error" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground")}>{run.status}</span><span className="truncate text-muted-foreground">{new Date(run.created_at).toLocaleString("pt-BR")}</span><code className="hidden truncate text-muted-foreground sm:block">{run.id.slice(0, 8)}</code></div>)}</div></div>}
+      {approvals.length > 0 && <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Aprovações pendentes</span><button type="button" className="text-[10px] text-primary" onClick={() => void loadApprovals()}>Atualizar</button></div><div className="grid gap-2">{approvals.map((approval) => <div key={approval.id} className="flex flex-wrap items-center justify-between gap-2 text-[10px]"><span className="min-w-0 truncate text-muted-foreground">Execução {approval.run_id.slice(0, 8)} · nó {approval.node_id.slice(-8)}</span><span className="flex gap-1"><Button size="sm" className="h-7 px-2 text-[10px]" onClick={() => void resolveApproval(approval.id, "approved")}>Aprovar</Button><Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => void resolveApproval(approval.id, "rejected")}>Rejeitar</Button></span></div>)}</div></div>}
+      {!validation.ok && workflow.nodes.length > 0 && <p className="mt-3 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{validationErrors.join(" ")}</p>}
+    </section>
+    <aside className="space-y-4">
+      <section className="gd-panel p-4"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Adicionar nó</h3><div className="mt-3 grid gap-2">{(Object.keys(labels) as WorkflowNodeType[]).map((type) => { const Icon = icons[type]; return <Button key={type} variant="outline" className="justify-start" onClick={() => addNode(type)}><Plus className="mr-2 h-4 w-4" /><Icon className="mr-2 h-4 w-4 text-primary" />{labels[type]}</Button>; })}</div></section>
+      <section className="gd-panel p-4"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Conexões</h3><div className="mt-3 grid gap-2"><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Nó de origem" value={connectionDraft.source} onChange={(event) => setConnectionDraft((current) => ({ ...current, source: event.target.value }))}><option value="">Origem</option>{workflow.nodes.map((node) => <option key={node.id} value={node.id}>{labels[node.type]} · {node.id.slice(-6)}</option>)}</select><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Nó de destino" value={connectionDraft.target} onChange={(event) => setConnectionDraft((current) => ({ ...current, target: event.target.value }))}><option value="">Destino</option>{workflow.nodes.map((node) => <option key={node.id} value={node.id}>{labels[node.type]} · {node.id.slice(-6)}</option>)}</select><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Saída da conexão" value={connectionDraft.sourcePort} onChange={(event) => setConnectionDraft((current) => ({ ...current, sourcePort: event.target.value }))}><option value="">Saída padrão</option><option value="true">true</option><option value="false">false</option><option value="default">default</option></select><Button type="button" size="sm" variant="outline" onClick={addConnection} disabled={!connectionDraft.source || !connectionDraft.target}>Adicionar conexão</Button></div><div className="mt-3 grid gap-1.5">{workflow.connections.map((edge, index) => <div key={`${edge.source}-${edge.target}-${index}`} className="flex items-center gap-2 text-[10px]"><span className="min-w-0 grow truncate">{edge.source.slice(-6)} → {edge.target.slice(-6)}{edge.sourcePort ? ` (${edge.sourcePort})` : ""}</span><button type="button" className="text-destructive" onClick={() => removeConnection(index)} aria-label="Remover conexão">×</button></div>)}</div></section>
+      <section className="gd-panel p-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Configuração</h3>{selected && <Button variant="ghost" size="icon" onClick={removeSelected} aria-label="Excluir nó"><Trash2 className="h-4 w-4 text-destructive" /></Button>}</div>{selected ? <NodeForm node={selected} onChange={updateSelected} /> : <p className="mt-3 text-xs text-muted-foreground">Selecione um nó no canvas.</p>}</section>
+    </aside>
+  </div>;
+}
+
+function NodeForm({ node, onChange }: { node: WorkflowNode; onChange: (parameters: Record<string, unknown>) => void }) {
+  if (node.type === "http.request") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">URL<Input value={String(node.parameters.url || "")} onChange={(event) => onChange({ ...node.parameters, url: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Método<Input value={String(node.parameters.method || "POST")} onChange={(event) => onChange({ ...node.parameters, method: event.target.value.toUpperCase() })} /></label><label className="grid gap-1 text-xs font-bold">Corpo JSON<Textarea value={String(node.parameters.body || "")} onChange={(event) => onChange({ ...node.parameters, body: event.target.value })} placeholder='{"lead_id":"{{id}}"}' /></label></div>;
+  if (node.type === "google.sheets.append") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha<Input value={String(node.parameters.spreadsheetId || "")} onChange={(event) => onChange({ ...node.parameters, spreadsheetId: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Aba<Input value={String(node.parameters.sheetName || "Leads")} onChange={(event) => onChange({ ...node.parameters, sheetName: event.target.value })} /></label></div>;
+  if (node.type === "google.sheets.lookup") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha<Input value={String(node.parameters.spreadsheetId || "")} onChange={(event) => onChange({ ...node.parameters, spreadsheetId: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Aba<Input value={String(node.parameters.sheetName || "Leads")} onChange={(event) => onChange({ ...node.parameters, sheetName: event.target.value })} /></label></div>;
+  if (node.type === "instagram.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Evento<Input value={String(node.parameters.event || "comment")} onChange={(event) => onChange({ ...node.parameters, event: event.target.value })} placeholder="comment ou message" /></label><label className="grid gap-1 text-xs font-bold">Palavra-chave opcional<Input value={String(node.parameters.keyword || "")} onChange={(event) => onChange({ ...node.parameters, keyword: event.target.value })} /></label></div>;
+  if (node.type === "webhook.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Token do caminho<Input value={String(node.parameters.pathToken || "")} onChange={(event) => onChange({ ...node.parameters, pathToken: event.target.value })} placeholder="gerado ao ativar" /></label><label className="grid gap-1 text-xs font-bold">Secret opcional<Input type="password" value={String(node.parameters.secret || "")} onChange={(event) => onChange({ ...node.parameters, secret: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Envie o secret no cabeçalho <code>x-workflow-secret</code>.</p></div>;
+  if (node.type === "instagram.reply") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Instagram conectada à Growdash e as permissões aprovadas pela Meta.</p></div>;
+  if (node.type === "instagram.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID do destinatário<Input value={String(node.parameters.recipientId || "")} onChange={(event) => onChange({ ...node.parameters, recipientId: event.target.value })} placeholder="{{trigger.sender_id}}" /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label></div>;
+  if (node.type === "whatsapp.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Telefone ou campo dinâmico<Input value={String(node.parameters.phone || "")} onChange={(event) => onChange({ ...node.parameters, phone: event.target.value })} placeholder="{{lead.whatsapp}}" /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">O envio usa a conexão oficial de WhatsApp configurada no workspace.</p></div>;
+  if (node.type === "google.drive.upload") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Arquivo ou URL dinâmica<Input value={String(node.parameters.fileUrl || "")} onChange={(event) => onChange({ ...node.parameters, fileUrl: event.target.value })} placeholder="{{arquivo.url}}" /></label><label className="grid gap-1 text-xs font-bold">Pasta do Drive (opcional)<Input value={String(node.parameters.folderId || "")} onChange={(event) => onChange({ ...node.parameters, folderId: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Google Workspace conectada à Growdash.</p></div>;
+  if (node.type === "google.drive.lookup") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Nome ou busca no Drive<Input value={String(node.parameters.query || "")} onChange={(event) => onChange({ ...node.parameters, query: event.target.value })} placeholder="contrato" /></label></div>;
+  if (node.type === "gmail.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Destinatário<Input type="email" value={String(node.parameters.to || "")} onChange={(event) => onChange({ ...node.parameters, to: event.target.value })} placeholder="{{lead.email}}" /></label><label className="grid gap-1 text-xs font-bold">Assunto<Input value={String(node.parameters.subject || "")} onChange={(event) => onChange({ ...node.parameters, subject: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Mensagem HTML<Textarea value={String(node.parameters.html || "")} onChange={(event) => onChange({ ...node.parameters, html: event.target.value })} /></label></div>;
+  if (node.type === "agent.run") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Instrução do agente<Textarea value={String(node.parameters.prompt || "")} onChange={(event) => onChange({ ...node.parameters, prompt: event.target.value })} placeholder="Analise o lead e classifique o próximo passo." /></label><label className="grid gap-1 text-xs font-bold">Saída<Input value={String(node.parameters.output || "text")} onChange={(event) => onChange({ ...node.parameters, output: event.target.value })} placeholder="text ou json" /></label></div>;
+  if (node.type === "schedule.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Expressão cron<Input value={String(node.parameters.cron || "0 * * * *")} onChange={(event) => onChange({ ...node.parameters, cron: event.target.value })} placeholder="0 * * * *" /></label><label className="grid gap-1 text-xs font-bold">Fuso horário<Input value={String(node.parameters.timezone || "America/Sao_Paulo")} onChange={(event) => onChange({ ...node.parameters, timezone: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">O agendamento usa o fuso informado e é executado somente quando o workflow estiver ativo.</p></div>;
+  if (node.type === "whatsapp.message.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Palavra-chave opcional<Input value={String(node.parameters.keyword || "")} onChange={(event) => onChange({ ...node.parameters, event: "message", keyword: event.target.value })} placeholder="preço" /></label><label className="grid gap-1 text-xs font-bold">ID do número WhatsApp (opcional)<Input value={String(node.parameters.whatsapp_number_id || "")} onChange={(event) => onChange({ ...node.parameters, event: "message", whatsapp_number_id: event.target.value })} placeholder="UUID do número conectado" /></label><p className="text-[10px] text-muted-foreground">O workflow será acionado pela mensagem recebida no webhook oficial da Meta.</p></div>;
+  if (node.type === "google.drive.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da integração Google (opcional)<Input value={String(node.parameters.integration_id || "")} onChange={(event) => onChange({ ...node.parameters, event: "file", integration_id: event.target.value })} placeholder="ID da integração" /></label><p className="text-[10px] text-muted-foreground">Arquivos novos ou alterados são avaliados quando o Drive é sincronizado.</p></div>;
+  if (node.type === "google.sheets.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha (opcional)<Input value={String(node.parameters.spreadsheet_id || "")} onChange={(event) => onChange({ ...node.parameters, event: "row", spreadsheet_id: event.target.value })} placeholder="ID da planilha" /></label><p className="text-[10px] text-muted-foreground">Cada linha lida na sincronização é enviada ao fluxo com os campos originais.</p></div>;
+  if (node.type === "task.create") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Título da tarefa<Input value={String(node.parameters.title || "")} onChange={(event) => onChange({ ...node.parameters, title: event.target.value })} placeholder="Ligar para {{lead.name}}" /></label><label className="grid gap-1 text-xs font-bold">Descrição<Textarea value={String(node.parameters.description || "")} onChange={(event) => onChange({ ...node.parameters, description: event.target.value })} /></label><div className="grid grid-cols-2 gap-2"><label className="grid gap-1 text-xs font-bold">Prioridade<select className="h-9 rounded-md border border-border bg-background px-2 text-xs" value={String(node.parameters.priority || "medium")} onChange={(event) => onChange({ ...node.parameters, priority: event.target.value })}><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label><label className="grid gap-1 text-xs font-bold">Status<select className="h-9 rounded-md border border-border bg-background px-2 text-xs" value={String(node.parameters.status || "open")} onChange={(event) => onChange({ ...node.parameters, status: event.target.value })}><option value="open">Aberta</option><option value="in_progress">Em andamento</option><option value="done">Concluída</option><option value="cancelled">Cancelada</option></select></label></div><label className="grid gap-1 text-xs font-bold">ID do responsável (opcional)<Input value={String(node.parameters.assigneeUserId || "")} onChange={(event) => onChange({ ...node.parameters, assigneeUserId: event.target.value })} placeholder="UUID do vendedor" /></label><label className="grid gap-1 text-xs font-bold">Prazo ISO (opcional)<Input value={String(node.parameters.dueAt || "")} onChange={(event) => onChange({ ...node.parameters, dueAt: event.target.value })} placeholder="2026-10-22T18:00:00-03:00" /></label><div className="grid grid-cols-2 gap-2"><label className="grid gap-1 text-xs font-bold">Tipo da entidade<Input value={String(node.parameters.entityType || "rd_deal")} onChange={(event) => onChange({ ...node.parameters, entityType: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">ID da entidade<Input value={String(node.parameters.entityId || "")} onChange={(event) => onChange({ ...node.parameters, entityId: event.target.value })} placeholder="{{trigger.rd_deal_id}}" /></label></div></div>;
+  if (node.type === "tag.add") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Nome da tag<Input value={String(node.parameters.name || "")} onChange={(event) => onChange({ ...node.parameters, name: event.target.value })} placeholder="Quente" /></label><div className="grid grid-cols-2 gap-2"><label className="grid gap-1 text-xs font-bold">Tipo da entidade<Input value={String(node.parameters.entityType || "rd_deal")} onChange={(event) => onChange({ ...node.parameters, entityType: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">ID da entidade<Input value={String(node.parameters.entityId || "")} onChange={(event) => onChange({ ...node.parameters, entityId: event.target.value })} placeholder="{{trigger.rd_deal_id}}" /></label></div><label className="grid gap-1 text-xs font-bold">Cor opcional<Input value={String(node.parameters.color || "")} onChange={(event) => onChange({ ...node.parameters, color: event.target.value })} placeholder="#22c55e" /></label></div>;
+  if (node.type === "seller.notify") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID do vendedor<Input value={String(node.parameters.recipientUserId || "")} onChange={(event) => onChange({ ...node.parameters, recipientUserId: event.target.value })} placeholder="UUID do usuário" /></label><label className="grid gap-1 text-xs font-bold">Título<Input value={String(node.parameters.title || "Notificação de automação")} onChange={(event) => onChange({ ...node.parameters, title: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} placeholder="Novo lead atribuído a você." /></label><label className="grid gap-1 text-xs font-bold">Link opcional<Input value={String(node.parameters.link || "")} onChange={(event) => onChange({ ...node.parameters, link: event.target.value })} placeholder="/crm" /></label></div>;
+  if (node.type === "condition.if") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Campo dinâmico<Input value={String(node.parameters.field || "")} onChange={(event) => onChange({ ...node.parameters, field: event.target.value })} placeholder="lead.interesse" /></label><label className="grid gap-1 text-xs font-bold">Operador<Input value={String(node.parameters.operator || "contains")} onChange={(event) => onChange({ ...node.parameters, operator: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Valor<Input value={String(node.parameters.value || "")} onChange={(event) => onChange({ ...node.parameters, value: event.target.value })} /></label></div>;
+  if (node.type === "logic.switch") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Campo dinâmico<Input value={String(node.parameters.field || "")} onChange={(event) => onChange({ ...node.parameters, field: event.target.value })} placeholder="lead.status" /></label><label className="grid gap-1 text-xs font-bold">Casos JSON<Textarea value={String(node.parameters.cases ? JSON.stringify(node.parameters.cases, null, 2) : "[]")} onChange={(event) => { try { onChange({ ...node.parameters, cases: JSON.parse(event.target.value) }); } catch { /* mantém o último JSON válido */ } }} placeholder='[{"value":"won","port":"won"}]' /></label></div>;
+  if (node.type === "logic.loop") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Lista por caminho dinâmico<Input value={String(node.parameters.itemsPath || "lead.items")} onChange={(event) => onChange({ ...node.parameters, itemsPath: event.target.value })} placeholder="lead.items" /></label><label className="grid gap-1 text-xs font-bold">Máximo de itens<Input type="number" min="1" max="100" value={String(node.parameters.maxItems || 100)} onChange={(event) => onChange({ ...node.parameters, maxItems: Number(event.target.value) })} /></label><p className="text-[10px] text-muted-foreground">Os nós seguintes serão executados uma vez por item, com <code>{"{{loop.item}}"}</code> e <code>{"{{loop.index}}"}</code>.</p></div>;
+  if (node.type === "approval.manual") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Mensagem de aprovação<Textarea value={String(node.parameters.message || "Revise esta etapa antes de continuar.")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">A execução pausa até um membro do workspace aprovar ou rejeitar em /automacoes.</p></div>;
+  if (node.type === "delay.wait") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Segundos<Input type="number" min="1" value={String(node.parameters.seconds || 60)} onChange={(event) => onChange({ ...node.parameters, seconds: Number(event.target.value) })} /></label></div>;
+  return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Parâmetros JSON<Textarea value={JSON.stringify(node.parameters, null, 2)} onChange={(event) => { try { onChange(JSON.parse(event.target.value)); } catch { /* mantém o último JSON válido */ } }} /></label><p className="text-[10px] text-muted-foreground">Use variáveis como <code>{"{{lead.email}}"}</code> para dados do evento.</p></div>;
+}

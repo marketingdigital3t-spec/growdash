@@ -1,0 +1,1088 @@
+import { useEffect, useMemo, useState } from "react";
+import { differenceInCalendarDays, format, subDays } from "date-fns";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate, type RDDeal } from "@/hooks/useRDDeals";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod, type RDDealLite } from "@/hooks/useRDDealsForPeriod";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { FunnelKPIs } from "@/components/funnel-analysis/FunnelKPIs";
+import { FunnelGrowthBlock } from "@/components/funnel-analysis/FunnelGrowthBlock";
+import { FunnelStageDistribution } from "@/components/funnel-analysis/FunnelStageDistribution";
+import { FunnelStageConversion } from "@/components/funnel-analysis/FunnelStageConversion";
+import { FunnelOrbitalInteractive } from "@/components/funnel-analysis/FunnelOrbitalInteractive";
+import { FunnelLeadsEvolution } from "@/components/funnel-analysis/FunnelLeadsEvolution";
+import { FunnelBottlenecks } from "@/components/funnel-analysis/FunnelBottlenecks";
+import { FunnelSourceTable } from "@/components/funnel-analysis/FunnelSourceTable";
+import { FunnelLostReasons } from "@/components/funnel-analysis/FunnelLostReasons";
+import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
+import { FunnelConversionHeatmap } from "@/components/funnel-analysis/FunnelConversionHeatmap";
+import { FunnelSalesAttribution } from "@/components/funnel-analysis/FunnelSalesAttribution";
+import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useRDHealthCheck } from "@/hooks/useRDHealthCheck";
+import { useInsights } from "@/hooks/useInsights";
+import { useSyncMeta } from "@/hooks/useSyncMeta";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { isProviderRateLimited, isTransientProviderOverload } from "@/lib/concurrency";
+import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+import { useSales } from "@/hooks/useSales";
+import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
+import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
+import { getMetaSyncRange } from "@/lib/metaSyncRange";
+import { businessDateKey } from "@/lib/businessDate";
+import { DashboardProvider } from "@/contexts/DashboardContext";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
+import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
+import { CampaignMultiSelect } from "@/components/dashboard/CampaignMultiSelect";
+import { AskAICard } from "@/components/dashboard/AskAICard";
+import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
+import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
+import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
+import { filterRDPeriodDeals, mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
+import { buildFunnelCampaignOptions, splitFunnelCampaignSelection } from "@/lib/funnelCampaignOptions";
+import { buildFunnelMetricAvailability, hasRenderableFunnelStages } from "@/lib/funnelMetricAvailability";
+import { FunnelSyncStatusBadge } from "@/components/funnel-analysis/FunnelSyncStatusBadge";
+
+const blockHelp = {
+  media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
+  distribution: ["Distribuição por etapa do funil", "Mostra quantos leads estão em cada etapa do RD, sua participação, tempo médio e valor em negociação."],
+  conversion: ["Taxa de avanço entre etapas", "Usa movimentações reais do RD quando disponíveis e sinaliza quando a taxa é estimada pela etapa atual."],
+  evolution: ["Evolução do funil", "Exibe a variação diária de leads, oportunidades e vendas no período selecionado."],
+  bottlenecks: ["Gargalos do funil", "Mostra somente negócios atualmente parados por faixa de tempo. Não infere perdas entre etapas sem o histórico de movimentações do RD."],
+  sources: ["Origem dos leads", "Compara volume, vendas, conversão e receita por origem para revelar os canais de maior qualidade."],
+  losses: ["Motivos de perda", "Agrupa os motivos registrados no RD para mostrar por que as negociações não avançaram."],
+  insights: ["Insights automáticos", "Transforma padrões do funil em observações acionáveis sobre origem, gargalos, região e tempo parado."],
+  states: ["Mapa por estado", "Distribui leads e conversões geograficamente para identificar regiões com maior volume e eficiência."],
+  weekdays: ["Dias que mais convertem", "Compara conversões e receita por dia da semana usando a data dos eventos do RD."],
+  hours: ["Melhor período do dia", "Compara manhã, tarde, noite e madrugada; clique em um período para detalhar as vendas por hora."],
+  attribution: ["Vendas por campanha e criativo", "Mostra exatamente quais UTMs de campanha e criativo chegaram até uma venda confirmada no RD.", "Use apenas linhas com atribuição identificada para decidir escala; corrija UTMs antes de concluir que uma peça não vende."],
+} as const;
+
+function HelpBlock({ help, children, className }: { help: readonly string[]; children: React.ReactNode; className?: string }) {
+  return (
+    <MetricHelpTooltip title={help[0]} description={help[1]} detail={help[2]} className={className ?? "h-full"} showHint>
+      {children}
+    </MetricHelpTooltip>
+  );
+}
+
+export default function FunnelAnalysis() {
+  const { adAccountIds, funnelIds: selectedFunnelIds, setFunnelIds: setSelectedFunnelIds, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { data: adAccounts = [] } = useAdAccounts();
+  const visibleAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => adAccountIds.length
+      ? adAccountIds.includes(account.id)
+      : account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccountIds, adAccounts, businessUnitId, segment]);
+  const integratedAccountIds = useMemo(
+    () => new Set(visibleAccounts.map((account) => account.id)),
+    [visibleAccounts],
+  );
+  const selectedAccountIds = useMemo(
+    () => adAccountIds.filter((accountId) => integratedAccountIds.has(accountId)),
+    [adAccountIds, integratedAccountIds],
+  );
+  const selectedAccountIdSet = useMemo(() => new Set(selectedAccountIds), [selectedAccountIds]);
+  const allAccountsSelected = selectedAccountIds.length === 0;
+  const selectedMetaScope = useMemo(() => {
+    const scoped = selectedAccountIds.length
+      ? visibleAccounts.filter((account) => selectedAccountIdSet.has(account.id))
+      : visibleAccounts;
+    const windows = Array.from(new Set(scoped.map((account) => account.attribution_window || "account_default")));
+    const timezones = Array.from(new Set(scoped.map((account) => account.timezone_name || "America/Sao_Paulo")));
+    return {
+      attributionWindow: windows.length === 1 ? windows[0] : "account_default",
+      timezone: timezones.length === 1 ? timezones[0] : "account",
+    };
+  }, [selectedAccountIdSet, selectedAccountIds.length, visibleAccounts]);
+  const { data: funnels = [], isLoading: loadingFunnels, isFetched: funnelsFetched } = useRDFunnels();
+  const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const { selectedMetaCampaignIds, selectedUtmCampaigns } = useMemo(
+    () => splitFunnelCampaignSelection(selectedCampaigns),
+    [selectedCampaigns],
+  );
+  const [selectedState, setSelectedState] = useState<string>("all");
+  const [selectedOwner, setSelectedOwner] = useState<string>("all");
+  const [selectedProduct, setSelectedProduct] = useState<string>("all");
+  const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const syncMeta = useSyncMeta();
+  const [rdLiveState, setRdLiveState] = useState<"idle" | "refreshing" | "fresh" | "error">("idle");
+  const [rdLastUpdatedAt, setRdLastUpdatedAt] = useState<Date | null>(null);
+  const [rdLiveError, setRdLiveError] = useState<string | null>(null);
+
+  // RD é uma fonte independente de Meta. Funis ativos continuam disponíveis
+  // mesmo quando ainda não possuem uma conta de anúncios vinculada.
+  const activeFunnels = useMemo(
+    () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id),
+    [funnels],
+  );
+  const selectedFunnelIdSet = useMemo(() => new Set(selectedFunnelIds), [selectedFunnelIds]);
+  const allFunnelsSelected = selectedFunnelIds.length === 0;
+  // RD continua sendo fonte independente; a seleção Meta resolve somente os
+  // funis RD explicitamente vinculados à conexão daquela conta.
+  const scopedActiveFunnels = useMemo(
+    () => allFunnelsSelected ? activeFunnels : activeFunnels.filter((funnel) => selectedFunnelIdSet.has(funnel.id)),
+    [activeFunnels, allFunnelsSelected, selectedFunnelIdSet],
+  );
+  useEffect(() => {
+    // Remove selections for funnels that were deactivated or deleted.
+    if (!loadingFunnels && selectedFunnelIds.length) {
+      const valid = selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || activeFunnels.some((funnel) => funnel.id === id));
+      if (valid.length !== selectedFunnelIds.length) setSelectedFunnelIds(valid);
+    }
+  }, [activeFunnels, loadingFunnels, selectedFunnelIds, setSelectedFunnelIds]);
+  const funnelId = selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "";
+  const funnelScopeIds = useMemo(
+    () => selectedFunnelIds.includes(NO_LINKED_RD_FUNNEL_SCOPE_ID)
+      ? [NO_LINKED_RD_FUNNEL_SCOPE_ID]
+      : scopedActiveFunnels.map((funnel) => funnel.id),
+    [scopedActiveFunnels, selectedFunnelIds],
+  );
+  const funnelScopeKey = funnelScopeIds.join(",");
+  const analyticsScope = useMemo<AnalyticsScope>(() => ({
+    adAccountIds: selectedAccountIds,
+    funnelIds: funnelScopeIds,
+    campaignIds: selectedMetaCampaignIds,
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
+    timezoneByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
+    attributionWindowByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
+  }), [endDate, funnelScopeIds, selectedAccountIds, selectedMetaCampaignIds, startDate, visibleAccounts]);
+  const analyticsScopeKey = useMemo(() => analyticsScopeFingerprint(analyticsScope), [analyticsScope]);
+
+  const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
+  const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
+  const insightScopeAccountIds = useMemo(
+    () => selectedAccountIds.length ? selectedAccountIds : Array.from(integratedAccountIds),
+    [integratedAccountIds, selectedAccountIds],
+  );
+  const insightAttributionWindowsByAccount = useMemo(
+    () => buildAttributionWindowsByAccount(visibleAccounts, insightScopeAccountIds),
+    [insightScopeAccountIds, visibleAccounts],
+  );
+
+  // "Todas as contas" é uma escolha válida e não pode ser regravada pelo
+  // carregamento de funis. Alterar o filtro global aqui fazia o Select alternar
+  // entre "Todas" e a primeira conta retornada, reiniciando as consultas e
+  // causando o piscar relatado. A conta efetiva é usada apenas para reconciliar
+  // a análise detalhada com o funil encontrado, sem mudar a escolha do usuário.
+
+  const { data: stages = [], isFetched: stagesFetched, refetch: refetchStages } = useFunnelStagesForIds(funnelScopeIds);
+  const { data: deals = [], isFetched: dealsFetched, refetch } = useRDDeals({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    startDate,
+    endDate,
+    source: selectedSource,
+    campaigns: selectedUtmCampaigns,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+    includeHistory: true,
+    enabled: funnelScopeIds.length > 0,
+  });
+  // O recorte RD usa a consulta indexada/cached de período. A consulta antiga
+  // montava um OR amplo em três timestamps e podia deixar a página presa em
+  // "Carregando" enquanto o PostgREST varria o funil inteiro.
+  const { data: periodDeals = [], isLoading: loadingPeriodDeals, isFetched: periodDealsFetched, isFetching: fetchingPeriodDeals, isError: periodDealsIsError, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDealsForPeriod({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    startDate,
+    endDate,
+    enabled: funnelScopeIds.length > 0,
+  });
+
+  useEffect(() => {
+    if (!funnelScopeIds.length) return;
+    let disposed = false;
+    let debounceTimer: number | null = null;
+    let initialRefreshTimer: number | null = null;
+    const refreshDistribution = async () => {
+      if (disposed || document.visibilityState === "hidden") return;
+      setRdLiveState("refreshing");
+      try {
+        const results = await Promise.allSettled([refetch(), refetchPeriodDeals(), refetchStages()]);
+        const dealsResult = results[0];
+        const stagesResult = results[2];
+        if (dealsResult.status === "rejected" || (dealsResult.status === "fulfilled" && dealsResult.value.isError)) {
+          const error = dealsResult.status === "rejected" ? dealsResult.reason : dealsResult.value.error;
+          throw error || new Error("Não foi possível confirmar a atualização das negociações RD.");
+        }
+        if (disposed) return;
+        setRdLastUpdatedAt(new Date());
+        setRdLiveError(stagesResult.status === "rejected" || (stagesResult.status === "fulfilled" && stagesResult.value.isError)
+          ? "O catálogo de etapas está indisponível; a distribuição usa a etapa salva em cada negociação."
+          : null);
+        setRdLiveState("fresh");
+      } catch (error) {
+        if (disposed) return;
+        setRdLiveError(error instanceof Error ? error.message : "Não foi possível atualizar o RD agora.");
+        setRdLiveState("error");
+      }
+    };
+    const queueRefresh = () => {
+      if (debounceTimer) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => void refreshDistribution(), 500);
+    };
+    // The scope can change while Supabase is still removing the previous
+    // channel. Reusing the same topic in that window makes Supabase return
+    // the already-subscribed channel and throws when callbacks are added.
+    // A per-mount suffix keeps subscriptions isolated until cleanup finishes.
+    const channel = supabase.channel(`funnel-analysis-rd-${analyticsScopeKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 150)}-${Math.random().toString(36).slice(2, 10)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
+      .subscribe();
+    // Realtime events already trigger the refresh. Delay the first explicit
+    // reconciliation so an existing RD snapshot can paint before the broad
+    // period/history reads start competing for the connection.
+    const interval = window.setInterval(() => void refreshDistribution(), 60_000);
+    const onVisibility = () => { if (document.visibilityState === "visible") void refreshDistribution(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    initialRefreshTimer = window.setTimeout(() => void refreshDistribution(), 2_000);
+    return () => {
+      disposed = true;
+      if (debounceTimer) window.clearTimeout(debounceTimer);
+      if (initialRefreshTimer) window.clearTimeout(initialRefreshTimer);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      void supabase.removeChannel(channel);
+    };
+  }, [analyticsScopeKey, funnelScopeIds, funnelScopeKey, refetch, refetchPeriodDeals, refetchStages]);
+  // Os filtros precisam vir do conjunto completo do período. Usar `deals`
+  // aqui fazia uma opção desaparecer depois que outro filtro era aplicado.
+  // Quando todos os filtros estão em "all", o React Query reutiliza esta
+  // mesma consulta e não há uma segunda requisição.
+  const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    // Filtros devem listar todos os valores que existem no pipeline, não só
+    // os valores de leads recém-criados.
+    includeHistory: true,
+    enabled: funnelScopeIds.length > 0,
+  });
+  const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    startDate,
+    endDate,
+    source: selectedSource,
+    campaigns: selectedUtmCampaigns,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+    includeHistory: true,
+    enabled: funnelScopeIds.length > 0,
+  });
+  // A mesma consulta canônica usada pelo Dashboard define as vendas do
+  // período. A consulta histórica acima continua disponível para filtros e
+  // contexto, mas não pode gerar um segundo conjunto de vendas com regras
+  // diferentes de data/escopo.
+  const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals, isFetched: periodClosedDealsFetched, isError: periodClosedDealsIsError, error: periodClosedDealsError } = useRDWonDealsForPeriod({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    startDate,
+    endDate,
+    enabled: funnelScopeIds.length > 0,
+  });
+  const { data: stageHistory = [], isLoading: loadingStageHistory } = useRDDealStageHistory({
+    funnelIds: funnelScopeIds,
+    startDate,
+    endDate,
+    enabled: funnelScopeIds.length > 0,
+  });
+  const { data: periodSales = [], isLoading: loadingPeriodSales } = useSales({
+    startDate,
+    endDate,
+    funnelIds: funnelScopeIds,
+  });
+
+  // A mesma regra operacional do CRM vale para relatórios: o lote legado de
+  // "Leads Antigos do Junior" do funil Aluna não pode reaparecer ao escolher
+  // todas as contas e inflar distribuição, KPIs ou conversão.
+  const filteredPeriodDeals = useMemo(() => filterRDPeriodDeals(periodDeals, {
+    source: selectedSource,
+    campaignIds: selectedUtmCampaigns,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+  }), [periodDeals, selectedOwner, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
+  const operationalDeals = useMemo(() => filterOperationalRDDeals(deals, activeFunnels), [activeFunnels, deals]);
+  const operationalPeriodDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodDeals as unknown as RDDeal[], activeFunnels), [activeFunnels, filteredPeriodDeals]);
+  const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
+  const filteredPeriodClosedDeals = useMemo(() => periodClosedDeals.filter((deal) => (
+    (selectedSource === "all" || deal.utm_source === selectedSource)
+      && (!selectedUtmCampaigns.length || selectedUtmCampaigns.includes(deal.utm_campaign || ""))
+      && (selectedState === "all" || deal.lead_state === selectedState)
+      && (selectedOwner === "all" || deal.deal_owner_name === selectedOwner)
+      && (selectedProduct === "all" || deal.rd_product_name === selectedProduct)
+  )), [periodClosedDeals, selectedOwner, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
+  const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
+  const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodClosedDeals, activeFunnels), [activeFunnels, filteredPeriodClosedDeals]);
+  const operationalPeriodFunnelDeals = useMemo(
+    () => mergeRDPeriodDeals(operationalPeriodDeals, operationalPeriodClosedDeals),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
+  );
+  const operationalStages = useMemo(() => filterOperationalRDFunnelStages(stages, activeFunnels), [activeFunnels, stages]);
+  const funnelNames = useMemo(
+    () => Object.fromEntries(activeFunnels.map((funnel) => [funnel.rd_funnel_id!, funnel.name])),
+    [activeFunnels],
+  );
+  const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
+
+  const sources = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+  const rdCampaigns = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+  const states = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.lead_state).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+  const owners = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+  const products = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+
+  const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals, undefined, [], funnelNames), [funnelNames, operationalClosedDeals, operationalDeals, operationalStages]);
+  const periodBaseAnalytics = useMemo(
+    // O recorte de leads usa a data de entrada, mas uma venda pertence ao dia
+    // em que foi fechada. Incluímos a união deduplicada para que uma venda de
+    // lead antigo não desapareça da etapa "Venda Realizada".
+    () => computeFunnelAnalytics(operationalPeriodFunnelDeals, operationalStages, operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals, { startDate, endDate }, stageHistory, funnelNames),
+    [endDate, funnelNames, operationalPeriodClosedDeals, operationalPeriodFunnelDeals, operationalStages, stageHistory, startDate],
+  );
+  // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
+  // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à
+  // atribuição de campanha/criativo, para não atrasar ou alterar os KPIs RD.
+  const analytics = baseAnalytics;
+  const periodAllowedDealIds = useMemo(
+    () => selectedOwner === "all" ? undefined : new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
+    [operationalPeriodClosedDeals, operationalPeriodDeals, selectedOwner],
+  );
+  const periodScopedDealIds = useMemo(
+    () => new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
+  );
+  const periodStateByDealId = useMemo(
+    () => new Map([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => [deal.rd_deal_id, deal.lead_state])),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
+  );
+  const periodFunnelSales = useMemo(() => filterCanonicalFunnelSales(periodSales, {
+    funnelIds: funnelScopeIds,
+    scopedDealIds: periodScopedDealIds,
+    source: selectedSource,
+    campaigns: selectedUtmCampaigns,
+    state: selectedState,
+    product: selectedProduct,
+    allowedDealIds: periodAllowedDealIds,
+    stateByDealId: periodStateByDealId,
+    excludedDealIds,
+  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedProduct, selectedSource, selectedState, selectedUtmCampaigns]);
+  const periodAnalytics = periodBaseAnalytics;
+  // Funil Orbital: reúne as etapas do funil canônico (RD) com a taxa de conversão
+  // entre etapas e o índice do maior gargalo, derivado das mesmas Facts que
+  // alimentam o resto da página.
+  const orbitalStages = useMemo(() => periodAnalytics.stages.map((stage) => ({
+    key: stage.rd_stage_id,
+    label: stage.name,
+    current: stage.count,
+  })), [periodAnalytics.stages]);
+  const orbitalConversionRates = useMemo(
+    () => periodAnalytics.stageConversion.map((transition) => transition.rate),
+    [periodAnalytics.stageConversion],
+  );
+  const orbitalBottleneckIndex = useMemo(() => {
+    const index = periodAnalytics.stageConversion.findIndex((transition) => transition.isBottleneck);
+    return index >= 0 ? index : undefined;
+  }, [periodAnalytics.stageConversion]);
+  const previousAvgDaysToConvert = useMemo(() => {
+    const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+    const previousStart = subDays(startDate, span);
+    const previousEnd = subDays(startDate, 1);
+    const values = operationalClosedDeals.filter((deal) => {
+      const wonDate = rdDealWonDate(deal);
+      if (!wonDate || !deal.lead_created_at) return false;
+      const closed = new Date(wonDate);
+      return closed >= previousStart && closed <= new Date(previousEnd.getFullYear(), previousEnd.getMonth(), previousEnd.getDate(), 23, 59, 59, 999);
+    }).map((deal) => Math.max(0, (new Date(rdDealWonDate(deal)!).getTime() - new Date(deal.lead_created_at!).getTime()) / 86400000));
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  }, [endDate, operationalClosedDeals, startDate]);
+
+  const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
+    // Always scope facts to internal account UUIDs; the same per-account
+    // attribution windows are used by the canonical Meta KPI hook below.
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds || (selectedAccountIds.length === 0 ? insightScopeAccountIds : undefined),
+    attributionWindow: selectedMetaScope.attributionWindow,
+    attributionWindowsByAccount: insightAttributionWindowsByAccount,
+    campaignIds: selectedMetaCampaignIds.length ? selectedMetaCampaignIds : undefined,
+    startDate,
+    endDate,
+    enabled: visibleAccounts.length > 0,
+  });
+  const campaignScopeAccountIds = useMemo(
+    () => selectedAccountIds.length ? selectedAccountIds : Array.from(integratedAccountIds),
+    [integratedAccountIds, selectedAccountIds],
+  );
+  const campaignScopeAccountId = campaignScopeAccountIds.length === 1 ? campaignScopeAccountIds[0] : undefined;
+  const { data: campaignRows = [], isLoading: loadingCampaigns } = useCampaigns(
+    campaignScopeAccountId,
+    campaignScopeAccountIds.length > 1 ? campaignScopeAccountIds : undefined,
+  );
+  const { data: hierarchyRows = [] } = useQuery({
+    queryKey: ["funnel-attribution-hierarchy", campaignScopeAccountIds.slice().sort().join(","), selectedMetaCampaignIds.slice().sort().join(",")],
+    enabled: visibleAccounts.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      let query = (supabase as any)
+        .from("ads")
+        .select("id,name,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
+        .limit(10000);
+      if (campaignScopeAccountIds.length > 1) query = query.in("adsets.campaigns.ad_account_id", campaignScopeAccountIds);
+      else if (campaignScopeAccountId) query = query.eq("adsets.campaigns.ad_account_id", campaignScopeAccountId);
+      if (selectedMetaCampaignIds.length) query = query.in("adsets.campaigns.id", selectedMetaCampaignIds);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        ad_id: String(row.id),
+        ad_name: row.name || "",
+        adset_name: row.adsets?.name || "",
+        campaign_name: row.adsets?.campaigns?.name || "",
+        campaign_id: row.adsets?.campaigns?.id || null,
+        ad_account_id: row.adsets?.campaigns?.ad_account_id || null,
+        adset_id: row.adset_id || row.adsets?.id || null,
+        date: "",
+        spend: 0,
+        impressions: 0,
+        reach: 0,
+        clicks: 0,
+        ctr: 0,
+        cpm: 0,
+        frequency: 0,
+        leads: 0,
+        cpl: 0,
+        conversion_rate: 0,
+        efficiency_rate: 0,
+        health_score: 0,
+      }));
+    },
+  });
+  const visibleCampaignRows = useMemo(
+    () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
+    [campaignRows, integratedAccountIds],
+  );
+  const campaignOptions = useMemo(
+    () => buildFunnelCampaignOptions(visibleCampaignRows, rdCampaigns),
+    [rdCampaigns, visibleCampaignRows],
+  );
+  useEffect(() => {
+    if (loadingFilterDeals || loadingCampaigns) return;
+    const availableIds = new Set(campaignOptions.map((campaign) => campaign.id));
+    const validSelection = selectedCampaigns.filter((campaign) => availableIds.has(campaign));
+    if (validSelection.length !== selectedCampaigns.length) setSelectedCampaigns(validSelection);
+    if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
+    if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
+    if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
+    if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
+  }, [campaignOptions, loadingCampaigns, loadingFilterDeals, owners, products, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
+  const scopedInsights = useMemo(() => {
+    const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
+    // Mesmo que a política do banco permita consultar histórico legado, a
+    // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
+    // Meta e RD são fontes independentes. A seleção Meta já foi aplicada na
+    // consulta de Insights pelos IDs reais; não compare nomes com UTMs RD.
+    return insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
+  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet]);
+  const breakdownAttributionByCampaign = useMemo(() => {
+    const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
+    const result: Record<string, string> = {};
+    for (const campaign of visibleCampaignRows) {
+      if (accountIds.has(campaign.ad_account_id)) {
+        const account = visibleAccounts.find((item) => item.id === campaign.ad_account_id);
+        result[String(campaign.id)] = account?.attribution_window || "account_default";
+      }
+    }
+    for (const row of scopedInsights) {
+      if (row.campaign_id && row.ad_account_id) {
+        result[String(row.campaign_id)] = insightAttributionWindowsByAccount[row.ad_account_id] || "account_default";
+      }
+    }
+    return result;
+  }, [allAccountsSelected, insightAttributionWindowsByAccount, scopedInsights, selectedAccountIdSet, visibleAccounts, visibleCampaignRows, integratedAccountIds]);
+
+  // O perfil de mídia usa os IDs Meta selecionados. Sem seleção, ele mantém
+  // todas as campanhas reais das contas filtradas.
+  const audienceCampaignIds = useMemo(() => {
+    const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
+    const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));
+    const insightIds = scopedInsights
+      .filter((row) => !!row.campaign_id && !!row.ad_account_id && accountIds.has(row.ad_account_id))
+      .map((row) => String(row.campaign_id));
+    const ids = (selectedMetaCampaignIds.length
+      ? selectedMetaCampaignIds
+      : candidates.map((campaign: any) => String(campaign.id)))
+      .concat(insightIds)
+      .filter(Boolean);
+    return Array.from(new Set(ids));
+  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedMetaCampaignIds, visibleCampaignRows]);
+
+  const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
+  const funnelMeta = useMetaTrafficMetrics({
+    adAccountIds: actionScopeAccountIds,
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
+    campaignIds: selectedMetaCampaignIds.length ? selectedMetaCampaignIds : undefined,
+    attributionWindow: selectedMetaScope.attributionWindow,
+    timezone: selectedMetaScope.timezone,
+  }, visibleAccounts.length > 0);
+
+  // O snapshot persistido da Meta é lido pelo escopo exato de conta e
+  // período. A cobertura (`available`) confirma a reconciliação, mas sua
+  // ausência não invalida as linhas já gravadas: esconder esses números
+  // deixava a tela inteira em "Aguardando sincronização" mesmo com dados
+  // válidos no banco. O Dashboard já usa `rowCount` como autoridade para
+  // exibir o último snapshot; o Funil segue o mesmo contrato.
+  const hasMetaSnapshot = funnelMeta.data.rowCount > 0;
+  const metaLeadsAvailable = hasMetaSnapshot && (funnelMeta.data.metricAvailability.leads?.available ?? false);
+  const mediaMetrics = useMemo(
+    () => {
+      // Use somente o adaptador canônico Meta. `insights.leads` é legado e não
+      // pode substituir nem completar ações quando o snapshot estiver ausente.
+      const mediaRows = hasMetaSnapshot ? [{
+        spend: funnelMeta.data.spend,
+        impressions: funnelMeta.data.impressions,
+        reach: funnelMeta.data.reach,
+        clicks: funnelMeta.data.clicks,
+      }] : [];
+      const computed = computeFunnelMediaMetrics(
+      mediaRows as any,
+      funnelMeta.data.conversations,
+      periodAnalytics.totalLeads,
+      periodAnalytics.conversions,
+      periodAnalytics.revenue,
+      funnelMeta.data.formLeads,
+      funnelMeta.data.siteLeads,
+      );
+      return {
+        ...computed,
+        spend: hasMetaSnapshot ? funnelMeta.data.spend : 0,
+        metaLeads: metaLeadsAvailable ? funnelMeta.data.leads : 0,
+        rdCpl: hasMetaSnapshot && periodAnalytics.totalLeads > 0
+          ? funnelMeta.data.spend / periodAnalytics.totalLeads
+          : null,
+        metaCpl: metaLeadsAvailable
+          ? funnelMeta.data.cpl
+          : null,
+        cac: hasMetaSnapshot && periodAnalytics.conversions > 0
+          ? funnelMeta.data.spend / periodAnalytics.conversions
+          : null,
+        // A análise de funil usa vendas e receita confirmadas no RD como
+        // fonte financeira única. O investimento continua vindo da Meta.
+        roas: metaLeadsAvailable
+          ? (funnelMeta.data.spend > 0 ? periodAnalytics.revenue / funnelMeta.data.spend : null)
+          : null,
+        salesConversionRate: metaLeadsAvailable
+          ? computed.salesConversionRate
+          : null,
+      };
+    },
+    [funnelMeta.data, hasMetaSnapshot, metaLeadsAvailable, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads],
+  );
+  const funnelTableInsights = useMemo(() => {
+    const countedAds = new Set<string>();
+    return scopedInsights.map((row) => {
+      const adId = String(row.ad_id || "");
+      const canonicalLeads = funnelMeta.data.leadBreakdownByAd[adId]?.totalLeads ?? 0;
+      // CampaignResultsTable expects daily facts and sums them by ad. Put the
+      // period-level canonical action total on one row only; never re-sum the
+      // legacy `insights.leads` column or multiply an ad's actions by days.
+      const leads = countedAds.has(adId) ? 0 : canonicalLeads;
+      countedAds.add(adId);
+      return { ...row, leads, form_leads: 0, site_leads: 0, conversations: 0 };
+    });
+  }, [funnelMeta.data.leadBreakdownByAd, scopedInsights]);
+
+  async function runProviderReconciliation() {
+    try {
+      // A atualização manual deve ser rápida e previsível: reconcilia apenas
+      // o período atualmente selecionado. O backfill histórico é executado
+      // pelo job próprio e não deve bloquear o botão por dezenas de minutos.
+      // A função ainda limita o início a 36 meses, que é o máximo aceito pela
+      // Graph API da Meta.
+      const metaSyncRange = getMetaSyncRange(new Date(), startDate, endDate);
+      const funnelsToSync = scopedActiveFunnels;
+
+      let metaResult: PromiseSettledResult<unknown>;
+      try {
+        metaResult = {
+          status: "fulfilled",
+          value: await syncMeta.mutateAsync({
+            adAccountId: effectiveAdAccountId,
+            adAccountIds: effectiveAdAccountIds,
+            startDate: metaSyncRange.startDate,
+            endDate: metaSyncRange.endDate,
+            includeBreakdowns: false,
+            force: true,
+            syncMode: "recent_window",
+            recentHours: 5,
+            fast: true,
+            attributionWindow: selectedMetaScope.attributionWindow,
+            timezone: selectedMetaScope.timezone,
+          }),
+        };
+      } catch (reason) {
+        metaResult = { status: "rejected", reason };
+      }
+
+      // Execução sequencial para não sobrecarregar CPU da Supabase nem estourar rate limit da Meta/RD.
+      // Disparar 20 Edge Functions em paralelo estourava CPU, memoria do projeto e o rate limit da Meta.
+      const rdResults: PromiseSettledResult<unknown>[] = [];
+      for (const funnel of funnelsToSync) {
+        // Pausa preventiva entre funis para nao saturar o banco nem a API do RD.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        try {
+          const syncBody = {
+            funnel_id: funnel.id,
+            analytics_mode: true,
+            // A atualização manual precisa respeitar exatamente o período
+            // visível no calendário. Enviar full_history sem as datas fazia
+            // a Edge Function varrer o arquivo inteiro e misturar negócios
+            // fora do escopo atual nos KPIs.
+            full_history: false,
+            // The RD amount selected in the CRM is the source for
+            // faturamento. On the maximum reconciliation, hydrate won
+            // deals from the authoritative detail endpoint so an older
+            // abbreviated list value cannot remain in the KPI.
+            refresh_amounts: preset === "max",
+            start_date: businessDateKey(startDate),
+            end_date: businessDateKey(endDate),
+          };
+          let latestResult: any = null;
+          let running = false;
+          const MAX_RESUMABLE_PASSES = 12;
+          for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
+            const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
+            if (error) {
+              // O lock do RD é por funil. Um ciclo automático pode já estar
+              // reconciliando o mesmo funil; isso não é falha nem motivo para
+              // zerar o último snapshot visível.
+              const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
+              const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
+              if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
+                running = true;
+                break;
+              }
+              const details = await edgeFunctionErrorDetails(error);
+              throw new Error(formatEdgeFunctionError(details));
+            }
+            if (data?.status === "already_running") {
+              running = true;
+              break;
+            }
+            if (data?.error || data?.success === false) {
+              const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
+              throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
+            }
+            latestResult = data;
+            // Só a paginação pendente justifica repetir a reconciliação. O
+            // catálogo de etapas é um enriquecimento opcional: quando ele
+            // falha, o backend restaura as etapas a partir do snapshot das
+            // negociações e marca `partial` sem deixar páginas em aberto.
+            // Repetir a chamada dez vezes por causa desse aviso apenas
+            // multiplicava o tempo no botão.
+            if (data?.complete !== false) break;
+            if (pass === MAX_RESUMABLE_PASSES - 1) {
+              throw new Error("O RD ainda não concluiu todas as páginas. O snapshot anterior foi preservado e a sincronização pode ser retomada.");
+            }
+          }
+          rdResults.push(running
+            ? { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } }
+            : { status: "fulfilled", value: latestResult });
+        } catch (reason) {
+          rdResults.push({ status: "rejected", reason });
+        }
+      }
+
+      const rdFailures = rdResults.filter((result) => result.status === "rejected");
+      if (metaResult.status === "rejected" && rdFailures.length === rdResults.length) {
+        throw metaResult.reason;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["insights"] });
+      await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      await queryClient.invalidateQueries({ queryKey: ["funnel-audience-breakdowns"] });
+      await queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
+      await queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] });
+      await queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
+      await queryClient.invalidateQueries({ queryKey: ["sales"] });
+      await refetch();
+      // Quando o lock pertence ao ciclo automático, a função manual retorna
+      // antes da escrita. Reconsulta o snapshot após a janela normal de uma
+      // página RD, sem bloquear o usuário no botão.
+      if (rdResults.some((result) => result.status === "fulfilled" && (result.value as any)?.status === "running")) {
+        window.setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
+          void queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
+          void queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] });
+        }, 5_000);
+      }
+
+      const metaPartial = metaResult.status === "fulfilled" && Boolean((metaResult.value as any)?.status && (metaResult.value as any).status !== "success");
+      const rdRunning = rdResults.some((result) => result.status === "fulfilled" && (result.value as any)?.status === "running");
+      if (metaResult.status === "rejected" || metaPartial || rdFailures.length > 0 || rdRunning) {
+        const metaMessage = metaResult.status === "rejected"
+          ? (metaResult.reason instanceof Error ? metaResult.reason.message : String(metaResult.reason))
+          : metaPartial
+            ? ((metaResult.value as any)?.errors?.join(" · ") || "A Meta concluiu apenas parte da sincronização.")
+            : "";
+        const rdMessage = rdRunning
+          ? "Um ciclo do RD já está em andamento; o snapshot anterior foi preservado e será atualizado automaticamente."
+          : rdFailures
+          .map((result) => result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "")
+          .filter(Boolean)
+          .join(" · ");
+        // Erros de cota da Meta e sobrecarga do provedor sao transitorios: o snapshot
+        // salvo permanece valido e a plataforma deve informar isso sem alarmar.
+        const cleanMeta = isProviderRateLimited(metaMessage)
+          ? "Meta Ads em cooldown temporário da API. Todos os dados salvos seguem preservados e visíveis."
+          : isTransientProviderOverload(metaMessage)
+            ? "Meta Ads atualizando em segundo plano. Snapshot anterior preservado."
+            : metaMessage;
+        const cleanRd = isTransientProviderOverload(rdMessage)
+          ? "Funis do RD processados em fila contínua. Snapshot anterior preservado."
+          : rdMessage;
+        toast.info("Atualização processada", {
+          description: [cleanMeta, cleanRd].filter(Boolean).slice(0, 2).join(" · ") || "Snapshot de dados preservado com segurança.",
+        });
+      } else {
+        toast.success(`Meta Ads e ${funnelsToSync.length} funil(is) do RD atualizados.`);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao sincronizar");
+    } finally {
+      setSyncing(false);
+      setRdLastUpdatedAt(new Date());
+    }
+  }
+
+  // A sincronização manual não pode prender a interface. O provider pode
+  // demorar dezenas de segundos para paginar uma conta grande, e um `await`
+  // dentro do handler mantinha a tela em "Sincronizando…" esse tempo todo.
+  // O trabalho real continua no servidor; a interface apenas informa o
+  // estado e deixa os dados já salvos visíveis.
+  function handleSync() {
+    if (syncing) {
+      toast.info("Sincronização já está em andamento", {
+        description: "Os dados atuais continuam visíveis e serão atualizados assim que o servidor concluir.",
+      });
+      return;
+    }
+    if (!funnelId && visibleAccounts.length === 0) return;
+    setSyncing(true);
+    toast.info("Sincronização em andamento", {
+      description: "Os dados atuais continuam disponíveis e serão atualizados assim que a Meta e o RD concluírem.",
+    });
+    void runProviderReconciliation();
+  }
+
+  // `isLoading` can briefly become true during a background refetch. The
+  // current snapshot must remain on screen in that case; only the first fetch
+  // for the active period should replace the page with the loading state.
+  //
+  // Historical deals and the stage catalog are used to enrich the lower
+  // sections, but they are not prerequisites for the period KPIs. Waiting for
+  // those broad queries here made a fresh visit sit on "Carregando…" for
+  // dozens of seconds while the same period snapshot was already available.
+  // They now hydrate independently and the visible period remains truthful
+  // until they arrive.
+  //
+  // A tela só troca o conteúdo por "Carregando…" quando nenhuma consulta do
+  // recorte foi concluída ainda. Um recorte já confirmado precisa continuar
+  // visível: as leituras mais lentas (histórico, vendas fechadas) hidratam
+  // sozinhas depois, sem apagar os números que o usuário já estava vendo.
+  const periodSnapshotReady = periodDealsFetched || periodDealsIsError;
+  const closedSnapshotReady = periodClosedDealsFetched || periodClosedDealsIsError;
+  const initialDataLoading = !funnelsFetched
+    || (funnelScopeIds.length > 0 && !periodSnapshotReady && !periodDeals.length)
+    || (funnelScopeIds.length > 0 && !closedSnapshotReady && !periodClosedDeals.length);
+  const rdPeriodError = periodDealsIsError || periodClosedDealsIsError;
+  const rdPeriodErrorMessage = [periodDealsError, periodClosedDealsError]
+    .map((error) => error instanceof Error ? error.message : error ? String(error) : "")
+    .filter(Boolean)
+    .join(" · ");
+  // Um snapshot confirmado permanece visível enquanto o provedor reconcilia.
+  // O cartão só entra em estado pendente quando este recorte nunca produziu
+  // um snapshot salvo.
+  const funnelAvailability = useMemo(() => buildFunnelMetricAvailability({
+    hasMetaSnapshot,
+    metaLoading: funnelMeta.insightsLoading || funnelMeta.actionsLoading,
+    metaUnavailable: !hasMetaSnapshot,
+    metaReason: funnelMeta.data.unavailableReason,
+    hasRDSnapshot: periodDealsFetched && !periodDealsIsError,
+    rdLoading: loadingPeriodDeals || loadingPeriodClosedDeals,
+    rdError: periodDealsIsError || periodClosedDealsIsError,
+    rdReason: rdPeriodErrorMessage,
+    rdSyncing: syncing,
+  }), [funnelMeta.actionsLoading, funnelMeta.data.unavailableReason, funnelMeta.insightsLoading, hasMetaSnapshot, loadingPeriodClosedDeals, loadingPeriodDeals, periodClosedDealsIsError, periodDealsFetched, periodDealsIsError, rdPeriodErrorMessage, syncing]);
+  const renderableStages = hasRenderableFunnelStages(operationalStages.length, periodAnalytics.stages.length);
+  const lastUpdatedAt = funnelMeta.data.syncedAt ? new Date(funnelMeta.data.syncedAt) : rdLastUpdatedAt;
+
+  return (
+    <MotionPage className="gd-module-shell gd-funnel-analysis mx-auto max-w-[1700px] space-y-5">
+      <MotionItem>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Análise de Funis</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Acompanhe a performance dos leads e funis reais do RD. Meta: última sincronização {funnelMeta.data.syncedAt ? `às ${new Date(funnelMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}; Insights podem atrasar.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <MetaHealthBadge accounts={visibleAccounts} selectedIds={selectedAccountIds} />
+            <RDHealthBadge />
+            <FunnelSyncStatusBadge lastUpdatedAt={lastUpdatedAt} syncing={syncing} />
+            <Button onClick={handleSync} disabled={syncing || syncMeta.isPending || (!funnelId && visibleAccounts.length === 0)} variant="default" size="sm">
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing || syncMeta.isPending ? "animate-spin" : ""}`} />
+              {syncing || syncMeta.isPending ? "Sincronização em andamento" : "Sincronizar Meta + RD"}
+            </Button>
+          </div>
+        </div>
+      </MotionItem>
+
+      <MotionItem>
+        <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
+          <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
+          <CampaignMultiSelect campaigns={campaignOptions} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Campanhas Meta + UTM RD" className="gd-filter-control w-full bg-background/60 sm:w-[220px]" />
+          <FilterSelect label="Estado" value={selectedState} onChange={setSelectedState} options={states} />
+          <FilterSelect label="Responsável" value={selectedOwner} onChange={setSelectedOwner} options={owners} />
+          <FilterSelect label="Produto" value={selectedProduct} onChange={setSelectedProduct} options={products} />
+        </div>
+      </MotionItem>
+
+      {initialDataLoading ? (
+        <MotionItem>
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
+        </MotionItem>
+      ) : (
+        <>
+          {(activeFunnels.length === 0 || !renderableStages || rdPeriodError || (!fetchingPeriodDeals && operationalPeriodDeals.length === 0)) && (
+            <MotionItem>
+              <div className="flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {activeFunnels.length === 0
+                      ? "Nenhum funil RD ativo disponível."
+                      : !renderableStages
+                        ? "O catálogo de etapas do RD não está disponível."
+                    : rdPeriodError
+                      ? "Não foi possível confirmar as negociações RD deste recorte."
+                      : "Nenhuma negociação encontrada no histórico sincronizado."}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {!renderableStages
+                      ? "A distribuição usa as etapas salvas nas negociações; o histórico de movimentações entre etapas continua indisponível. O período acima continua sendo usado para comparar a mídia Meta."
+                    : rdPeriodError
+                      ? `${rdPeriodErrorMessage || "A consulta expirou ou a sincronização está incompleta."} O snapshot anterior foi preservado; não exibiremos zero como se fosse ausência de negociações.`
+                      : "O período acima usa a data de entrada para leads e a data de fechamento para vendas, comparando a mídia Meta no mesmo intervalo."}
+                  </p>
+                </div>
+                <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
+                  <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                    {syncing
+                      ? "Sincronização em andamento"
+                      : activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
+                </Button>
+              </div>
+            </MotionItem>
+          )}
+
+          <MotionItem>
+            <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Escopos separados:</span> campanhas Meta filtram o tráfego pago pelos IDs reais; UTM RD filtra os negócios do CRM pelos valores persistidos. A seleção não cruza nomes entre fontes. {periodAnalytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no período selecionado.
+            </div>
+            {/* Preserve a confirmed sales snapshot when the lead read times out. */}
+            <FunnelKPIs
+              a={periodAnalytics}
+              rdLeads={periodAnalytics.totalLeads}
+              rdLeadsLoading={loadingPeriodDeals}
+              rdLeadsError={Boolean(periodDealsError) && periodAnalytics.totalLeads === 0}
+              trafficSpend={mediaMetrics.spend}
+              metaLeads={mediaMetrics.metaLeads}
+              metaLeadsAvailable={metaLeadsAvailable}
+              metaLeadsLoading={funnelMeta.actionsLoading}
+              trafficReason={funnelMeta.data.unavailableReason}
+              cpl={mediaMetrics.metaCpl}
+              rdCpl={mediaMetrics.rdCpl}
+              cac={mediaMetrics.cac}
+              roas={mediaMetrics.roas}
+              salesConversionRate={mediaMetrics.salesConversionRate}
+              previousAvgDaysToConvert={previousAvgDaysToConvert}
+              metaAvailability={funnelAvailability.meta}
+              rdAvailability={funnelAvailability.rd}
+            />
+          </MotionItem>
+
+          {/* Bloco de growth: leads Meta + RD no mesmo lugar e quantos leads
+              são necessários para 1 venda. */}
+          <MotionItem>
+            <FunnelGrowthBlock
+              input={{
+                rdLeads: periodAnalytics.totalLeads,
+                metaLeads: mediaMetrics.metaLeads,
+                metaLeadsAvailable,
+                sales: periodAnalytics.conversions,
+                dealsWithMetaAttribution: operationalPeriodFunnelDeals.filter(
+                  (deal) => Boolean((deal as { meta_lead_id?: string | null }).meta_lead_id),
+                ).length,
+                totalDeals: operationalPeriodFunnelDeals.length,
+              }}
+            />
+          </MotionItem>
+
+          {/* Funil Orbital interativo: comparativo por etapa e destaque do gargalo */}
+          <MotionItem>
+            <FunnelOrbitalInteractive
+              stages={orbitalStages}
+              conversionRates={orbitalConversionRates}
+              bottleneckIndex={orbitalBottleneckIndex}
+            />
+          </MotionItem>
+
+          <MotionItem>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock>
+            </div>
+          </MotionItem>
+
+          <MotionItem><HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock></MotionItem>
+
+          <MotionItem><HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock></MotionItem>
+
+          <MotionItem>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <HelpBlock help={blockHelp.sources} className="h-auto"><FunnelSourceTable a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.losses} className="h-auto"><FunnelLostReasons a={periodAnalytics} /></HelpBlock>
+            </div>
+          </MotionItem>
+
+          <MotionItem>
+            <HelpBlock help={blockHelp.states}><FunnelStateMap a={periodAnalytics} /></HelpBlock>
+          </MotionItem>
+
+          <MotionItem>
+              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodFunnelDeals} periodDealsLoading={loadingPeriodDeals || loadingPeriodClosedDeals} periodDealsUnavailable={!!periodDealsError} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+            </MotionItem>
+
+          <MotionItem>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals} /></HelpBlock>
+              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodFunnelDeals} insights={[...scopedInsights, ...hierarchyRows]} /></HelpBlock>
+            </div>
+          </MotionItem>
+
+          <MotionItem>
+            <FunnelOpportunityProfile deals={operationalPeriodFunnelDeals.length ? operationalPeriodFunnelDeals : operationalDeals} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+          </MotionItem>
+
+          <MotionItem>
+            <section aria-label="Performance de campanhas e funil de mídia">
+              <DashboardProvider value={{
+                startDate,
+                endDate,
+                adAccountId: effectiveAdAccountId,
+                insights: funnelTableInsights,
+                sales: periodFunnelSales,
+                rdDeals: operationalPeriodFunnelDeals as unknown as RDDealLite[],
+                revenueDeals: operationalPeriodFunnelDeals as unknown as RDDealLite[],
+                alerts: [],
+                campaigns: visibleCampaignRows,
+                adAccounts: visibleAccounts,
+                products: [],
+                isLoading: loadingInsights || funnelMeta.isLoading,
+              }}>
+                <div className="space-y-6">
+                  {funnelMeta.actionsLoading
+                    ? <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground" role="status">Aguardando confirmação das ações Meta para mostrar leads por campanha.</div>
+                    : !funnelMeta.data.metricAvailability.leads?.available
+                      ? <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-700 dark:text-amber-300" role="status">Leads Meta indisponíveis neste recorte; não exibiremos o total legado de `insights.leads`. {funnelMeta.data.metricAvailability.leads?.reason || "Ações Meta ainda não confirmadas."}</div>
+                      : <CampaignResultsTable />}
+                  <AskAICard accountIds={actionScopeAccountIds} startDate={businessDateKey(startDate)} endDate={businessDateKey(endDate)} />
+                </div>
+              </DashboardProvider>
+            </section>
+          </MotionItem>
+        </>
+      )}
+    </MotionPage>
+  );
+}
+
+function FilterSelect({
+  label, value, onChange, options,
+}: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="gd-filter-control w-full bg-background/60 sm:w-[160px]">
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos · {label}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>{o}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function RDHealthBadge() {
+  const navigate = useNavigate();
+  const { data, isLoading } = useRDHealthCheck();
+  if (isLoading || !data) return null;
+  const map = {
+    ok: { Icon: CheckCircle2, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", label: "Integração OK" },
+    warning: { Icon: AlertTriangle, cls: "bg-amber-500/10 text-amber-600 border-amber-500/30", label: "Atenção" },
+    error: { Icon: XCircle, cls: "bg-red-500/10 text-red-600 border-red-500/30", label: "Reconectar" },
+  } as const;
+  const { Icon, cls, label } = map[data.overall];
+  return (
+    <Badge
+      variant="outline"
+      className={`${cls} cursor-pointer gap-1.5 px-2.5 py-1`}
+      onClick={() => navigate("/configuracoes#rd-health")}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </Badge>
+  );
+}
+
+type MetaHealthAccount = { id: string; name?: string | null; connection_status?: string | null; last_sync_error?: string | null; last_sync_success_at?: string | null };
+
+function MetaHealthBadge({ accounts, selectedIds }: { accounts: MetaHealthAccount[]; selectedIds: string[] }) {
+  const navigate = useNavigate();
+  const scoped = selectedIds.length ? accounts.filter((account) => selectedIds.includes(account.id)) : accounts;
+  if (!scoped.length) return null;
+  const hasBlocked = scoped.some((account) => ["disconnected", "blocked", "expired", "invalid"].includes(String(account.connection_status)));
+  const hasError = scoped.some((account) => ["error", "unknown"].includes(String(account.connection_status)) || Boolean(account.last_sync_error));
+  const allConnected = scoped.every((account) => account.connection_status === "connected" && !account.last_sync_error);
+  const state = allConnected ? "ok" : hasBlocked && !hasError ? "error" : "warning";
+  const map = {
+    ok: { Icon: CheckCircle2, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", label: "Meta OK" },
+    warning: { Icon: AlertTriangle, cls: "bg-amber-500/10 text-amber-600 border-amber-500/30", label: "Meta parcial" },
+    error: { Icon: XCircle, cls: "bg-red-500/10 text-red-600 border-red-500/30", label: "Meta bloqueada" },
+  } as const;
+  const { Icon, cls, label } = map[state];
+  return (
+    <Badge variant="outline" className={`${cls} cursor-pointer gap-1.5 px-2.5 py-1`} onClick={() => navigate("/integracoes")}>
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </Badge>
+  );
+}

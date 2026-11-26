@@ -1,0 +1,474 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, Check, CheckCheck, ChevronDown, Copy, ExternalLink, ImageUp, Lightbulb, Link2, Presentation, Sparkles, Trash2, TrendingDown, TrendingUp, X } from "lucide-react";
+import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, type Sale } from "@/hooks/useSales";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { businessDateKey } from "@/lib/businessDate";
+import { Button } from "@/components/ui/button";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { cn } from "@/lib/utils";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import type { InsightRow } from "@/hooks/useInsights";
+import { useInsights } from "@/hooks/useInsights";
+import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useSales } from "@/hooks/useSales";
+import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficReport";
+import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
+import { buildDailyLeadReport, buildLeadQualitySummary, type DailyLeadReport, type LeadQualitySummary } from "@/lib/leadQualityReport";
+import type { DatePreset } from "@/hooks/useDateFilter";
+import { safeSetLocalStorage } from "@/lib/localCache";
+
+export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "costPerOpportunity" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
+export type ReportTotals = Record<MetricId, number>;
+export type ReportSnapshot = {
+  title: string;
+  accountName: string;
+  branding?: { name: string; signature: string };
+  dateFrom: string;
+  dateTo: string;
+  metrics: MetricId[];
+  banner?: string;
+  totals: ReportTotals;
+  daily: Array<{ date: string; leads: number; spend: number }>;
+  weekly: Array<{ week: string; leads: number; spend: number; days: number }>;
+  analysis?: TwoMonthAnalysis;
+  audience?: AudienceProfileData;
+  quality?: LeadQualitySummary;
+  dailyReport?: DailyLeadReport;
+};
+
+const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
+  { id: "spend", label: "Investimento", description: "Valor gasto pela Meta no período selecionado." },
+  { id: "leads", label: "Leads Meta", description: "Forms, site e conversas iniciadas atribuídos pela Meta Ads." },
+  { id: "conversations", label: "Conversas iniciadas", description: "Eventos oficiais de conversa iniciada da Meta Ads, com aliases reconciliados." },
+  { id: "cpl", label: "CPL", description: "Investimento dividido pelos leads Meta." },
+  { id: "impressions", label: "Impressões", description: "Total de vezes que os anúncios foram exibidos." },
+  { id: "reach", label: "Alcance", description: "Quantidade estimada de pessoas únicas alcançadas." },
+  { id: "frequency", label: "Frequência", description: "Média de impressões por pessoa alcançada." },
+  { id: "clicks", label: "Cliques", description: "Cliques registrados nos anúncios do período." },
+  { id: "cpc", label: "CPC", description: "Investimento dividido pelo total de cliques." },
+  { id: "ctr", label: "CTR", description: "Percentual de cliques sobre as impressões." },
+  { id: "cpm", label: "CPM", description: "Custo médio para mil impressões." },
+  { id: "conversionRate", label: "Taxa de conversão", description: "Percentual de leads gerados sobre os cliques." },
+  { id: "rd", label: "Oportunidades RD", description: "Negociações criadas no RD Station no mesmo período e conta." },
+  { id: "costPerOpportunity", label: "Custo por oportunidade", description: "Investimento dividido pelas oportunidades registradas no RD Station." },
+  { id: "sales", label: "Vendas", description: "Quantidade de vendas confirmadas e atribuídas." },
+  { id: "revenue", label: "Receita", description: "Receita líquida confirmada no período." },
+  { id: "cac", label: "Custo por venda", description: "Investimento dividido pelas vendas confirmadas." },
+  { id: "roas", label: "ROAS", description: "Receita atribuída dividida pelo investimento." },
+  { id: "profit", label: "Resultado", description: "Receita menos investimento em mídia." },
+  { id: "coverage", label: "Cobertura RD/Meta", description: "Relação percentual entre negócios RD e leads Meta." },
+];
+const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+
+export function LeadReportStudio({ accountId, accountName, accounts, onAccountChange, preset, onPresetChange, customRange, onCustomRangeChange, startDate, endDate, insights, deals, sales, audience, audienceLoading = false }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void; preset: DatePreset; onPresetChange: (preset: DatePreset) => void; customRange: { from: Date; to: Date }; onCustomRangeChange: (range: { from: Date; to: Date }) => void; startDate: Date; endDate: Date; insights: InsightRow[]; deals: RDDealLite[]; sales: Sale[]; audience?: AudienceProfileData; audienceLoading?: boolean }) {
+  const { user } = useAuth();
+  const { data: workspace } = useWorkspace();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "conversations", "cpl", "impressions", "clicks", "rd", "costPerOpportunity", "sales", "revenue", "cac", "roas"]);
+  const [presenting, setPresenting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState("");
+  const [banner, setBanner] = useState(() => window.localStorage.getItem(`growdash:report-banner:${accountId}`) || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setBanner(window.localStorage.getItem(`growdash:report-banner:${accountId}`) || "");
+  }, [accountId]);
+
+  const reportFrom = businessDateKey(startDate);
+  const reportTo = businessDateKey(endDate);
+  const filteredInsights = useMemo(() => insights.filter((row) => !row.date || (row.date >= reportFrom && row.date <= reportTo)), [insights, reportFrom, reportTo]);
+  const filteredDeals = useMemo(() => deals.filter((row) => !row.lead_created_at || (row.lead_created_at.slice(0, 10) >= reportFrom && row.lead_created_at.slice(0, 10) <= reportTo)), [deals, reportFrom, reportTo]);
+  const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);
+  const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row) => row.ad_id).filter(Boolean))), [filteredInsights]);
+  const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
+  const { data: actionData, isLoading: loadingActions } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId, {
+    adAccountIds: accountId === "all" ? accounts.map((account) => account.id) : [accountId],
+    attributionWindowsByAccount: Object.fromEntries(accounts.map((account) => [account.id, account.attribution_window || "account_default"])),
+  });
+  const metaLeadActions = actionData?.metaLeadActions;
+  const conversations = metaLeadActions?.conversations || 0;
+  const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, metaLeadActions), [filteredDeals, filteredInsights, filteredSales, metaLeadActions]);
+  const quality = useMemo(() => buildLeadQualitySummary(filteredDeals, totals.spend), [filteredDeals, totals.spend]);
+  const canonicalLeadsByDate = useMemo(() => {
+    if (actionData) {
+      return Object.values(actionData.dailyMetaLeadByAccount || {}).reduce((all, accountDays) => {
+        for (const [date, counts] of Object.entries(accountDays)) all[date] = (all[date] || 0) + Number(counts.total || 0);
+        return all;
+      }, {} as Record<string, number>);
+    }
+    // Keep the preview coherent while the action facts are still loading.
+    // This fallback uses only canonical fields already persisted in Insights;
+    // it never reads the ambiguous legacy `insights.leads` aggregate.
+    return filteredInsights.reduce((all, row) => {
+      if (!row.date) return all;
+      all[row.date] = (all[row.date] || 0) + Number(row.form_leads || 0) + Number(row.site_leads || 0) + Number(row.conversations || 0);
+      return all;
+    }, {} as Record<string, number>);
+  }, [actionData, filteredInsights]);
+  const daily = useMemo(() => dailyRows(filteredInsights, canonicalLeadsByDate), [canonicalLeadsByDate, filteredInsights]);
+  const weekly = useMemo(() => weeklyRows(daily), [daily]);
+  // Relatório diário: quando o filtro inclui hoje, usamos o último dia
+  // completo (ontem). Assim o resumo não oscila enquanto o dia está aberto.
+  const reportDay = useMemo(() => {
+    const today = businessDateKey(new Date());
+    const yesterday = businessDateKey(subDays(new Date(), 1));
+    if (reportFrom <= yesterday && yesterday <= reportTo) return yesterday;
+    return reportTo < today ? reportTo : reportFrom;
+  }, [reportFrom, reportTo]);
+  const dailyReport = useMemo(() => buildDailyLeadReport({
+    date: reportDay,
+    spend: filteredInsights.filter((row) => row.date === reportDay).reduce((sum, row) => sum + Number(row.spend || 0), 0),
+    metaLeads: Number(canonicalLeadsByDate[reportDay] || 0),
+    deals: filteredDeals,
+    sales: filteredSales,
+  }), [canonicalLeadsByDate, filteredDeals, filteredInsights, filteredSales, reportDay]);
+  const analysisFromDate = useMemo(() => startOfMonth(subMonths(endDate, 1)), [endDate]);
+  const analysisEnabled = accountId !== "all";
+  const { data: analysisInsights = [], isLoading: loadingAnalysisInsights } = useInsights({ adAccountId: analysisEnabled ? accountId : undefined, startDate: analysisFromDate, endDate, enabled: analysisEnabled });
+  const { data: analysisDeals = [], isLoading: loadingAnalysisDeals } = useRDDealsForPeriod({ startDate: analysisFromDate, endDate, adAccountId: analysisEnabled ? accountId : undefined, enabled: analysisEnabled });
+  const { data: analysisSales = [], isLoading: loadingAnalysisSales } = useSales({ startDate: analysisFromDate, endDate, adAccountId: analysisEnabled ? accountId : undefined, enabled: analysisEnabled });
+  const analysisAdIds = useMemo(() => Array.from(new Set(analysisInsights.map((row) => row.ad_id).filter(Boolean))), [analysisInsights]);
+  const analysisAdAccountByAdId = useMemo(() => Object.fromEntries(analysisInsights.map((row) => [row.ad_id, row.ad_account_id])), [analysisInsights]);
+  const { data: analysisActionData, isLoading: loadingAnalysisActions } = useActionTotalsByAds(analysisAdIds, analysisFromDate, endDate, analysisAdAccountByAdId, { adAccountIds: [accountId] });
+  const analysisMetaLeadPartsByDate = useMemo(() => analysisActionData?.dailyMetaLeadByAccount?.[accountId] || {}, [accountId, analysisActionData?.dailyMetaLeadByAccount]);
+  const analysis = useMemo(() => analysisEnabled ? buildTwoMonthAnalysis({ analysisFrom: analysisFromDate, analysisTo: endDate, insights: analysisInsights, deals: analysisDeals, sales: analysisSales, metaLeadPartsByDate: analysisMetaLeadPartsByDate }) : undefined, [analysisDeals, analysisEnabled, analysisFromDate, analysisInsights, analysisMetaLeadPartsByDate, analysisSales, endDate]);
+  const analysisLoading = analysisEnabled && (loadingAnalysisInsights || loadingAnalysisDeals || loadingAnalysisSales || (analysisAdIds.length > 0 && loadingAnalysisActions));
+  const snapshot = useMemo<ReportSnapshot>(() => ({ title: `Relatório de performance — ${accountName || "Conta selecionada"}`, accountName: accountName || "Conta selecionada", branding: { name: workspace?.name || "Growdash", signature: `${workspace?.name || "Growdash"} · Operação monitorada pela Torre de Controle` }, dateFrom: reportFrom, dateTo: reportTo, metrics: selected, banner, totals, daily, weekly, analysis, audience, quality, dailyReport }), [accountName, analysis, audience, banner, daily, dailyReport, quality, reportFrom, reportTo, selected, totals, weekly, workspace?.name]);
+
+  const history = useQuery({
+    queryKey: ["lead-report-pages", workspace?.id, accountId],
+    enabled: !!workspace?.id && !workspace.id.startsWith("legacy-"),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("lead_report_pages").select("id, share_token, title, date_from, date_to, created_at").eq("workspace_id", workspace!.id).eq("account_id", accountId).order("created_at", { ascending: false }).limit(12);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  function toggle(id: MetricId) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
+  function selectAll() { setSelected(METRICS.map((metric) => metric.id)); }
+  function clearSelection() { setSelected([]); }
+  function upload(file?: File) {
+    if (!file) return;
+    if (file.size > 2_000_000) { toast({ title: "Imagem muito grande", description: "Use um banner de até 2 MB.", variant: "destructive" }); return; }
+    const reader = new FileReader();
+    reader.onload = () => { const value = String(reader.result || ""); setBanner(value); safeSetLocalStorage(`growdash:report-banner:${accountId}`, value); };
+    reader.readAsDataURL(file);
+  }
+  async function generate() {
+    if (accountId === "all") { toast({ title: "Selecione uma conta", description: "O relatório compartilhável precisa manter uma origem única para não misturar métricas." }); return; }
+    setPresenting(true);
+    if (!workspace?.id || workspace.id.startsWith("legacy-") || !user) return;
+    setSaving(true);
+    const { data, error } = await supabase.from("lead_report_pages").insert({ workspace_id: workspace.id, user_id: user.id, account_id: accountId, account_name: accountName || "Conta selecionada", title: snapshot.title, date_from: reportFrom, date_to: reportTo, metrics: selected, payload: snapshot }).select("share_token").single();
+    setSaving(false);
+    if (error) { toast({ title: "Página aberta sem link público", description: error.message, variant: "destructive" }); return; }
+    const url = `${window.location.origin}/relatorios/${data.share_token}`;
+    setShareUrl(url);
+    queryClient.invalidateQueries({ queryKey: ["lead-report-pages", workspace.id, accountId] });
+    toast({ title: "Relatório publicado", description: "O link compartilhável foi criado e salvo no histórico." });
+  }
+  async function copy(value = shareUrl) { if (!value) return; await navigator.clipboard.writeText(value); toast({ title: "Link copiado" }); }
+  async function removeReport(id: string) {
+    if (!window.confirm("Excluir este relatório compartilhável? O link deixará de funcionar.")) return;
+    setDeletingId(id);
+    const { error } = await supabase.from("lead_report_pages").delete().eq("id", id);
+    setDeletingId(null);
+    if (error) { toast({ title: "Não foi possível excluir", description: error.message, variant: "destructive" }); return; }
+    await queryClient.invalidateQueries({ queryKey: ["lead-report-pages", workspace?.id, accountId] });
+    toast({ title: "Relatório excluído" });
+  }
+
+  return <>
+    <section className="gd-panel w-full overflow-hidden">
+      <header className="border-b border-border p-4 sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0"><h2 className="flex items-center gap-2 font-black"><Presentation className="h-4 w-4 text-primary" />Estúdio do relatório de leads</h2><p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">Escolha a conta, o período e as métricas. Gere uma página completa com banner, análise e link para compartilhar.</p></div>
+          <div className="flex shrink-0 items-center gap-2"><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-[10px] font-black text-primary">{selected.length} métrica(s) selecionada(s)</span>{banner ? <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-300">Banner pronto</span> : null}</div>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0"><MetaDateRangePicker preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} applyPresetOnClick className="h-10 min-w-0 w-full" /></div>
+          <div className="flex min-w-0 gap-2 sm:col-span-2 lg:col-span-1"><input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => { upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /><Button variant="outline" className="h-10 flex-1" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />{banner ? "Trocar banner" : "Adicionar banner"}</Button>{banner ? <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" title="Remover banner" aria-label="Remover banner" onClick={() => { setBanner(""); window.localStorage.removeItem(`growdash:report-banner:${accountId}`); }}><X className="h-4 w-4" /></Button> : null}</div>
+        </div>
+      </header>
+      <div className="space-y-5 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3 text-[11px] text-muted-foreground"><BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><b className="block text-foreground">Dados do relatório</b><span>{loadingActions ? "Os dados de leads estão sendo atualizados em segundo plano; você já pode gerar o relatório." : analysisLoading ? "A análise executiva está sendo atualizada em segundo plano; você já pode gerar o relatório." : analysis ? `Análise executiva pronta: ${format(new Date(`${analysis.analysisFrom}T12:00:00`), "dd/MM/yyyy")} a ${format(new Date(`${analysis.analysisTo}T12:00:00`), "dd/MM/yyyy")}.` : "Selecione uma conta para comparar os dois últimos meses."}{audienceLoading ? " Perfil do público carregando em segundo plano." : audience ? " O perfil do público será incluído na página." : ""}</span></div></div><div className="flex shrink-0 flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" className="h-9" onClick={clearSelection} disabled={!selected.length}><X className="mr-1.5 h-3.5 w-3.5" />Limpar</Button><Button type="button" size="sm" variant="outline" className="h-9" onClick={selectAll} disabled={selected.length === METRICS.length}><CheckCheck className="mr-1.5 h-3.5 w-3.5" />Selecionar todas</Button><Button type="button" className="gold-action h-9" disabled={saving || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : "Gerar relatório"}</Button></div></div>
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.55fr)]">
+          <section className="min-w-0"><div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Escolha as métricas</h3><p className="mt-1 text-[11px] text-muted-foreground">Clique em qualquer indicador para incluir ou remover da página final.</p></div><span className="text-[10px] font-bold text-muted-foreground">{METRICS.length} disponíveis</span></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{METRICS.map((metric) => { const active = selected.includes(metric.id); return <button key={metric.id} type="button" title={metric.description} aria-pressed={active} onClick={() => toggle(metric.id)} className={cn("flex min-w-0 items-center gap-2 rounded-xl border p-3 text-left text-xs font-bold transition", active ? "border-primary/55 bg-primary/10 text-foreground shadow-[0_0_22px_-15px_hsl(var(--primary))]" : "border-border text-muted-foreground hover:bg-muted/35")}><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded border", active ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{active && <Check className="h-3 w-3" />}</span><span className="min-w-0 truncate">{metric.label}</span></button>; })}</div></section>
+          <aside className="min-w-0 rounded-2xl border border-border bg-background/45 p-4"><div className="flex items-center justify-between gap-2"><div><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Prévia do relatório</h3><p className="mt-1 text-[11px] text-muted-foreground">Assim os dados aparecerão na página final.</p></div><Presentation className="h-4 w-4 text-primary" /></div>{selected.length ? <div className="mt-4 grid grid-cols-2 gap-2">{selected.map((id) => <div key={id} className="h-full"><PreviewMetric id={id} totals={totals} /></div>)}</div> : <div className="mt-4 rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">Nenhuma métrica selecionada. Use “Selecionar todas” ou escolha os indicadores ao lado.</div>}</aside>
+        </div>
+        <QualitySummarySection quality={quality} />
+        <DailyLeadReportSection report={dailyReport} />
+        {shareUrl && <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center"><div className="min-w-0 grow"><p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Link gerado agora</p><p className="truncate text-xs text-muted-foreground" title={shareUrl}>{shareUrl}</p></div><Button size="sm" className="shrink-0" onClick={() => copy()}><Copy className="mr-1.5 h-3.5 w-3.5" />Copiar link</Button></div>}
+        {history.data?.length ? <div className="border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[10px] font-black uppercase tracking-[.18em] text-muted-foreground">Histórico de relatórios · {accountName}</h3><span className="text-[10px] text-muted-foreground">{history.data.length} relatório(s) salvo(s)</span></div><div className="grid gap-2 sm:grid-cols-2">{history.data.map((item) => { const url = `${window.location.origin}/relatorios/${item.share_token}`; return <div key={item.id} className="min-w-0 rounded-xl border border-border bg-background/45 p-3"><b className="block truncate text-xs" title={item.title}>{item.title}</b><small className="mt-1 block text-muted-foreground">{format(new Date(`${item.date_from}T12:00:00`), "dd/MM")}–{format(new Date(`${item.date_to}T12:00:00`), "dd/MM/yyyy")}</small><p className="mt-2 truncate text-[10px] text-muted-foreground" title={url}>{url}</p><div className="mt-3 flex gap-1"><Button size="sm" variant="outline" className="h-7" title="Copiar link" aria-label="Copiar link" onClick={() => copy(url)}><Copy className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7" title="Abrir relatório" aria-label="Abrir relatório" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><ExternalLink className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 text-destructive hover:text-destructive" title="Excluir relatório" aria-label="Excluir relatório" disabled={deletingId === item.id} onClick={() => removeReport(item.id)}><Trash2 className="h-3 w-3" /></Button></div></div>; })}</div></div> : null}
+      </div>
+    </section>
+    {presenting && <ReportPresentation report={snapshot} onClose={() => setPresenting(false)} shareUrl={shareUrl} onCopy={() => copy()} />}
+  </>;
+}
+
+export function ReportPresentation({ report, onClose, shareUrl, onCopy }: { report: ReportSnapshot; onClose?: () => void; shareUrl?: string; onCopy?: () => void }) {
+  const { totals, daily, weekly, metrics } = report;
+  const analysis = report.analysis;
+  const brandName = report.branding?.name || "Growdash";
+  return <div role={onClose ? "dialog" : undefined} aria-label={onClose ? "Relatório de performance" : undefined} className={cn(onClose && "fixed inset-0 z-[200]", "min-h-screen overflow-y-auto bg-[#050505] text-white")}>
+    <div className="relative min-h-[380px] overflow-hidden border-b border-white/10 bg-gradient-to-br from-[#181105] via-black to-[#2b1f08]">
+      {report.banner && <img src={report.banner} alt="Banner da marca" className="absolute inset-0 h-full w-full object-cover opacity-60" />}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-black/45 to-black/15" />
+      <div className="absolute left-4 top-4 z-10 flex gap-2">{onClose && <Button variant="outline" className="border-white/20 bg-black/45 text-white hover:bg-black/65" onClick={onClose}><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button>}{shareUrl && onCopy && <Button variant="outline" className="border-white/20 bg-black/45 text-white hover:bg-black/65" onClick={onCopy}><Link2 className="mr-2 h-4 w-4" />Copiar link</Button>}</div>
+      <div className="relative z-[1] mx-auto flex min-h-[380px] max-w-[1800px] items-end px-5 pb-12 sm:px-10"><div><span className="text-[10px] font-black uppercase tracking-[.3em] text-[#d8b65c]">{brandName} · Relatório executivo</span><h1 className="mt-3 max-w-5xl text-3xl font-black sm:text-5xl">{report.accountName}</h1><p className="mt-3 text-sm text-white/65">Meta Ads × RD Station · {format(new Date(`${report.dateFrom}T12:00:00`), "dd/MM/yyyy")} a {format(new Date(`${report.dateTo}T12:00:00`), "dd/MM/yyyy")}</p></div></div>
+    </div>
+    <main className="mx-auto max-w-[1800px] space-y-8 px-5 py-10 sm:px-10">
+      <section><div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="text-lg font-black">Resumo executivo</h2><p className="mt-1 text-xs text-white/45">Métricas do intervalo publicado, com leads e conversas separadas no detalhamento.</p></div>{analysis && <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold text-emerald-300">Dados reais · 2 meses</span>}</div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">{metrics.map((id) => <ReportMetric key={id} id={id} totals={totals} />)}</div></section>
+      {report.audience && <AudienceReportSection audience={report.audience} />}
+      {report.quality && <QualitySummarySection quality={report.quality} dark />}
+      {report.dailyReport && <DailyLeadReportSection report={report.dailyReport} dark />}
+      {analysis ? <TwoMonthExecutive analysis={analysis} /> : <>
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_.65fr]"><div className="rounded-2xl border border-white/10 bg-white/[.035] p-5"><h2 className="flex items-center gap-2 font-black"><BarChart3 className="h-4 w-4 text-[#d8b65c]" />Leads e investimento por dia</h2><div className="mt-6 flex min-h-[260px] items-end gap-2 overflow-x-auto border-b border-white/15 pb-1">{daily.length ? daily.map((row) => { const max = Math.max(1, ...daily.map((item) => item.leads)); return <div key={row.date} className="group flex min-w-10 flex-1 flex-col items-center justify-end gap-2"><div className="w-full max-w-12 rounded-t bg-gradient-to-t from-[#73500f] via-[#b98a29] to-[#f0dfa4] transition group-hover:brightness-125" style={{ height: `${Math.max(4, row.leads / max * 220)}px` }} title={`${integer.format(row.leads)} leads · ${currency.format(row.spend)}`} /><span className="text-[8px] text-white/45">{format(new Date(`${row.date}T12:00:00`), "dd/MM")}</span></div>; }) : <div className="grid w-full place-items-center text-sm text-white/40">Sem dados diários no período</div>}</div></div><div className="rounded-2xl border border-white/10 bg-white/[.035] p-5"><h2 className="font-black">Leitura automática</h2><div className="mt-5 space-y-3 text-xs leading-relaxed text-white/65"><p>• Foram registrados <b className="text-white">{integer.format(totals.leads)} leads</b> com CPL de <b className="text-white">{currency.format(totals.cpl)}</b>.</p><p>• O RD recebeu <b className="text-white">{integer.format(totals.rd)}</b> negócios e marcou <b className="text-white">{integer.format(totals.sales)}</b> venda(s).</p><p>• A cobertura RD/Meta é <b className="text-white">{totals.leads ? (totals.rd / totals.leads * 100).toFixed(1) : "0.0"}%</b>; diferenças pedem revisão de UTM, período e atribuição.</p><p>• ROAS atribuído: <b className="text-white">{totals.roas.toFixed(2)}x</b>.</p></div></div></section>
+      <section><h2 className="mb-4 text-lg font-black">Consolidado semanal</h2><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{weekly.length ? weekly.map((row) => <article key={row.week} className="rounded-2xl border border-white/10 bg-white/[.035] p-5"><span className="text-[9px] font-black uppercase tracking-[.16em] text-[#d8b65c]">Semana de {format(new Date(`${row.week}T12:00:00`), "dd/MM")}</span><div className="mt-4 grid grid-cols-2 gap-4 text-xs"><span><small className="block text-white/45">Leads</small><b className="mt-1 block text-lg">{integer.format(row.leads)}</b></span><span><small className="block text-white/45">Investimento</small><b className="mt-1 block text-lg">{currency.format(row.spend)}</b></span><span><small className="block text-white/45">CPL</small><b>{currency.format(row.leads ? row.spend / row.leads : 0)}</b></span><span><small className="block text-white/45">Dias</small><b>{integer.format(row.days)}</b></span></div></article>) : <div className="rounded-2xl border border-white/10 p-5 text-sm text-white/40">Sem consolidado semanal no período.</div>}</div></section>
+      </>}
+      <footer className="border-t border-white/10 py-6 text-center text-[10px] font-bold uppercase tracking-[.18em] text-white/40">{report.branding?.signature || "Growdash · Torre de Controle do Crescimento"}</footer>
+    </main>
+  </div>;
+}
+
+function QualitySummarySection({ quality, dark = false }: { quality: LeadQualitySummary; dark?: boolean }) {
+  const card = dark ? "border-white/10 bg-white/[.035]" : "border-border bg-card";
+  const muted = dark ? "text-white/45" : "text-muted-foreground";
+  const value = dark ? "text-white" : "text-foreground";
+  const categoryLabel: Record<string, string> = { paciente_modelo: "Paciente modelo", aluna: "Aluna", sem_classificacao: "Sem classificação" };
+  return <section className={`rounded-2xl border p-4 sm:p-5 ${card}`}><div className="flex flex-wrap items-end justify-between gap-2"><div><h2 className={`font-black ${value}`}>Qualidade e avanço do funil</h2><p className={`mt-1 text-[11px] ${muted}`}>Leads captados não são tratados como oportunidade ou venda automaticamente.</p></div><span className={`text-[10px] ${muted}`}>{quality.qualificationRate.toFixed(1)}% qualificados</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><ReportQualityMetric label="Leads no RD" value={quality.leads} dark={dark} /><ReportQualityMetric label="Qualificados (MQL/SQL)" value={quality.qualified} dark={dark} /><ReportQualityMetric label="Oportunidades" value={quality.opportunities} dark={dark} /><ReportQualityMetric label="Vendas" value={quality.sales} dark={dark} /><ReportQualityMetric label="CPL qualificado" value={quality.costPerQualified} currency dark={dark} /><ReportQualityMetric label="Custo por oportunidade" value={quality.costPerOpportunity} currency dark={dark} /><ReportQualityMetric label="Taxa lead → venda" value={quality.leadToSaleRate} percent dark={dark} /></div><div className="mt-4 grid gap-2 md:grid-cols-3">{Object.entries(quality.byCategory).map(([key, row]) => <article key={key} className={`rounded-xl border p-3 ${dark ? "border-white/10 bg-black/15" : "border-border bg-background/40"}`}><b className={`text-xs ${value}`}>{categoryLabel[key]}</b><div className={`mt-2 grid grid-cols-2 gap-2 text-[11px] ${muted}`}><span>Leads <strong className={value}>{row.leads}</strong></span><span>Qualif. <strong className={value}>{row.qualified}</strong></span><span>Oportun. <strong className={value}>{row.opportunities}</strong></span><span>Vendas <strong className={value}>{row.sales}</strong></span></div></article>)}</div></section>;
+}
+
+function DailyLeadReportSection({ report, dark = false }: { report: DailyLeadReport; dark?: boolean }) {
+  const frame = dark ? "border-white/10 bg-white/[.035]" : "border-border bg-card";
+  const muted = dark ? "text-white/50" : "text-muted-foreground";
+  const value = dark ? "text-white" : "text-foreground";
+  const statusLabel = report.status === "ok" ? "Cobertura completa" : report.status === "partial" ? "Cobertura parcial" : "Sem dados";
+  const statusClass = report.status === "ok" ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300" : report.status === "partial" ? "border-amber-400/25 bg-amber-400/10 text-amber-700 dark:text-amber-300" : "border-rose-400/25 bg-rose-400/10 text-rose-600 dark:text-rose-300";
+  return <section className={`rounded-2xl border p-4 sm:p-5 ${frame}`}>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><h2 className={`font-black ${value}`}>Resumo diário do funil</h2><p className={`mt-1 text-[11px] ${muted}`}>Meta → RD → oportunidade → venda · dia analisado {format(new Date(`${report.date}T12:00:00`), "dd/MM/yyyy")}</p></div>
+      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${statusClass}`}>{statusLabel}</span>
+    </div>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <ReportQualityMetric label="Leads Meta" value={report.metaLeads} dark={dark} />
+      <ReportQualityMetric label="Leads no RD" value={report.rdLeads} dark={dark} />
+      <ReportQualityMetric label="Oportunidades" value={report.opportunities} dark={dark} />
+      <ReportQualityMetric label="Vendas" value={report.sales} dark={dark} />
+      <ReportQualityMetric label="CPL" value={report.cpl} currency dark={dark} />
+      <ReportQualityMetric label="Custo por oportunidade" value={report.costPerOpportunity} currency dark={dark} />
+      <ReportQualityMetric label="Custo por venda" value={report.costPerSale} currency dark={dark} />
+    </div>
+    <div className={`mt-3 grid gap-2 text-[11px] sm:grid-cols-3 ${muted}`}>
+      <span>Meta → RD <strong className={value}>{report.metaToRdRate.toFixed(1)}%</strong></span>
+      <span>RD → oportunidade <strong className={value}>{report.rdToOpportunityRate.toFixed(1)}%</strong></span>
+      <span>Oportunidade → venda <strong className={value}>{report.opportunityToSaleRate.toFixed(1)}%</strong></span>
+    </div>
+    <p className={`mt-4 rounded-xl border p-3 text-xs leading-relaxed ${dark ? "border-white/10 bg-black/15 text-white/65" : "border-border bg-background/40 text-muted-foreground"}`}><b className={value}>Cobertura:</b> {report.coverageNote}</p>
+    <div className={`mt-3 grid gap-3 md:grid-cols-2`}>
+      <div className={`rounded-xl border p-3 ${dark ? "border-[#d8b65c]/25 bg-[#d8b65c]/[.05]" : "border-primary/20 bg-primary/5"}`}><b className={`text-xs ${value}`}>Leitura do dia</b><p className={`mt-2 text-xs leading-relaxed ${muted}`}>{report.recommendation}</p></div>
+      <div className={`rounded-xl border p-3 ${dark ? "border-white/10 bg-black/15" : "border-border bg-background/40"}`}><b className={`text-xs ${value}`}>Próxima ação</b><p className={`mt-2 text-xs leading-relaxed ${muted}`}>{report.nextAction}</p></div>
+    </div>
+  </section>;
+}
+
+function ReportQualityMetric({ label, value, currency: isCurrency = false, percent = false, dark = false }: { label: string; value: number; currency?: boolean; percent?: boolean; dark?: boolean }) {
+  const formatted = isCurrency ? currency.format(value) : percent ? `${value.toFixed(1)}%` : integer.format(value);
+  return <div className={`rounded-xl border p-3 ${dark ? "border-white/10 bg-black/15" : "border-border bg-background/40"}`}><span className={`block text-[10px] ${dark ? "text-white/45" : "text-muted-foreground"}`}>{label}</span><b className={`mt-1 block text-lg ${dark ? "text-white" : "text-foreground"}`}>{formatted}</b></div>;
+}
+
+function AudienceReportSection({ audience }: { audience: AudienceProfileData }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ age: true, gender: true, publisher_platform: true, platform_position: true, country: true, region: true, locations: true });
+  const top = (type: (typeof audienceBreakdowns)[number]["type"]) => audience.segments[type]?.[0]?.key || "Sem dado";
+  const toggle = (key: string) => setCollapsed((current) => ({ ...current, [key]: !current[key] }));
+  const sections = [
+    ...audienceBreakdowns.map((item) => ({ key: item.type, title: item.title, source: "Meta · agregado", description: item.description, rows: audience.segments[item.type] })),
+    { key: "locations", title: "Mapa por estado", source: "Meta Ads", description: "Região de entrega reportada pela Meta no período selecionado.", rows: audience.metaLocations.map((row) => ({ key: row.key, leads: row.leads, spend: 0, impressions: 0, clicks: 0 })) },
+  ];
+  return <section className="rounded-2xl border border-white/10 bg-white/[.035] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">Perfil do público e entrega</h2><p className="mt-1 text-[11px] text-white/45">Quem está chegando, com a fonte identificada em cada bloco.</p></div><span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] text-white/55">{integer.format(audience.registrations)} cadastros RD</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2"><small className="block text-[10px] uppercase tracking-wide text-white/40">Faixa mais frequente</small><b className="mt-1 block truncate text-sm">{top("age")}</b><span className="text-[10px] text-white/40">Meta · agregado</span></div><div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2"><small className="block text-[10px] uppercase tracking-wide text-white/40">Gênero predominante</small><b className="mt-1 block truncate text-sm">{top("gender")}</b><span className="text-[10px] text-white/40">Meta · agregado</span></div><div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2"><small className="block text-[10px] uppercase tracking-wide text-white/40">Plataforma principal</small><b className="mt-1 block truncate text-sm">{top("publisher_platform")}</b><span className="text-[10px] text-white/40">Meta · agregado</span></div><div className="rounded-xl border border-white/10 bg-black/15 px-3 py-2"><small className="block text-[10px] uppercase tracking-wide text-white/40">Estado com maior entrega</small><b className="mt-1 block truncate text-sm">{audience.metaLocations[0]?.key || "Sem dado"}</b><span className="text-[10px] text-white/40">Meta Ads</span></div></div><div className="mt-3 grid gap-2 lg:grid-cols-2">{sections.map((section) => { const rows = section.rows; const total = rows.reduce((sum, row) => sum + row.leads, 0); const isCollapsed = !!collapsed[section.key]; return <article key={section.key} className="rounded-xl border border-white/10 bg-black/10"><button type="button" aria-expanded={!isCollapsed} onClick={() => toggle(section.key)} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"><span className="min-w-0"><span className="block truncate text-xs font-black">{section.title}</span><span className="mt-0.5 block truncate text-[10px] text-white/40">{section.source} · {rows.length ? `${integer.format(total)} registros` : "sem dados"}</span></span><ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} /></button>{!isCollapsed && <div className="border-t border-white/10 px-3 pb-3 pt-2">{rows.length ? <div className="space-y-1.5">{rows.slice(0, 8).map((row) => <div key={row.key} className="flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-white/65" title={row.key}>{row.key}</span><b className="shrink-0 tabular-nums">{integer.format(row.leads)} <small className="font-normal text-white/40">({total ? (row.leads / total * 100).toFixed(1) : "0.0"}%)</small></b></div>)}</div> : <p className="text-[11px] text-white/40">Sem detalhamento sincronizado neste período.</p>}{rows.length > 8 && <p className="mt-2 text-[10px] text-white/35">Exibindo os 8 maiores segmentos.</p>}</div>}</article>; })}</div><p className="mt-3 text-[10px] text-white/40">Meta: {integer.format(audience.metaLocatedRegistrations)} de {integer.format(audience.metaRegistrations)} leads têm região informada ({audience.metaRegistrations ? (audience.metaLocatedRegistrations / audience.metaRegistrations * 100).toFixed(1) : "0.0"}%). RD permanece disponível na tabela individual do CRM.</p></section>;
+}
+
+function TwoMonthExecutive({ analysis }: { analysis: TwoMonthAnalysis }) {
+  const { currentMonth, previousMonth } = analysis;
+  const maxWeeklyLeads = Math.max(1, ...analysis.weeklyComparison.map((row) => row.metrics.leads));
+  const comparisonRows = analysis.metricComparisons.filter((item) =>
+    ["spend", "leads", "conversations", "cpl", "ctr", "cpm", "rd", "sales", "revenue", "roas"].includes(item.id),
+  );
+  const funnel: Array<[string, number]> = [
+    ["Impressões", currentMonth.metrics.impressions],
+    ["Cliques", currentMonth.metrics.clicks],
+    ["Leads + conversas", currentMonth.metrics.leads],
+    ["Negócios RD", currentMonth.metrics.rd],
+    ["Vendas", currentMonth.metrics.sales],
+  ];
+
+  return <>
+    <section className="grid gap-4 xl:grid-cols-[1.35fr_.65fr]">
+      <article className="rounded-2xl border border-white/10 bg-white/[.035] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 font-black"><BarChart3 className="h-4 w-4 text-[#d8b65c]" />Mês atual × mês anterior</h2>
+            <p className="mt-1 text-[11px] text-white/45">{currentMonth.isPartial ? `Mês atual parcial · ${currentMonth.daysWithData} dia(s) com dados` : "Comparação de meses completos"}</p>
+          </div>
+          <span className="text-[10px] text-white/45">{format(new Date(`${previousMonth.from}T12:00:00`), "dd/MM")}–{format(new Date(`${currentMonth.to}T12:00:00`), "dd/MM/yyyy")}</span>
+        </div>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[680px] text-left text-xs">
+            <thead className="text-[10px] uppercase tracking-[.12em] text-white/40"><tr><th className="pb-3">Métrica</th><th className="pb-3 text-right">Atual</th><th className="pb-3 text-right">Anterior</th><th className="pb-3 text-right">Variação</th></tr></thead>
+            <tbody>{comparisonRows.map((item) => <tr key={item.id} className="border-t border-white/10">
+              <td className="py-3 font-bold">{item.label}</td>
+              <td className="py-3 text-right">{formatAnalysisMetric(item.id, item.current)}</td>
+              <td className="py-3 text-right text-white/55">{formatAnalysisMetric(item.id, item.previous)}</td>
+              <td className={cn("py-3 text-right font-black", item.assessment === "positive" ? "text-emerald-300" : item.assessment === "negative" ? "text-rose-300" : "text-white/45")}>
+                {item.variationPercent == null ? "Sem base" : <span className="inline-flex items-center justify-end gap-1">{item.assessment === "positive" ? <ArrowUpRight className="h-3.5 w-3.5" /> : item.assessment === "negative" ? <ArrowDownRight className="h-3.5 w-3.5" /> : null}{item.variationPercent > 0 ? "+" : ""}{item.variationPercent}%</span>}
+              </td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </article>
+
+      <article className="rounded-2xl border border-white/10 bg-white/[.035] p-5">
+        <h2 className="font-black">Funil executivo do mês</h2>
+        <p className="mt-1 text-[11px] text-white/45">Do alcance da mídia até a receita confirmada.</p>
+        <div className="mt-5 space-y-3">{funnel.map(([label, value]) => <div key={label}>
+          <div className="flex items-center justify-between gap-2 text-xs"><span className="text-white/60">{label}</span><b>{integer.format(value)}</b></div>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#8c6418] via-[#d8b65c] to-[#f0dfa4]" style={{ width: `${Math.max(4, value / Math.max(1, funnel[0][1]) * 100)}%` }} /></div>
+        </div>)}</div>
+        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-xs">
+          <span><small className="block text-white/45">CPL atual</small><b className="mt-1 block text-base">{currency.format(currentMonth.metrics.cpl)}</b></span>
+          <span><small className="block text-white/45">ROAS atual</small><b className="mt-1 block text-base">{currentMonth.metrics.roas.toFixed(2)}x</b></span>
+          <span><small className="block text-white/45">Cobertura RD</small><b className="mt-1 block text-base">{currentMonth.metrics.coverage.toFixed(1)}%</b></span>
+          <span><small className="block text-white/45">Resultado</small><b className="mt-1 block text-base">{currency.format(currentMonth.metrics.profit)}</b></span>
+        </div>
+      </article>
+    </section>
+
+    <section className="rounded-2xl border border-white/10 bg-white/[.035] p-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div><h2 className="font-black">Comparação semanal</h2><p className="mt-1 text-[11px] text-white/45">Barras por leads totais; tabela com custo e retorno para localizar a virada de performance.</p></div>
+        <div className="flex gap-3 text-[10px] text-white/50"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#d8b65c]" />Mês anterior</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-400" />Mês atual</span></div>
+      </div>
+      <div className="mt-6 flex min-h-[230px] items-end gap-2 overflow-x-auto border-b border-white/15 pb-1">
+        {analysis.weeklyComparison.length ? analysis.weeklyComparison.map((row) => <div key={row.week} className="group flex min-w-16 flex-1 flex-col items-center justify-end gap-2">
+          <div className={cn("w-full max-w-16 rounded-t transition group-hover:brightness-125", row.month === "current" ? "bg-gradient-to-t from-sky-700 to-sky-300" : "bg-gradient-to-t from-[#73500f] via-[#b98a29] to-[#f0dfa4]")} style={{ height: `${Math.max(6, row.metrics.leads / maxWeeklyLeads * 190)}px` }} title={`${integer.format(row.metrics.leads)} leads · ${currency.format(row.metrics.spend)} · CPL ${currency.format(row.metrics.cpl)}`} />
+          <span className="text-[8px] text-white/45">{format(new Date(`${row.week}T12:00:00`), "dd/MM")}</span><span className="text-[9px] font-bold text-white/70">{integer.format(row.metrics.leads)}</span>
+        </div>) : <div className="grid w-full place-items-center text-sm text-white/40">Sem dados semanais nos dois meses.</div>}
+      </div>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-[11px]">
+          <thead className="text-[10px] uppercase tracking-[.12em] text-white/40"><tr><th className="pb-3">Semana</th><th className="pb-3 text-right">Investimento</th><th className="pb-3 text-right">Leads</th><th className="pb-3 text-right">Conversas</th><th className="pb-3 text-right">CPL</th><th className="pb-3 text-right">Vendas</th><th className="pb-3 text-right">Receita</th><th className="pb-3 text-right">ROAS</th></tr></thead>
+          <tbody>{analysis.weeklyComparison.map((row) => <tr key={`table-${row.week}`} className="border-t border-white/10">
+            <td className="py-3 font-bold"><span className={cn("mr-2 inline-block h-2 w-2 rounded-full", row.month === "current" ? "bg-sky-400" : "bg-[#d8b65c]")} />{format(new Date(`${row.week}T12:00:00`), "dd/MM")}–{format(new Date(`${row.to}T12:00:00`), "dd/MM")}</td>
+            <td className="py-3 text-right">{currency.format(row.metrics.spend)}</td><td className="py-3 text-right">{integer.format(row.metrics.leads)}</td><td className="py-3 text-right">{integer.format(row.metrics.conversations)}</td><td className="py-3 text-right">{currency.format(row.metrics.cpl)}</td><td className="py-3 text-right">{integer.format(row.metrics.sales)}</td><td className="py-3 text-right">{currency.format(row.metrics.revenue)}</td><td className="py-3 text-right">{row.metrics.roas.toFixed(2)}x</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <RecommendationGrid title="O que deu certo" icon={<TrendingUp className="h-4 w-4" />} tone="success" items={analysis.wins} empty="Nenhum ganho consistente foi identificado com a amostra disponível." />
+    <RecommendationGrid title="O que piorou" icon={<TrendingDown className="h-4 w-4" />} tone="danger" items={analysis.risks} empty="Nenhum risco adicional foi detectado na comparação." />
+    <RecommendationGrid title="O que fazer agora" icon={<Lightbulb className="h-4 w-4" />} tone="gold" items={analysis.actions} empty="Sem ação recomendada." />
+  </>;
+}
+
+function RecommendationGrid({ title, icon, tone, items, empty }: { title: string; icon: ReactNode; tone: "success" | "danger" | "gold"; items: TwoMonthAnalysis["wins"]; empty: string }) {
+  const frame = tone === "success" ? "border-emerald-400/20 bg-emerald-400/[.05]" : tone === "danger" ? "border-rose-400/20 bg-rose-400/[.05]" : "border-[#d8b65c]/25 bg-[#d8b65c]/[.05]";
+  const textTone = tone === "success" ? "text-emerald-300" : tone === "danger" ? "text-rose-300" : "text-[#f0dfa4]";
+  return <section className="rounded-2xl border border-white/10 bg-white/[.035] p-5">
+    <h2 className={cn("flex items-center gap-2 font-black", textTone)}>{icon}{title}</h2>
+    <div className="mt-4 grid gap-3 md:grid-cols-2">{items.length ? items.map((item) => <article key={`${title}-${item.title}`} className={cn("rounded-xl border p-4", frame)}>
+      <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-black text-white">{item.title}</h3><span className={cn("rounded-full border border-current/25 px-2 py-1 text-[9px] font-black uppercase", textTone)}>{item.priority}</span></div>
+      <p className="mt-3 text-xs leading-relaxed text-white/65"><b className="text-white">Evidência:</b> {item.evidence}</p>
+      <p className="mt-2 text-xs leading-relaxed text-white/80"><b className="text-white">Direcionamento:</b> {item.recommendation}</p>
+      {item.steps?.length ? <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
+        <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/55">Plano de ação</p>
+        <ol className="mt-2 space-y-2 text-xs leading-relaxed text-white/75">
+          {item.steps.map((step, index) => <li key={`${item.title}-step-${index}`} className="flex gap-2"><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] font-black", textTone, "border-current/30")}>{index + 1}</span><span>{step}</span></li>)}
+        </ol>
+      </div> : null}
+    </article>) : <div className="rounded-xl border border-white/10 p-4 text-xs text-white/45">{empty}</div>}</div>
+  </section>;
+}
+
+function formatAnalysisMetric(id: TwoMonthAnalysis["metricComparisons"][number]["id"], value: number) {
+  if (["spend", "cpl", "cpc", "cpm", "revenue", "cac", "profit"].includes(id)) return currency.format(value);
+  if (["ctr", "conversionRate", "coverage"].includes(id)) return `${value.toFixed(2)}%`;
+  if (id === "roas") return `${value.toFixed(2)}x`;
+  return integer.format(value);
+}
+
+function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], metaLeadActions?: { forms: number; site: number; conversations: number; total: number }): ReportTotals {
+  const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  const fallback = insights.reduce((total, row) => ({
+    forms: total.forms + Number(row.form_leads || 0),
+    site: total.site + Number(row.site_leads || 0),
+    conversations: total.conversations + Number(row.conversations || 0),
+  }), { forms: 0, site: 0, conversations: 0 });
+  const conversations = metaLeadActions?.conversations ?? fallback.conversations;
+  // The legacy `insights.leads` aggregate is intentionally not a fallback.
+  const leads = metaLeadActions ? Number(metaLeadActions.total || 0) : fallback.forms + fallback.site + fallback.conversations;
+  const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
+  const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+  const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
+  const confirmed = aggregateSales(saleRows);
+  const sales = confirmed.totalQuantity;
+  const revenue = confirmed.totalNet;
+
+  return {
+    spend,
+    leads,
+    conversations,
+    cpl: leads ? spend / leads : 0,
+    impressions,
+    reach,
+    frequency: reach ? impressions / reach : 0,
+    clicks,
+    cpc: clicks ? spend / clicks : 0,
+    ctr: impressions ? clicks / impressions * 100 : 0,
+    cpm: impressions ? spend / impressions * 1000 : 0,
+    conversionRate: clicks ? leads / clicks * 100 : 0,
+    rd: deals.length,
+    costPerOpportunity: deals.length ? spend / deals.length : 0,
+    sales,
+    revenue,
+    cac: sales ? spend / sales : 0,
+    roas: spend ? revenue / spend : 0,
+    profit: revenue - spend,
+    coverage: leads ? deals.length / leads * 100 : 0,
+  };
+}
+function dailyRows(insights: InsightRow[], canonicalLeadsByDate: Record<string, number>) { const map = new Map<string, { date: string; leads: number; spend: number }>(); insights.forEach((r) => { if (!r.date) return; const row = map.get(r.date) || { date: r.date, leads: 0, spend: 0 }; row.spend += Number(r.spend || 0); map.set(r.date, row); }); for (const [date, leads] of Object.entries(canonicalLeadsByDate)) { const row = map.get(date) || { date, leads: 0, spend: 0 }; row.leads = leads; map.set(date, row); } return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)); }
+function weeklyRows(daily: ReturnType<typeof dailyRows>) { const map = new Map<string, { week: string; leads: number; spend: number; days: number }>(); daily.forEach((day) => { const week = format(startOfWeek(new Date(`${day.date}T12:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd"); const row = map.get(week) || { week, leads: 0, spend: 0, days: 0 }; row.leads += day.leads; row.spend += day.spend; row.days += 1; map.set(week, row); }); return Array.from(map.values()).sort((a, b) => a.week.localeCompare(b.week)); }
+function formatMetricValue(id: MetricId, value: number) {
+  if (["spend", "cpl", "cpc", "cpm", "revenue", "costPerOpportunity", "cac", "profit"].includes(id)) return currency.format(value);
+  if (["ctr", "conversionRate", "coverage"].includes(id)) return `${value.toFixed(2)}%`;
+  if (["roas", "frequency"].includes(id)) return `${value.toFixed(2)}x`;
+  return integer.format(value);
+}
+
+function PreviewMetric({ id, totals }: { id: MetricId; totals: ReportTotals }) {
+  const metric = METRICS.find((item) => item.id === id);
+  return <article title={metric?.description} className="min-w-0 rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/[.045] p-4 shadow-[0_18px_55px_-45px_hsl(var(--primary))]">
+    <span className="block truncate text-[9px] font-black uppercase tracking-[.16em] text-muted-foreground">{metric?.label || id}</span>
+    <b className="mt-2 block truncate text-xl text-foreground">{formatMetricValue(id, totals[id])}</b>
+  </article>;
+}
+
+function ReportMetric({ id, totals }: { id: MetricId; totals: ReportTotals }) {
+  const metric = METRICS.find((item) => item.id === id);
+  return <article title={metric?.description} className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[.07] to-white/[.025] p-5 shadow-2xl">
+    <span className="text-[9px] font-black uppercase tracking-[.18em] text-white/45">{metric?.label || id}</span>
+    <b className="mt-3 block text-2xl">{formatMetricValue(id, totals[id])}</b>
+  </article>;
+}

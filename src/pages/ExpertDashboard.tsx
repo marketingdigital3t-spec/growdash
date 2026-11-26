@@ -1,0 +1,340 @@
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
+import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
+import { DashboardProvider } from "@/contexts/DashboardContext";
+import { KPIWidget } from "@/components/dashboard/widgets/KPIWidget";
+import { PaymentChartWidget, PlatformDistributionWidget } from "@/components/dashboard/widgets/FinancialOverviewWidgets";
+import { Card, CardContent } from "@/components/ui/card";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useInsights } from "@/hooks/useInsights";
+import { useSales } from "@/hooks/useSales";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
+import { mergeCanonicalExpertSales } from "@/lib/expertRevenueSales";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { ExpertOperationsView } from "@/components/expert/ExpertOperationsView";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
+import type { MetricAvailability } from "@/lib/metricAvailability";
+
+
+function expertGreeting(name: string) {
+  if (!name) return "Painel do Expert";
+  const normalized = name.toLocaleLowerCase();
+  if (normalized.includes("jose") || normalized.includes("josé")) return "Bem-vindo Dr. José";
+  if (normalized.includes("ranniely")) return "Bem-vinda Dra. Ranniely";
+  const feminine = /ranniely|dra\.?\s/.test(normalized);
+  const clean = name.replace(/^\s*(ca\d+\s*[-–]\s*)/i, "").trim();
+  return `${feminine ? "Bem-vinda" : "Bem-vindo"} ${clean}`;
+}
+
+export function queryMetricAvailability(input: {
+  hasSnapshot: boolean;
+  hasRows?: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  reason?: string;
+  /** A dependent query can be disabled until its scope is ready. */
+  dependencyPending?: boolean;
+  dependencyError?: string;
+}): MetricAvailability {
+  if (input.dependencyError) {
+    return input.hasSnapshot
+      ? { state: "partial", reason: input.reason || input.dependencyError }
+      : { state: "unavailable", reason: input.reason || input.dependencyError };
+  }
+  if (input.dependencyPending) {
+    return input.hasSnapshot
+      ? { state: "stale", reason: "Atualizando a fonte de dependência; o último snapshot permanece visível." }
+      : { state: "loading" };
+  }
+  if (!input.hasSnapshot && (input.isLoading || input.isFetching || input.dependencyPending)) return { state: "loading" };
+  if (!input.hasSnapshot && input.isError) return { state: "unavailable", reason: input.reason };
+  if (input.isError) return { state: "partial", reason: input.reason || "A fonte falhou; o último snapshot foi preservado." };
+  if (input.isFetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
+  return input.hasRows === false ? { state: "empty_confirmed" } : { state: "fresh" };
+}
+
+export function getExpertAccountScopeAvailability(input: {
+  data: unknown[] | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  isPlaceholderData: boolean;
+}): MetricAvailability {
+  const hasRows = (input.data?.length || 0) > 0;
+  const reason = "Não foi possível consultar as contas autorizadas para este recorte.";
+
+  // An empty placeholder is only a cache seed. It is not evidence that the
+  // workspace has no connected accounts, so dependent metrics must remain in
+  // loading until the server returns a confirmed snapshot.
+  if (input.isLoading || (input.isPlaceholderData && !hasRows) || (!input.data && input.isFetching)) {
+    return { state: "loading" };
+  }
+  if (input.isError) {
+    return hasRows ? { state: "stale", reason } : { state: "unavailable", reason };
+  }
+  if (!input.data) return { state: "unavailable", reason };
+  if (input.isFetching) return { state: "stale", reason: "Atualizando as contas autorizadas; o último snapshot permanece visível." };
+  return hasRows ? { state: "fresh" } : { state: "empty_confirmed" };
+}
+
+export function hasActionMetricSnapshot(input: {
+  hasActionData: boolean;
+  actionAdCount: number;
+  insightsDataUpdatedAt: number;
+}) {
+  return input.hasActionData && (input.actionAdCount > 0 || input.insightsDataUpdatedAt > 0);
+}
+
+export function buildExpertMetricAvailability(input: {
+  insightAvailability: MetricAvailability;
+  leadAvailability: MetricAvailability;
+  revenueAvailability: MetricAvailability;
+}) {
+  return {
+    spend: input.insightAvailability,
+    leads: input.leadAvailability,
+    cpl: input.leadAvailability,
+    conversion_rate: input.leadAvailability,
+    campaign_leads: input.leadAvailability,
+    campaign_cpl: input.leadAvailability,
+    campaign_conversion_rate: input.leadAvailability,
+    revenue_gross: input.revenueAvailability,
+    revenue_net: input.revenueAvailability,
+    sales_count: input.revenueAvailability,
+    roas: input.revenueAvailability,
+    roi: input.revenueAvailability,
+    profit: input.revenueAvailability,
+    profit_margin: input.revenueAvailability,
+    receivables: input.revenueAvailability,
+    average_ticket: input.revenueAvailability,
+  };
+}
+
+/**
+ * Deliberately separate from the editable operational dashboard. The page only
+ * queries metric sources protected by account RLS and renders no write actions,
+ * integrations, CRM details, campaign editor, or dashboard configuration.
+ */
+export default function ExpertDashboard() {
+  const { startDate, endDate, adAccountIds, setAdAccountIds, funnelIds } = useGlobalFilters();
+  const accountsQuery = useAdAccounts();
+  const { data: accounts = [], isLoading: loadingAccounts } = accountsQuery;
+  const accountScopeAvailability = getExpertAccountScopeAvailability({
+    data: accountsQuery.data,
+    isLoading: accountsQuery.isLoading,
+    isFetching: accountsQuery.isFetching,
+    isError: accountsQuery.isError,
+    isPlaceholderData: accountsQuery.isPlaceholderData,
+  });
+  const accountScopePending = accountScopeAvailability.state === "loading";
+  const accountScopeError = accountScopeAvailability.state === "unavailable" || accountScopeAvailability.state === "stale"
+    ? accountScopeAvailability.reason || undefined
+    : undefined;
+  const accountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
+  const selectedAccountName = useMemo(() => {
+    const selected = accounts.find((account) => account.id === accountId)?.name ?? "";
+    return selected;
+  }, [accountId, accounts]);
+
+  useEffect(() => {
+    if (loadingAccounts || accounts.length === 0) return;
+    const allowed = new Set(accounts.map((account) => account.id));
+    const next = adAccountIds.filter((id) => allowed.has(id));
+    if (next.length !== adAccountIds.length) setAdAccountIds(next);
+  }, [adAccountIds, accounts, loadingAccounts, setAdAccountIds]);
+
+  const selectedId = accountId === "all" ? undefined : accountId;
+  // “Todas as contas” means the union of accounts authorized for this expert,
+  // not every RD deal without attribution. The latter is a reconciliation item
+  // and must never inflate the owner-facing dashboard total.
+  const selectedAccountIds = useMemo(() => adAccountIds.length ? adAccountIds : accounts.map((account) => account.id), [adAccountIds, accounts]);
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(accounts.filter((account) => selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
+    [accounts, selectedAccountIds],
+  );
+  const insightsQuery = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
+  const { data: insights = [], isLoading: loadingInsights } = insightsQuery;
+  const salesQuery = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const rdDealsQuery = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const revenueDealsQuery = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const sales = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
+  const rdDeals = useMemo(() => rdDealsQuery.data ?? [], [rdDealsQuery.data]);
+  const revenueDeals = useMemo(() => revenueDealsQuery.data ?? [], [revenueDealsQuery.data]);
+  const [view, setView] = useState<"executive" | "operations">("executive");
+  // useInsights keeps the previous query result while a filter changes. Always
+  // reapply the permitted account scope so the all-accounts total can never
+  // briefly include a prior account or an account outside this expert access.
+  const permittedInsights = useMemo(() => {
+    const accountIds = new Set(accounts.map((account) => account.id));
+    return insights.filter((insight) => !!insight.ad_account_id
+      && accountIds.has(insight.ad_account_id)
+      && (adAccountIds.length === 0 || adAccountIds.includes(insight.ad_account_id)));
+  }, [accounts, insights, adAccountIds]);
+  const permittedSales = useMemo(() => {
+    const accountIds = new Set(accounts.map((account) => account.id));
+    return sales.filter((sale) => !!sale.ad_account_id
+      && accountIds.has(sale.ad_account_id)
+      && (adAccountIds.length === 0 || adAccountIds.includes(sale.ad_account_id)));
+  }, [accounts, sales, adAccountIds]);
+  // Resolve the same complete account universe used by Dashboard/Funnel. The
+  // action resolver must not depend on local insights rows: a valid historical
+  // action can exist for an ad whose insight row failed to persist.
+  const actionAccountMap = useMemo(
+    () => Object.fromEntries(permittedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
+    [permittedInsights],
+  );
+  const actionAdIds = useMemo(
+    () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
+    [permittedInsights],
+  );
+  const actionAdsetIdByAdId = useMemo(
+    () => Object.fromEntries(permittedInsights.map((insight) => [insight.ad_id, insight.adset_id || null])),
+    [permittedInsights],
+  );
+  const actionDestinationTypeByAdset = useMemo(
+    () => Object.fromEntries(permittedInsights.filter((insight) => insight.adset_id).map((insight) => [String(insight.adset_id), insight.adset_destination_type || null])),
+    [permittedInsights],
+  );
+  const actionQuery = useActionTotalsByAds(
+    actionAdIds,
+    startDate,
+    endDate,
+    actionAccountMap,
+    { adAccountIds: selectedAccountIds, attributionWindowsByAccount, adsetIdByAdId: actionAdsetIdByAdId, destinationTypeByAdset: actionDestinationTypeByAdset },
+  );
+  const actionData = actionQuery.data;
+  const scopedRevenueDeals = useMemo(
+    () => revenueDeals.filter((deal) => isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, revenueDealsQuery.resolvedFunnelIds ?? [])),
+    [revenueDeals, revenueDealsQuery.resolvedFunnelIds, selectedAccountIds],
+  );
+  // The RD snapshot is canonical for a won deal. Materialize a temporary
+  // read-only row when the financial `sales` mirror is still catching up so
+  // KPIs, payment and platform widgets cannot disagree during sync.
+  const canonicalSales = useMemo(
+    () => mergeCanonicalExpertSales(permittedSales, scopedRevenueDeals),
+    [permittedSales, scopedRevenueDeals],
+  );
+  const revenueUnavailableReason = revenueDealsQuery.isError && !revenueDealsQuery.dataUpdatedAt
+    ? "Não foi possível consultar o RD Station neste momento."
+    : null;
+  const expertLeadActions = useMemo(() => actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [actionData?.metaLeadActions]);
+  const expertMetrics = useMemo(
+    () => getExpertDashboardMetrics(permittedInsights, rdDeals, canonicalSales, {
+      nativeFormLeads: expertLeadActions.forms,
+      siteLeads: expertLeadActions.site,
+      conversations: expertLeadActions.conversations,
+      total: expertLeadActions.total,
+    }),
+    [canonicalSales, expertLeadActions, permittedInsights, rdDeals],
+  );
+  const leadBreakdown = useMemo(() => ({
+    forms: expertMetrics.forms,
+    site: expertMetrics.siteLeads,
+    conversations: expertMetrics.conversations,
+    total: expertMetrics.metaLeads,
+  }), [expertMetrics]);
+  const isLoading = loadingAccounts || loadingInsights || salesQuery.isLoading || rdDealsQuery.isLoading || revenueDealsQuery.isLoading || actionQuery.isLoading;
+  const revenueAvailability = useMemo<MetricAvailability>(() => queryMetricAvailability({
+    hasSnapshot: salesQuery.data !== undefined || revenueDealsQuery.data !== undefined,
+    hasRows: (salesQuery.data?.length || 0) + (revenueDealsQuery.data?.length || 0) > 0,
+    isLoading: loadingAccounts || salesQuery.isLoading || revenueDealsQuery.isLoading,
+    isFetching: salesQuery.isFetching || revenueDealsQuery.isFetching,
+    isError: salesQuery.isError || revenueDealsQuery.isError,
+    dependencyPending: accountScopePending,
+    dependencyError: accountScopeError,
+    reason: "Não foi possível consultar o faturamento confirmado no RD Station.",
+  }), [accountScopeError, accountScopePending, loadingAccounts, revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
+  const insightAvailability = queryMetricAvailability({
+    hasSnapshot: insightsQuery.data !== undefined,
+    hasRows: insights.length > 0,
+    isLoading: loadingAccounts || insightsQuery.isLoading,
+    isFetching: insightsQuery.isFetching,
+    isError: insightsQuery.isError,
+    dependencyPending: accountScopePending,
+    dependencyError: accountScopeError,
+    reason: "Não foi possível consultar os insights Meta para este recorte.",
+  });
+  const leadAvailability = queryMetricAvailability({
+    // When there are no ads, the action query is intentionally disabled. Its
+    // absence is only a confirmed zero after the canonical insights scope has
+    // settled successfully; before that it is still pending.
+    hasSnapshot: hasActionMetricSnapshot({
+      hasActionData: actionQuery.data !== undefined,
+      actionAdCount: actionAdIds.length,
+      insightsDataUpdatedAt: insightsQuery.dataUpdatedAt,
+    }) || (insightsQuery.data !== undefined && insightsQuery.dataUpdatedAt > 0 && actionAdIds.length === 0 && !insightsQuery.isError),
+    hasRows: Number(actionData?.metaLeadActions?.total || 0) > 0,
+    isLoading: loadingAccounts || actionQuery.isLoading,
+    isFetching: actionQuery.isFetching,
+    isError: actionQuery.isError,
+    dependencyPending: accountScopePending || insightsQuery.isLoading || insightsQuery.isFetching,
+    dependencyError: accountScopeError || (insightsQuery.isError ? "Os insights Meta não puderam ser confirmados para este recorte." : undefined),
+    reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",
+  });
+  const metricAvailability = useMemo(() => buildExpertMetricAvailability({ insightAvailability, leadAvailability, revenueAvailability }), [insightAvailability, leadAvailability, revenueAvailability]);
+
+  return (
+    <MotionPage className="expert-dashboard expert-dashboard-shell gd-module-shell min-w-0 space-y-3 sm:space-y-4">
+      <MotionItem>
+        <div className="expert-dashboard-header flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="expert-dashboard-brand flex items-center gap-2 text-primary"><BarChart3 className="h-5 w-5" /><span className="text-xs font-black uppercase tracking-[.16em]">Growdash</span></div>
+            <h1 className="mt-1 text-2xl font-bold">{expertGreeting(selectedAccountName)}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Resultados autorizados para acompanhamento da operação.</p>
+          </div>
+          <div className="expert-dashboard-readonly-badge flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[.07] px-3 py-1.5 text-xs font-semibold text-primary"><ShieldCheck className="h-3.5 w-3.5" />Somente leitura</div>
+        </div>
+      </MotionItem>
+
+      <div className="expert-dashboard-tabs flex w-fit items-center gap-1 rounded-xl bg-muted/50 p-1" role="tablist" aria-label="Visão do Painel do Expert">
+        <button type="button" role="tab" aria-selected={view === "executive"} onClick={() => setView("executive")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "executive" ? "gd-expert-tab-active bg-emerald-500 text-[#062015] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Visão executiva</button>
+        <button type="button" role="tab" aria-selected={view === "operations"} onClick={() => setView("operations")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "operations" ? "gd-expert-tab-active bg-emerald-500 text-[#062015] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Operação</button>
+      </div>
+
+      {view === "operations" && <MotionItem className="expert-operations-layout"><ExpertOperationsView /></MotionItem>}
+
+      {view === "executive" && <DashboardProvider value={{
+        startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: canonicalSales, rdDeals, revenueDeals: scopedRevenueDeals, revenueUnavailableReason,
+        alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading, revenueAvailability, metricAvailability,
+        metricOverrides: { leads: expertMetrics.leads, conversion_rate: expertMetrics.conversionRate, cpl: expertMetrics.cpl },
+        leadBreakdown,
+      }}>
+        <MotionItem>
+          <section aria-labelledby="expert-kpis-title" className="gd-module-section">
+            <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão executiva</p><h2 id="expert-kpis-title">Indicadores principais</h2></div><p className="dashboard-section-description">Resultados consolidados do período e das contas autorizadas.</p></div>
+            <div className="expert-kpi-grid gd-kpi-grid grid">
+            {[
+              ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
+            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            <DashboardWidgetHelp type="kpi" title="Leads Meta" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} availability={leadAvailability} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
+            {[
+              ["CPL", "cpl"], ["ROAS", "roas"],
+              ["Lucro", "profit"], ["Margem", "profit_margin"], ["Taxa de conversão", "conversion_rate"],
+            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            </div>
+          </section>
+        </MotionItem>
+
+        <MotionItem>
+          <section aria-labelledby="expert-charts-title" className="gd-module-section">
+            <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Leitura visual</p><h2 id="expert-charts-title">Distribuição dos resultados</h2></div><p className="dashboard-section-description">Compare pagamentos e plataformas sem misturar fontes.</p></div>
+            <div className="expert-charts-grid grid min-w-0 gap-4 xl:grid-cols-2">
+            <DashboardWidgetHelp type="payment_chart" title="Vendas por Pagamento" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PaymentChartWidget /></DashboardWidgetHelp>
+            <DashboardWidgetHelp type="platform_distribution" title="Distribuição por Plataforma" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PlatformDistributionWidget /></DashboardWidgetHelp>
+            </div>
+          </section>
+        </MotionItem>
+
+      </DashboardProvider>}
+
+      {!isLoading && accountScopeAvailability.state === "empty_confirmed" && accounts.length === 0 && (
+        <Card className="border-dashed"><CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground"><LockKeyhole className="h-5 w-5 text-primary" />Nenhuma conta foi autorizada para este acesso. Solicite ao administrador que vincule uma conta de anúncio.</CardContent></Card>
+      )}
+    </MotionPage>
+  );
+}

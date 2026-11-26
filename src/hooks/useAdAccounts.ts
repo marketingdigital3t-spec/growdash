@@ -1,0 +1,115 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+
+function canonicalMetaAccountId(value: unknown) {
+  const normalized = String(value ?? "").trim().replace(/^act_/i, "");
+  return normalized ? `act_${normalized}` : "";
+}
+
+/** Consolidates legacy rows that represent the same Meta account. */
+export function dedupeMetaAccounts<T extends { account_id?: string | null; connection_status?: string | null; created_at?: string | null }>(accounts: T[]) {
+  const byAccount = new Map<string, T>();
+  for (const account of accounts) {
+    const key = canonicalMetaAccountId(account.account_id);
+    if (!key) continue;
+    const current = byAccount.get(key);
+    const currentActive = current ? isActiveMetaAccount(current) : false;
+    const nextActive = isActiveMetaAccount(account);
+    const shouldReplace = !current
+      || (nextActive && !currentActive)
+      || (nextActive === currentActive && String(account.created_at || "") > String(current.created_at || ""));
+    if (shouldReplace) byAccount.set(key, { ...account, account_id: key });
+  }
+  return Array.from(byAccount.values());
+}
+
+function isProfileDisconnected(account: { connection_status?: string | null; metadata?: unknown }) {
+  return account.connection_status === "disconnected"
+    && Boolean(account.metadata && typeof account.metadata === "object" && (account.metadata as Record<string, unknown>).profile_disconnected === true);
+}
+
+export function isActiveMetaAccount(account: { connection_status?: string | null; last_sync_success_at?: string | null; metadata?: unknown }) {
+  if (isProfileDisconnected(account) || account.connection_status === "disconnected") return false;
+  // A transient sync/block error must not hide a valid last snapshot from the
+  // global scope selector. The metrics contract will expose the stale/error
+  // state while keeping the account's last valid values visible.
+  return account.connection_status === "connected" || Boolean(account.last_sync_success_at);
+}
+
+// Product screens use only accounts with an active Meta integration. The
+// optional flag is retained for the connection-management flow, which may
+// explicitly request the full inventory.
+export function useAdAccounts(includeDisconnected = false) {
+  const { user } = useAuth();
+  const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
+  const cachedAccounts = readLocalCache<any[]>(cacheKey);
+  return useQuery({
+    queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],
+    enabled: !!user,
+    // Account scope is required before analytics queries start. A second
+    // retry would push a cold dashboard past the three-second budget; the
+    // next focus/reconnect or manual refresh remains the recovery path.
+    retry: 0,
+    refetchOnReconnect: true,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(cachedAccounts)),
+    refetchOnWindowFocus: false,
+    // Keep the Integrations status aligned with the server-side health/sync
+    // worker without requiring a manual page reload.
+    refetchInterval: 5 * 60_000,
+    staleTime: 2 * 60_000,
+    placeholderData: cachedAccounts,
+    queryFn: async () => {
+      const { data, error } = await withRequestTimeout(supabase
+        .from("ad_accounts")
+        .select("id, account_id, name, created_at, daily_budget, remaining_balance, target_cpl, min_spend_threshold, connection_status, last_sync_error, last_sync_error_code, last_sync_attempt_at, last_sync_success_at, workspace_id, business_unit_id, timezone_name, timezone_offset_hours_utc, attribution_window, oauth_health_status, oauth_checked_at, oauth_permissions, token_issued_at, token_expires_at, token_refreshed_at, token_refresh_source, metadata")
+        .order("created_at", { ascending: false }), 2_500);
+      if (!error) {
+        const normalized = dedupeMetaAccounts((data ?? []).filter((account) => !isProfileDisconnected(account)));
+        const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
+        writeLocalCache(cacheKey, result ?? []);
+        return result;
+      }
+      if (!/workspace_id|business_unit_id|schema cache/i.test(error.message)) throw error;
+      const legacy = await withRequestTimeout(supabase
+        .from("ad_accounts")
+        .select("id, account_id, name, created_at, daily_budget, remaining_balance, target_cpl, min_spend_threshold, connection_status, last_sync_error, last_sync_error_code, last_sync_attempt_at, last_sync_success_at, token_issued_at, token_expires_at, token_refreshed_at, token_refresh_source, metadata")
+        .order("created_at", { ascending: false }), 2_500);
+      if (legacy.error) throw legacy.error;
+      const normalized = dedupeMetaAccounts((legacy.data ?? []).filter((account) => !isProfileDisconnected(account)).map((account) => ({ ...account, workspace_id: null, business_unit_id: "legacy-infoproduto", timezone_name: "America/Sao_Paulo", timezone_offset_hours_utc: -3, attribution_window: "account_default", oauth_health_status: "unchecked", oauth_checked_at: null, oauth_permissions: [] })));
+      const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
+      writeLocalCache(cacheKey, result);
+      return result;
+    },
+  });
+}
+
+export type MetaAccountStatusFilter = "all" | "active" | "disconnected";
+
+/**
+ * The Integrations switch writes `connection_status = "disconnected"` when the
+ * owner deactivates an account. That flag is the only reliable answer to "did
+ * I leave this account active", so the visual filter must trust it instead of
+ * `isActiveMetaAccount`, which also keeps accounts that only have a historical
+ * snapshot.
+ */
+export function isMetaAccountEnabled(account: { connection_status?: string | null }) {
+  return account.connection_status !== "disconnected";
+}
+
+export function countMetaAccountsByStatus(accounts: Array<{ connection_status?: string | null }>) {
+  const active = accounts.filter(isMetaAccountEnabled).length;
+  return { active, disconnected: accounts.length - active, total: accounts.length };
+}
+
+export function filterMetaAccountsByStatus<T extends { connection_status?: string | null }>(
+  accounts: T[],
+  filter: MetaAccountStatusFilter,
+): T[] {
+  if (filter === "active") return accounts.filter(isMetaAccountEnabled);
+  if (filter === "disconnected") return accounts.filter((account) => !isMetaAccountEnabled(account));
+  return accounts;
+}

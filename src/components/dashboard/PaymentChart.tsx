@@ -1,0 +1,100 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
+import type { MetricAvailability } from "@/lib/metricAvailability";
+
+interface PaymentChartProps {
+  byPayment: { pix: number; cartao: number; boleto: number; outros: number };
+  unknownPaymentRevenue?: number;
+  availability?: MetricAvailability;
+}
+
+const COLORS: Record<string, string> = {
+  pix: "#16a34a",
+  cartao: "#10b981",
+  boleto: "#f59e0b",
+  outros: "#047857",
+};
+
+const LABELS: Record<string, string> = {
+  pix: "Pix",
+  cartao: "Cartão",
+  boleto: "Boleto",
+  outros: "Outros",
+};
+
+export function PaymentChart({ byPayment, unknownPaymentRevenue = 0, availability }: PaymentChartProps) {
+  const data = Object.entries(byPayment)
+    .map(([key, value]) => ({ key, name: key === "outros" && unknownPaymentRevenue > 0 ? "Não informado" : LABELS[key], value }))
+    .filter((d) => d.value > 0);
+
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  if (availability?.state === "loading" || availability?.state === "unavailable") {
+    return (
+      <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card h-full">
+        <CardHeader className="expert-chart-card-header pb-2"><CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle></CardHeader>
+        <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{availability.state === "loading" ? "Carregando vendas…" : "Vendas indisponíveis"}</CardContent>
+      </Card>
+    );
+  }
+
+  if (total === 0) {
+    return (
+      <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card h-full">
+        <CardHeader className="expert-chart-card-header pb-2">
+          <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          {unknownPaymentRevenue > 0 ? `Venda RD confirmada: R$ ${unknownPaymentRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Nenhuma venda registrada"}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card flex h-full flex-col">
+      <CardHeader className="expert-chart-card-header pb-2">
+        <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col justify-center">
+        <div className="expert-payment-chart relative h-48 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={80}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {data.map((row) => (
+                  <Cell key={row.key} fill={COLORS[row.key] || COLORS.outros} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v: number) => `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-lg font-bold">
+                R$ <AnimatedNumber value={total} decimals={0} />
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 mt-2 justify-center">
+          {data.map((d) => (
+            <div key={d.name} className="flex items-center gap-1.5 text-xs">
+              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[d.key] || COLORS.outros }} />
+              <span>{d.name}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

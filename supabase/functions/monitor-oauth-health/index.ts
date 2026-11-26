@@ -1,0 +1,274 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+import { resolveMetaPermissionStatus } from "../_shared/metaPermissions.ts";
+import { secretsMatch } from "../_shared/secretsMatch.ts";
+import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+type HealthStatus = "healthy" | "expiring" | "expired" | "permission_removed" | "error" | "reauthorization_required" | "unchecked";
+type TokenCheck = { status: HealthStatus; permissions: string[]; details: Record<string, unknown> };
+
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
+
+const expiryStatus = (isActive: boolean | null, expiresAt: string | null): HealthStatus => {
+  if (!isActive) return "error";
+  if (!expiresAt) return "unchecked";
+  const timestamp = new Date(expiresAt).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= Date.now()) return "expired";
+  if (timestamp - Date.now() < 7 * 86_400_000) return "expiring";
+  return "healthy";
+};
+
+async function checkMetaToken(token: string, appId?: string, appSecret?: string): Promise<TokenCheck> {
+  if (!appId || !appSecret) {
+    return { status: "unchecked", permissions: [], details: { reason: "META_APP_SECRET não configurado" } };
+  }
+
+  const debugUrl = new URL("https://graph.facebook.com/debug_token");
+  debugUrl.searchParams.set("input_token", token);
+  debugUrl.searchParams.set("access_token", `${appId}|${appSecret}`);
+  const response = await fetchWithTimeout(debugUrl, { headers: { Accept: "application/json" } }, 15_000);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.error) {
+    return {
+      status: "error",
+      permissions: [],
+      details: { http_status: response.status, code: payload?.error?.code ?? null },
+    };
+  }
+
+  const data = payload?.data ?? {};
+  const permissions = Array.isArray(data.scopes) ? data.scopes.map(String) : [];
+  // Aggregate insights/actions need ads_read. leads_retrieval is only needed
+  // for person-level form submissions and must not block aggregate metrics.
+  const permissionStatus = resolveMetaPermissionStatus(permissions);
+  const tokenExpiresAt = Number(data.expires_at) > 0 ? Number(data.expires_at) * 1000 : null;
+  const dataAccessExpiresAt = Number(data.data_access_expiration_time) > 0
+    ? Number(data.data_access_expiration_time) * 1000
+    : null;
+  const expiryCandidates = [tokenExpiresAt, dataAccessExpiresAt].filter((value): value is number => value != null);
+  const earliestExpiry = expiryCandidates.length ? Math.min(...expiryCandidates) : null;
+  const status: HealthStatus = data.is_valid !== true
+    ? "expired"
+    : permissionStatus.status === "permission_removed"
+      ? permissionStatus.status
+      : earliestExpiry && earliestExpiry < Date.now()
+        ? "expired"
+      : earliestExpiry && earliestExpiry < Date.now() + 30 * 86_400_000
+        ? "expiring"
+      : "healthy";
+  return {
+    status,
+    permissions,
+    details: {
+      is_valid: data.is_valid === true,
+      app_id: data.app_id ?? null,
+      expires_at: data.expires_at ?? null,
+      data_access_expires_at: data.data_access_expiration_time ?? null,
+      issued_at: data.issued_at ?? null,
+      missing_permissions: permissionStatus.missingPermissions,
+      optional_missing_permissions: permissionStatus.optionalMissingPermissions,
+    },
+  };
+}
+
+async function checkInstagramToken(token: string, version: string): Promise<TokenCheck> {
+  const profileUrl = new URL(`https://graph.instagram.com/${version}/me`);
+  profileUrl.searchParams.set("fields", "id,username");
+  profileUrl.searchParams.set("access_token", token);
+  const response = await fetchWithTimeout(profileUrl, { headers: { Accept: "application/json" } }, 15_000);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.error || !payload?.id) {
+    return {
+      status: response.status === 401 || payload?.error?.code === 190 ? "expired" : "error",
+      permissions: [],
+      details: { http_status: response.status, code: payload?.error?.code ?? null },
+    };
+  }
+  return {
+    status: "healthy",
+    permissions: [],
+    details: { account_id: String(payload.id), username: payload.username ?? null },
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  try {
+    const url = Deno.env.get("SUPABASE_URL")!;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const admin = createClient(url, service);
+    const authHeader = req.headers.get("Authorization") || "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    // Comparação constant-time: `===` em segredo vaza informação pelo tempo de
+    // resposta. O padrão do repositório é `secretsMatch`.
+    const isService = secretsMatch(bearer, service);
+    let user: { id: string } | null = null;
+    let isCron = false;
+    if (!isService) {
+      const cronSecret = req.headers.get("x-cron-secret");
+      const { data: validSecret } = await admin.rpc("verify_daily_incremental_sync_secret", { candidate: cronSecret });
+      isCron = validSecret === true;
+      if (!isCron) {
+        const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
+        const { data: userRes, error: authError } = await userClient.auth.getUser();
+        if (authError || !userRes.user) return json({ error: "Não autorizado" }, 401);
+        user = { id: userRes.user.id };
+      }
+    }
+
+    const requestedUserId = user?.id || null;
+    const { data: memberships, error: membershipError } = await admin
+      .from("workspace_members")
+      .select("user_id,workspace_id")
+      .eq(isService || isCron ? "status" : "user_id", isService || isCron ? "active" : requestedUserId);
+    if (membershipError) throw membershipError;
+    const workspaceByUser = new Map((memberships || []).map((row: any) => [String(row.user_id), String(row.workspace_id)]));
+    const membership = requestedUserId ? workspaceByUser.get(requestedUserId) : null;
+    if (!isService && !isCron && !membership) return json({ error: "Workspace não encontrado" }, 409);
+
+    const appId = Deno.env.get("META_APP_ID");
+    const appSecret = Deno.env.get("META_APP_SECRET");
+    const graphVersion = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
+    const results: Array<Record<string, unknown>> = [];
+
+    let accountsQuery = admin
+      .from("ad_accounts")
+      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at, token_expires_at, token_issued_at, last_sync_error, last_sync_error_code");
+    if (requestedUserId) accountsQuery = accountsQuery.eq("user_id", requestedUserId);
+    const { data: accounts, error: accountsError } = await accountsQuery;
+    if (accountsError) throw accountsError;
+
+    for (const account of accounts ?? []) {
+      const baseStatus = expiryStatus(account.connection_status === "connected", null);
+      const check = account.access_token
+        ? await checkMetaToken(String(account.access_token), appId, appSecret)
+        : { status: baseStatus === "error" ? "error" : "unchecked" as HealthStatus, permissions: [], details: { reason: "Token ausente" } };
+      const checkedAt = new Date().toISOString();
+      const recoverPermissionBlock = ["healthy", "expiring"].includes(check.status)
+        && account.connection_status === "blocked"
+        && Number(account.last_sync_error_code) === 200
+        && account.last_sync_error === "Permissões Meta insuficientes para leitura de anúncios/leads";
+      // A transient Graph failure (for example code 1) must not permanently
+      // remove an otherwise valid account from the automatic sync worker.
+      // Token health is checked independently above; only hard authorization
+      // codes remain blocked until the user reconnects the account.
+      const recoverTransientSyncError = ["healthy", "expiring"].includes(check.status)
+        && ["error", "unknown"].includes(String(account.connection_status || ""))
+        && ![10, 100, 190, 200].includes(Number(account.last_sync_error_code));
+      // Health checks may refresh diagnostic columns for every account, but a
+      // manual disconnect is authoritative and must never be changed to
+      // `blocked` by an automated permission check.
+      const healthUpdate = {
+        oauth_health_status: check.status,
+        oauth_checked_at: checkedAt,
+        oauth_permissions: check.permissions,
+        token_expires_at: typeof check.details.expires_at === "number"
+          ? new Date(Number(check.details.expires_at) * 1000).toISOString()
+          : (typeof check.details.expires_at === "string" ? check.details.expires_at : account.token_expires_at),
+        token_issued_at: typeof check.details.issued_at === "number"
+          ? new Date(Number(check.details.issued_at) * 1000).toISOString()
+          : (typeof check.details.issued_at === "string" ? check.details.issued_at : account.token_issued_at),
+        token_refreshed_at: checkedAt,
+        token_refresh_source: "health_check",
+        ...(recoverPermissionBlock || recoverTransientSyncError
+          ? { connection_status: "connected", last_sync_error: null, last_sync_error_code: null }
+          : {}),
+      };
+      let accountUpdate = admin.from("ad_accounts").update(healthUpdate).eq("id", account.id);
+      if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
+      await accountUpdate;
+      if (check.status === "permission_removed" && account.connection_status !== "disconnected") {
+        let permissionUpdate = admin.from("ad_accounts").update({
+          connection_status: "blocked",
+          last_sync_error: "Permissões Meta insuficientes para leitura de anúncios/leads",
+          last_sync_error_code: 200,
+        }).eq("id", account.id).neq("connection_status", "disconnected");
+        if (requestedUserId) permissionUpdate = permissionUpdate.eq("user_id", requestedUserId);
+        await permissionUpdate;
+      }
+      const workspaceId = String(account.workspace_id || workspaceByUser.get(String(account.user_id)) || membership || "");
+      if (workspaceId) await admin.from("oauth_health_events").insert({
+        workspace_id: workspaceId,
+        ad_account_id: account.id,
+        provider: "meta_ads",
+        status: check.status,
+        missing_permissions: check.details.missing_permissions ?? [],
+        details: check.details,
+      });
+      results.push({
+        id: account.id,
+        provider: "meta_ads",
+        status: check.status,
+        missing_permissions: check.details.missing_permissions ?? [],
+        optional_missing_permissions: check.details.optional_missing_permissions ?? [],
+        ...(recoverPermissionBlock || recoverTransientSyncError ? { connection_restored: true } : {}),
+      });
+    }
+
+    let integrationsQuery = admin
+      .from("integrations")
+      .select("id, user_id, provider, api_token, provider_account_id, token_expires_at, is_active");
+    if (requestedUserId) integrationsQuery = integrationsQuery.eq("user_id", requestedUserId);
+    const { data: integrations, error: integrationsError } = await integrationsQuery;
+    if (integrationsError) throw integrationsError;
+
+    for (const integration of integrations ?? []) {
+      const provider = String(integration.provider).toLowerCase();
+      const baseStatus = expiryStatus(integration.is_active, integration.token_expires_at);
+      let check: TokenCheck = { status: baseStatus, permissions: [], details: {} };
+      if (integration.api_token && provider === "instagram_business") {
+        check = await checkInstagramToken(String(integration.api_token), graphVersion);
+        if (check.status === "healthy" && baseStatus === "expiring") check.status = "expiring";
+      }
+      if (provider === "google_workspace" && integration.is_active) {
+        try {
+          const token = await getFreshGoogleToken(admin, integration, "health_check");
+          const expiresAt = integration.token_expires_at ? new Date(integration.token_expires_at).getTime() : 0;
+          check = {
+            status: token.refreshed || !expiresAt || expiresAt >= Date.now() + 7 * 86_400_000 ? "healthy" : "expiring",
+            permissions: [],
+            details: { refreshed: token.refreshed, token_expires_at: integration.token_expires_at ?? null },
+          };
+        } catch (error) {
+          const failure = googleTokenFailure(error);
+          check = { status: failure.status, permissions: [], details: { error_code: failure.errorCode, reason: failure.message } };
+        }
+      }
+      const checkedAt = new Date().toISOString();
+      let integrationUpdate = admin.from("integrations").update({
+        permission_health: check.status,
+        last_permission_check_at: checkedAt,
+        last_health_error: ["error", "reauthorization_required"].includes(check.status) ? String(check.details.reason || "Falha ao validar a autorização") : null,
+      }).eq("id", integration.id);
+      if (requestedUserId) integrationUpdate = integrationUpdate.eq("user_id", requestedUserId);
+      await integrationUpdate;
+      const workspaceId = String(workspaceByUser.get(String(integration.user_id)) || membership || "");
+      if (workspaceId) await admin.from("oauth_health_events").insert({
+        workspace_id: workspaceId,
+        integration_id: integration.id,
+        provider,
+        status: check.status,
+        missing_permissions: check.details.missing_permissions ?? [],
+        details: check.details,
+      });
+      results.push({ id: integration.id, provider, status: check.status, missing_permissions: check.details.missing_permissions ?? [] });
+    }
+
+    return json({ checked: results.length, results, scope: requestedUserId ? "user" : "all" });
+  } catch (error) {
+    console.error("monitor-oauth-health", error);
+    return json({ error: error instanceof Error ? error.message : "Falha interna ao verificar OAuth" }, 500);
+  }
+});

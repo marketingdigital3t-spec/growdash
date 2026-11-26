@@ -1,0 +1,130 @@
+import { memo, useEffect, useMemo, useRef } from "react";
+import type { DrawElement, Point, ResizeHandle } from "../types";
+import { ShapeRenderer } from "../shapes";
+import { getElementBounds, getSelectionBounds } from "../utils/geometry";
+
+export type SelectionBox = { start: Point; end: Point } | null;
+
+export const Canvas = memo(function Canvas({
+  elements,
+  selectedIds,
+  zoom,
+  panOffset,
+  showGrid,
+  editingId,
+  selectionBox,
+  cursor,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onWheel,
+  onElementPointerDown,
+  onElementDoubleClick,
+  onResizePointerDown,
+  onTextChange,
+  onFinishEditing,
+  onDropFiles,
+  onContextMenu,
+}: {
+  elements: DrawElement[];
+  selectedIds: string[];
+  zoom: number;
+  panOffset: Point;
+  showGrid: boolean;
+  editingId: string | null;
+  selectionBox: SelectionBox;
+  cursor: string;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onWheel: (event: WheelEvent) => void;
+  onElementPointerDown: (event: React.PointerEvent<SVGGElement>, element: DrawElement) => void;
+  onElementDoubleClick: (element: DrawElement) => void;
+  onResizePointerDown: (event: React.PointerEvent<SVGElement>, handle: ResizeHandle) => void;
+  onTextChange: (elementId: string, value: string) => void;
+  onFinishEditing: () => void;
+  onDropFiles: (files: FileList, client: Point) => void;
+  onContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const ordered = useMemo(() => [...elements].sort((a, b) => a.layerIndex - b.layerIndex), [elements]);
+  const selectedBounds = getSelectionBounds(elements, selectedIds);
+  // Keep the visual selection on the content bounds. Handles are intentionally
+  // tiny so a selected block does not look like a second, oversized card.
+  const selectionHandleSize = 6 / zoom;
+
+  useEffect(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onWheel(event);
+    };
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [onWheel]);
+  const selection = selectionBox ? {
+    x: Math.min(selectionBox.start.x, selectionBox.end.x),
+    y: Math.min(selectionBox.start.y, selectionBox.end.y),
+    width: Math.abs(selectionBox.end.x - selectionBox.start.x),
+    height: Math.abs(selectionBox.end.y - selectionBox.start.y),
+  } : null;
+
+  return <div
+    ref={canvasRef}
+    data-growdash-flow-canvas
+    className="growdash-flow-canvas absolute inset-0 touch-none overflow-hidden"
+    style={{ cursor }}
+    onPointerDown={onPointerDown}
+    onPointerMove={onPointerMove}
+    onPointerUp={onPointerUp}
+    onPointerCancel={onPointerUp}
+    onContextMenu={onContextMenu}
+    onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
+    onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length) onDropFiles(event.dataTransfer.files, { x: event.clientX, y: event.clientY }); }}
+  >
+    {showGrid && <div className="pointer-events-none absolute inset-0 opacity-45 dark:opacity-40" style={{ backgroundImage: "radial-gradient(circle, rgba(120,113,108,.26) 1px, transparent 1.2px)", backgroundSize: `${20 * zoom}px ${20 * zoom}px`, backgroundPosition: `${panOffset.x}px ${panOffset.y}px` }} />}
+    <svg className="absolute inset-0 h-full w-full overflow-visible" aria-label="Canvas do Growdash Flow">
+      <defs>
+        <marker id="growdash-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" /></marker>
+        <filter id="growdash-flow-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#000" floodOpacity=".25" /></filter>
+      </defs>
+      <g transform={`translate(${panOffset.x} ${panOffset.y}) scale(${zoom})`}>
+        {ordered.map((element) => {
+          const bounds = getElementBounds(element);
+          const selected = selectedIds.includes(element.id);
+          return <g
+            key={element.id}
+            data-flow-element={element.id}
+            opacity={element.opacity}
+            transform={`rotate(${element.rotation} ${bounds.x + bounds.width / 2} ${bounds.y + bounds.height / 2})`}
+            onPointerDown={(event) => onElementPointerDown(event, element)}
+            onDoubleClick={(event) => { event.stopPropagation(); onElementDoubleClick(element); }}
+          >
+            <rect x={bounds.x - 4} y={bounds.y - 4} width={Math.max(8, bounds.width + 8)} height={Math.max(8, bounds.height + 8)} fill="transparent" stroke="transparent" />
+            <ShapeRenderer element={element} elements={elements} editing={editingId === element.id} onTextChange={(value) => onTextChange(element.id, value)} onFinishEditing={onFinishEditing} />
+            {selected && selectedIds.length === 1 && <rect x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} fill="none" stroke="hsl(var(--gd-content-selection, var(--primary)))" strokeWidth={1.25 / zoom} pointerEvents="none" />}
+          </g>;
+        })}
+
+        {selectedBounds && <>
+          {selectedIds.length > 1 && <rect x={selectedBounds.x} y={selectedBounds.y} width={selectedBounds.width} height={selectedBounds.height} fill="hsl(var(--gd-content-selection, var(--primary)) / .04)" stroke="hsl(var(--gd-content-selection, var(--primary)))" strokeWidth={1.25 / zoom} pointerEvents="none" />}
+          {selectedIds.length === 1 && (() => {
+            const left = selectedBounds.x;
+            const right = selectedBounds.x + selectedBounds.width;
+            const top = selectedBounds.y;
+            const bottom = selectedBounds.y + selectedBounds.height;
+            return ([
+              ["nw", left, top], ["n", selectedBounds.x + selectedBounds.width / 2, top], ["ne", right, top],
+              ["e", right, selectedBounds.y + selectedBounds.height / 2], ["se", right, bottom],
+              ["s", selectedBounds.x + selectedBounds.width / 2, bottom], ["sw", left, bottom], ["w", left, selectedBounds.y + selectedBounds.height / 2],
+            ] as Array<[ResizeHandle, number, number]>).map(([handle, x, y]) => <circle key={handle} cx={x} cy={y} r={selectionHandleSize / 2} fill="hsl(var(--background))" stroke="hsl(var(--gd-content-selection, var(--primary)))" strokeWidth={1.2 / zoom} data-resize-handle={handle} onPointerDown={(event) => onResizePointerDown(event, handle)} style={{ cursor: `${handle}-resize` }} />);
+          })()}
+        </>}
+
+        {selection && <rect x={selection.x} y={selection.y} width={selection.width} height={selection.height} fill="hsl(var(--gd-content-selection, var(--primary)) / .10)" stroke="hsl(var(--gd-content-selection, var(--primary)))" strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} pointerEvents="none" />}
+      </g>
+    </svg>
+  </div>;
+});

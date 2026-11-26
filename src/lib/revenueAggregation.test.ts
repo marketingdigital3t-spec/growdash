@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import { aggregateRevenueSources } from "./revenueAggregation";
+import type { RevenueSale, RDRevenueDeal } from "./revenueAggregation";
+
+const sale = (overrides: Partial<Sale> = {}) => ({
+  id: "sale-1", user_id: "user-1", product_id: null, ad_account_id: "account-1", campaign_ids: [], sale_date: "2026-08-01", gross_revenue: 100, net_revenue: 90, tax_amount: 10, refund_amount: 0, chargeback_amount: 0, payment_method: "pix", status: "confirmed", quantity: 1, notes: null, lead_state: null, lead_formation: null, contact_name: null, contact_phone: null, contact_email: null, lead_city: null, lead_entry_date: null, adset_id: null, ad_id: null, rd_deal_id: null, rd_campaign_name: null, rd_product_name: null, rd_funnel_id: null, utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, manual_platform: null, matched_campaign_id: null, match_method: null, manual_campaign_id: null, manual_adset_id: null, manual_ad_id: null, manual_override: false, workspace_id: null, business_unit_id: null, source_provider: null, source_record_id: null, source_closed_at: null, attribution_confidence: null, attribution_reason: null, created_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z", ...overrides,
+}) as RevenueSale;
+const deal = (overrides: Partial<RDRevenueDeal> = {}) => ({ rd_deal_id: "rd-1", rd_stage_name: "Vendas realizadas", win: true, amount_total: 1500, ...overrides }) as RDRevenueDeal;
+
+describe("aggregateRevenueSources", () => {
+  it("inclui nove negócios ganhos do RD que ainda não viraram vendas internas", () => {
+    const result = aggregateRevenueSources([], Array.from({ length: 9 }, (_, index) => deal({ rd_deal_id: `rd-${index}`, amount_total: 500 })));
+    expect(result.totalNet).toBe(4500);
+    expect(result.confirmedSalesCount).toBe(9);
+  });
+  it("não duplica uma negociação RD já representada em venda confirmada", () => {
+    const result = aggregateRevenueSources([sale({ rd_deal_id: "rd-1" })], [deal(), deal({ rd_deal_id: "rd-2", amount_total: 200 })]);
+    expect(result.totalNet).toBe(1700);
+    expect(result.totalTax).toBe(10);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
+  it("conta negócios ganhos mesmo sem valor, mas ignora perdidos, abertos e duplicados", () => {
+    const result = aggregateRevenueSources([], [deal({ win: false, rd_stage_name: "Perdido" }), deal({ win: false, rd_stage_name: "Em negociação" }), deal({ rd_deal_id: "zero", amount_total: 0 }), deal({ rd_deal_id: "rd-1", amount_total: 1500 })]);
+    expect(result.totalNet).toBe(1500);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
+  it("mantém 14 vendas do RD quando apenas 13 possuem linha financeira", () => {
+    const deals = Array.from({ length: 14 }, (_, index) => deal({ rd_deal_id: `patient-${index}`, amount_total: index === 13 ? 0 : 1500 }));
+    const sales = deals.slice(0, 13).map((row) => sale({ id: `sale-${row.rd_deal_id}`, rd_deal_id: row.rd_deal_id, net_revenue: 1500, gross_revenue: 1500, tax_amount: 0 }));
+    const result = aggregateRevenueSources(sales, deals);
+    expect(result.confirmedSalesCount).toBe(14);
+    expect(result.rdOnlyCount).toBe(1);
+  });
+  it("não usa venda financeira sem vínculo RD para inflar o KPI de vendas realizadas", () => {
+    const result = aggregateRevenueSources([sale({ rd_deal_id: null })], []);
+    expect(result.totalNet).toBe(0);
+    expect(result.confirmedSalesCount).toBe(0);
+    expect(result.rdWonDealsCount).toBe(0);
+  });
+  it("deduplica snapshots pelo vínculo conexão RD + negócio", () => {
+    const result = aggregateRevenueSources([], [
+      deal({ rd_connection_id: "connection-a", rd_deal_id: "same" }),
+      deal({ rd_connection_id: "connection-a", rd_deal_id: "same", amount_total: 999 }),
+      deal({ rd_connection_id: "connection-b", rd_deal_id: "same", amount_total: 700 }),
+    ]);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
+  it("normaliza métodos de pagamento e não duplica snapshots da mesma venda", () => {
+    const result = aggregateRevenueSources([
+      sale({ id: "sale-a", payment_method: "credit_card", net_revenue: 100 }),
+      sale({ id: "sale-a", payment_method: "cartao", net_revenue: 999, updated_at: "2026-08-02T12:00:00Z" }),
+      sale({ id: "sale-b", payment_method: "bank_slip", net_revenue: 50 }),
+    ], []);
+    expect(result.byPayment.cartao).toBe(999);
+    expect(result.byPayment.boleto).toBe(50);
+    expect(result.totalNet).toBe(0);
+  });
+
+  it("usa o valor efetivo do RD antes do valor original e mantém zero como zero", () => {
+    const result = aggregateRevenueSources([], [
+      deal({ rd_deal_id: "effective", amount_total: 1000, amount_total_effective: 2500 }),
+      deal({ rd_deal_id: "zero", amount_total: 0, amount_total_effective: 0 }),
+    ]);
+    expect(result.totalNet).toBe(2500);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
+});

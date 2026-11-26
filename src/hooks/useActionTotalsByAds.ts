@@ -1,0 +1,320 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
+import { businessDateKey } from "@/lib/businessDate";
+import { isSameQueryScope } from "@/lib/queryScope";
+import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
+import { ANALYTICS_REQUEST_TIMEOUT_MS, MAX_CAMPAIGN_QUERY_PAGES, fetchCampaignPages } from "@/lib/campaignQuery";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
+import { resolvePersistedSnapshot, type PersistedSnapshot } from "@/lib/metaSnapshot";
+import { shouldRefetchSnapshotOnMount } from "@/lib/queryRefreshPolicy";
+
+export interface ActionTotalsResult {
+  /** Sum across all ads, keyed by action_type. */
+  totals: Record<string, number>;
+  /** Sum keyed by `${ad_account_id}::${action_type}`. Empty if no map provided. */
+  totalsByAccount: Record<string, Record<string, number>>;
+  /** Per-account, per-day, per-action totals: { [accountId]: { [date]: { [action_type]: value } } }. */
+  dailyByAccount: Record<string, Record<string, Record<string, number>>>;
+  /** Per-ad, per-day, per-action totals. Keeps daily charts scoped to the selected campaigns. */
+  dailyByAd: Record<string, Record<string, Record<string, number>>>;
+  /** Per-ad totals: { [ad_id]: { [action_type]: value } }. Used to classify campaigns by mechanism. */
+  totalsByAd: Record<string, Record<string, number>>;
+  /** Per-ad monetary values keyed by action_type (for purchase value and ROAS). */
+  valueTotalsByAd: Record<string, Record<string, number>>;
+  /** Number of ad_ids excluded because their campaign was DELETED/ARCHIVED. */
+  excludedAdCount: number;
+  metaLeadActions: { forms: number; site: number; conversations: number; total: number };
+  /** Alias-safe Meta lead totals per ad, using configured site-event mapping. */
+  leadBreakdownByAd: Record<string, { forms: number; site: number; conversations: number; total: number }>;
+  dailyMetaLeadByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
+  /** Number of persisted lead-action facts; distinguishes absent facts from a valid zero. */
+  leadActionFactCount: number;
+}
+
+export interface ActionScope {
+  /** Resolve every ad in these accounts, including ads without an insights row. */
+  adAccountIds?: string[];
+  /** Optional campaign restriction applied while resolving the account ads. */
+  campaignIds?: string[];
+  attributionWindow?: string;
+  /** Per-account windows used when a consolidated view has mixed settings. */
+  attributionWindowsByAccount?: Record<string, string>;
+  /** Catalog facts already present in the canonical Insights snapshot. */
+  adsetIdByAdId?: Record<string, string | null | undefined>;
+  destinationTypeByAdset?: Record<string, string | null | undefined>;
+}
+
+export function buildActionTotalsSnapshotCacheKey(userId: string | undefined, queryKey: readonly unknown[]) {
+  return userId ? `growdash:action-totals-snapshot:${userId}:${encodeURIComponent(JSON.stringify(queryKey))}` : "";
+}
+
+export function hasCompleteMetaAdCatalog(adIds: string[], adsetIdByAdId?: ActionScope["adsetIdByAdId"]) {
+  return Boolean(adsetIdByAdId && adIds.every((adId) => Object.prototype.hasOwnProperty.call(adsetIdByAdId, adId)));
+}
+
+/**
+ * Aggregates insight_actions for the given ad_ids over a date range.
+ *
+ * Mirrors Meta Ads Manager default behavior: ad_ids whose parent campaign is
+ * DELETED or ARCHIVED are excluded from the totals. This avoids inflated counts
+ * coming from removed campaigns that still share the same pixel/custom event.
+ *
+ * If `adAccountByAdId` is provided, also returns per-account breakdowns so the
+ * caller can resolve per-account event mappings (e.g. lp_lead_action override).
+ */
+export function useActionTotalsByAds(
+  adIds: string[] | undefined,
+  startDate?: Date,
+  endDate?: Date,
+  adAccountByAdId?: Record<string, string | null | undefined>,
+  scope?: ActionScope,
+) {
+  const { user } = useAuth();
+  const sortedIds = [...(adIds || [])].sort();
+  const scopedAccounts = [...(scope?.adAccountIds || [])].sort();
+  const scopedCampaigns = [...(scope?.campaignIds || [])].sort();
+  const attributionWindow = scope?.attributionWindow || "account_default";
+  const attributionWindowsByAccount = scope?.attributionWindowsByAccount || {};
+  const adsetIdByAdId = scope?.adsetIdByAdId || {};
+  const destinationTypeByAdset = scope?.destinationTypeByAdset || {};
+  const attributionWindowsSignature = JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b)));
+  const adCatalogSignature = JSON.stringify(Object.entries(adsetIdByAdId).sort(([a], [b]) => a.localeCompare(b)));
+  const destinationSignature = JSON.stringify(Object.entries(destinationTypeByAdset).sort(([a], [b]) => a.localeCompare(b)));
+  const accountMapSignature = adAccountByAdId
+    ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
+    : "";
+  const queryKey = [
+    "action-totals-by-ads",
+    sortedIds.join(","),
+    scopedAccounts.join(","),
+    scopedCampaigns.join(","),
+    attributionWindow,
+    attributionWindowsSignature,
+    adCatalogSignature,
+    destinationSignature,
+    startDate ? businessDateKey(startDate) : null,
+    endDate ? businessDateKey(endDate) : null,
+    accountMapSignature,
+  ] as const;
+  const snapshotScopeKey = JSON.stringify(queryKey);
+  const snapshotCacheKey = buildActionTotalsSnapshotCacheKey(user?.id, queryKey);
+  const persistedSnapshot = resolvePersistedSnapshot(
+    readLocalCache<PersistedSnapshot<ActionTotalsResult>>(snapshotCacheKey),
+    snapshotScopeKey,
+  );
+  const persistSnapshot = (value: ActionTotalsResult) => {
+    if (snapshotCacheKey) writeLocalCache(snapshotCacheKey, { scopeKey: snapshotScopeKey, savedAt: new Date().toISOString(), value });
+    return value;
+  };
+  return useQuery({
+    queryKey,
+    enabled: sortedIds.length > 0 || scopedAccounts.length > 0 || scopedCampaigns.length > 0,
+    queryFn: async ({ signal }): Promise<ActionTotalsResult> => {
+      const totals: Record<string, number> = {};
+      const totalsByAccount: Record<string, Record<string, number>> = {};
+      const dailyByAccount: Record<string, Record<string, Record<string, number>>> = {};
+      const dailyByAd: Record<string, Record<string, Record<string, number>>> = {};
+      const totalsByAd: Record<string, Record<string, number>> = {};
+      const valueTotalsByAd: Record<string, Record<string, number>> = {};
+      const metaLeadActions = { forms: 0, site: 0, conversations: 0, total: 0 };
+      const leadBreakdownByAd: ActionTotalsResult["leadBreakdownByAd"] = {};
+      const dailyMetaLeadByAccount: ActionTotalsResult["dailyMetaLeadByAccount"] = {};
+      const seenFacts = new Set<string>();
+      const start = startDate ? businessDateKey(startDate) : null;
+      const end = endDate ? businessDateKey(endDate) : null;
+
+      // Resolve the complete account/campaign ad universe first. This is
+      // intentionally independent of `insights`: an ad can have valid Meta
+      // actions even when its daily insight row was not persisted locally.
+      const CHUNK_IDS = 500;
+      let resolvedIds = sortedIds;
+      const resolvedAccountByAd: Record<string, string | null> = { ...(adAccountByAdId || {}) };
+      // When the caller already supplied the ad universe from the canonical
+      // Insights query, never widen it back to every ad in the account. That
+      // was the source of cross-campaign totals and stale rows leaking into a
+      // selected calendar scope. An empty universe still resolves the account
+      // catalog so a brand-new ad can be reconciled.
+      // Actions are facts for the exact ad universe returned by the canonical
+      // Insights scope. Expanding an empty result to every ad in the account
+      // leaks stale/archived ads into the selected period and is a common
+      // source of inflated leads. An empty universe is therefore a valid
+      // empty snapshot; the sync layer will fill it on the next run.
+      if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
+        return persistSnapshot({ totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount: 0 });
+      }
+      const resolvedSortedIds = [...new Set(resolvedIds)].sort();
+      const canUseProvidedCatalog = hasCompleteMetaAdCatalog(resolvedSortedIds, adsetIdByAdId);
+      const adsetByAd: Record<string, string | null> = canUseProvidedCatalog
+        ? Object.fromEntries(resolvedSortedIds.map((adId) => [adId, adsetIdByAdId[adId] || null]))
+        : {};
+      const resolvedDestinationTypeByAdset: Record<string, string | null> = canUseProvidedCatalog
+        ? Object.fromEntries(Object.entries(destinationTypeByAdset).map(([id, value]) => [id, value || null]))
+        : {};
+      if (!canUseProvidedCatalog) {
+        for (let i = 0; i < resolvedSortedIds.length; i += CHUNK_IDS) {
+          const chunk = resolvedSortedIds.slice(i, i + CHUNK_IDS);
+          const data = await fetchCampaignPages(
+            () => supabase.from("ads").select("id, adset_id").in("id", chunk),
+            signal,
+            chunk.length || CHUNK_IDS,
+            "Os anúncios para calcular as ações",
+            2,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
+          );
+          for (const r of data as any[]) adsetByAd[r.id] = r.adset_id;
+        }
+        const adsetIds = Array.from(new Set(Object.values(adsetByAd).filter(Boolean))) as string[];
+        for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
+          const chunk = adsetIds.slice(i, i + CHUNK_IDS);
+          const data = await fetchCampaignPages(
+            () => supabase.from("adsets").select("id, destination_type").in("id", chunk),
+            signal,
+            chunk.length || CHUNK_IDS,
+            "Os conjuntos para calcular as ações",
+            2,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
+          );
+          for (const r of data as any[]) {
+            resolvedDestinationTypeByAdset[r.id] = r.destination_type || null;
+          }
+        }
+      }
+      // Historical Meta results remain valid even when the parent campaign is
+      // archived/deleted. Never discard those action rows by current status.
+      const allowedIds = resolvedSortedIds;
+      const excludedAdCount = 0;
+      const siteEligibleAdScopes = new Set(allowedIds
+        .filter((adId) => {
+          const adsetId = adsetByAd[adId];
+          return adsetId && String(resolvedDestinationTypeByAdset[adsetId] || "").toUpperCase() === "WEBSITE";
+        })
+        .map((adId) => `${resolvedAccountByAd[adId] || ""}|${adId}`));
+      const conversationEligibleAdScopes = buildConversationEligibleMetaAdScopes(
+        allowedIds.map((adId) => ({ ad_account_id: resolvedAccountByAd[adId] || "", ad_id: adId, adset_id: adsetByAd[adId] || null })),
+        resolvedDestinationTypeByAdset,
+      );
+
+      // === Sum insight_actions only for allowed ads ===
+      const CHUNK = 200;
+      const PAGE = 1000;
+      // A consolidated dashboard may contain accounts configured with
+      // different Meta attribution windows. Query each account/window pair
+      // separately; applying one global window silently drops valid actions
+      // from every account using another setting.
+      const actionGroups = new Map<string, { accountId: string; window: string; ids: string[] }>();
+      for (const id of allowedIds) {
+        const accountId = resolvedAccountByAd[id] || "";
+        const window = normalizeMetaAttributionWindow(attributionWindowsByAccount[accountId] || attributionWindow);
+        const key = `${accountId}::${window}`;
+        const group = actionGroups.get(key) || { accountId, window, ids: [] };
+        group.ids.push(id);
+        actionGroups.set(key, group);
+      }
+      for (const group of actionGroups.values()) {
+        for (let i = 0; i < group.ids.length; i += CHUNK) {
+          const chunk = group.ids.slice(i, i + CHUNK);
+          const rows = await fetchCampaignPages(
+            () => {
+              let q = supabase
+                .from("insight_actions" as any)
+                .select("ad_account_id, ad_id, action_type, value, value_amount, date, attribution_window")
+                .eq("ad_account_id", group.accountId)
+                .in("ad_id", chunk);
+              if (start) q = q.gte("date", start);
+              if (end) q = q.lte("date", end);
+              return q;
+            },
+            signal,
+            PAGE,
+            "As ações Meta das campanhas",
+            MAX_CAMPAIGN_QUERY_PAGES,
+            ANALYTICS_REQUEST_TIMEOUT_MS,
+          ) as any[];
+          for (const r of rows) {
+            if (!matchesMetaAttributionWindow(r.attribution_window, group.window)) continue;
+            const factKey = `${r.ad_id}|${r.date}|${r.action_type}|${normalizeMetaAttributionWindow(r.attribution_window)}`;
+            if (seenFacts.has(factKey)) continue;
+            seenFacts.add(factKey);
+            const v = Number(r.value || 0);
+            totals[r.action_type] = (totals[r.action_type] || 0) + v;
+            if (!totalsByAd[r.ad_id]) totalsByAd[r.ad_id] = {};
+            totalsByAd[r.ad_id][r.action_type] = (totalsByAd[r.ad_id][r.action_type] || 0) + v;
+            if (!dailyByAd[r.ad_id]) dailyByAd[r.ad_id] = {};
+            if (!dailyByAd[r.ad_id][r.date]) dailyByAd[r.ad_id][r.date] = {};
+            dailyByAd[r.ad_id][r.date][r.action_type] = (dailyByAd[r.ad_id][r.date][r.action_type] || 0) + v;
+            if (!valueTotalsByAd[r.ad_id]) valueTotalsByAd[r.ad_id] = {};
+            valueTotalsByAd[r.ad_id][r.action_type] = (valueTotalsByAd[r.ad_id][r.action_type] || 0) + Number(r.value_amount || 0);
+            const acc = resolvedAccountByAd[r.ad_id] || undefined;
+            if (acc) {
+              if (!totalsByAccount[acc]) totalsByAccount[acc] = {};
+              totalsByAccount[acc][r.action_type] = (totalsByAccount[acc][r.action_type] || 0) + v;
+              if (!dailyByAccount[acc]) dailyByAccount[acc] = {};
+              if (!dailyByAccount[acc][r.date]) dailyByAccount[acc][r.date] = {};
+              dailyByAccount[acc][r.date][r.action_type] =
+                (dailyByAccount[acc][r.date][r.action_type] || 0) + v;
+            }
+          }
+        }
+      }
+      const accountIds = Array.from(new Set(allowedIds.map((id) => resolvedAccountByAd[id]).filter(Boolean))) as string[];
+      const lpByAccount: Record<string, string> = {};
+      if (accountIds.length > 0) {
+        const configs = await fetchCampaignPages(
+          () => supabase.from("account_lp_config").select("ad_account_id, action_type").in("ad_account_id", accountIds),
+          signal,
+          accountIds.length,
+          "As configurações de atribuição das contas",
+          2,
+          ANALYTICS_REQUEST_TIMEOUT_MS,
+        );
+        for (const config of configs as Array<{ ad_account_id: string; action_type: string | null }>) {
+          if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
+        }
+      }
+      const canonicalDaily = aggregateMetaLeadActionDays(dailyByAd, resolvedAccountByAd, lpByAccount, siteEligibleAdScopes, conversationEligibleAdScopes);
+      Object.assign(metaLeadActions, canonicalDaily.totals);
+      Object.assign(dailyMetaLeadByAccount, canonicalDaily.dailyByAccount);
+      for (const [adId, dates] of Object.entries(dailyByAd)) {
+        const accountId = resolvedAccountByAd[adId];
+        const aggregate = { forms: 0, site: 0, conversations: 0, total: 0 };
+        for (const dailyActions of Object.values(dates)) {
+          const scopeKey = `${accountId || ""}|${adId}`;
+          const siteAction = siteEligibleAdScopes.has(scopeKey) && accountId ? lpByAccount[accountId] : undefined;
+          const resolved = resolveMetaLeadActions(dailyActions, siteAction, siteEligibleAdScopes.has(scopeKey), conversationEligibleAdScopes.has(scopeKey));
+          aggregate.forms += resolved.forms;
+          aggregate.site += resolved.site;
+          aggregate.conversations += resolved.conversations;
+        }
+        aggregate.total = aggregate.forms + aggregate.site + aggregate.conversations;
+        leadBreakdownByAd[adId] = aggregate;
+      }
+      const leadActionAliases = new Set<string>([
+        ...META_ACTION_TYPES.forms,
+        ...META_ACTION_TYPES.conversations,
+      ]);
+      const leadActionFactCount = Object.entries(dailyByAd).reduce((count, [adId, days]) => {
+        const accountId = resolvedAccountByAd[adId] || "";
+        const siteAction = siteEligibleAdScopes.has(`${accountId}|${adId}`) ? lpByAccount[accountId] : undefined;
+        return count + Object.values(days).filter((dayActions) =>
+          Object.keys(dayActions).some((actionType) => leadActionAliases.has(actionType) || actionType === siteAction),
+        ).length;
+      }, 0);
+      return persistSnapshot({ totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount });
+    },
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : persistedSnapshot,
+    // Sem polling de 60s: as ações do provider acompanham o ciclo de 15
+    // minutos ou o clique explícito em "Atualizar".
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
+    refetchOnMount: shouldRefetchSnapshotOnMount(Boolean(persistedSnapshot)),
+    refetchOnWindowFocus: false,
+    // Actions enrich the core Insights snapshot. Retrying after the bounded
+    // analytics timeout would delay Leads/CPL beyond the first-paint budget.
+    retry: 0,
+  });
+}

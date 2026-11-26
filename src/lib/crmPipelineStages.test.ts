@@ -1,0 +1,105 @@
+import { describe, expect, it } from "vitest";
+import { consolidateCRMPipeline, consolidatedCRMStage, excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages, isExcludedLegacyRannielyStage, mergeCRMStageSources } from "./crmPipelineStages";
+
+describe("CRM consolidated pipeline", () => {
+  it("puts equivalent new-lead labels in one column", () => {
+    const stages = consolidateCRMPipeline([
+      { id: "a", name: "Lead Novo", order: 1 },
+      { id: "b", name: "leads novos", order: 3 },
+      { id: "c", name: "Leads Novos", order: 2 },
+    ]);
+    expect(stages).toEqual([{ id: "new-leads", name: "Novos leads", order: 10, won: false, lost: false }]);
+  });
+
+  it("always joins won and lost stages independently of the funnel", () => {
+    expect(consolidatedCRMStage({ name: "Venda realizada", won: true })).toMatchObject({ id: "won", name: "Vendas ganhas" });
+    expect(consolidatedCRMStage({ name: "Não fechou", lost: true })).toMatchObject({ id: "lost", name: "Perdidas" });
+  });
+
+  it("uses terminal RD labels when a stale snapshot omits the won flag", () => {
+    expect(consolidatedCRMStage({ name: "Venda Realizada", won: false })).toMatchObject({ id: "won", won: true });
+    expect(consolidatedCRMStage({ name: "Perdido", lost: false })).toMatchObject({ id: "lost", lost: true });
+  });
+
+  it("joins SDR and opportunity variants from different RD funnels", () => {
+    const stages = consolidateCRMPipeline([
+      { id: "a", name: "SDR", order: 2 },
+      { id: "b", name: "Não Atendeu - SDR", order: 3 },
+      { id: "c", name: "Oportunidade", order: 4 },
+      { id: "d", name: "Oportunidades", order: 5 },
+    ]);
+
+    expect(stages).toEqual([
+      { id: "sdr", name: "SDR", order: 18, won: false, lost: false },
+      { id: "opportunity", name: "Oportunidades", order: 45, won: false, lost: false },
+    ]);
+  });
+
+  it("merges duplicate named snapshots inside one RD funnel without losing source mappings", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel:stage-a", funnelId: "funnel", stageId: "stage-a", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel:stage-b", funnelId: "funnel", stageId: "stage-b", name: "Venda realizada", order: 9, won: false, lost: false },
+      { sourceId: "funnel:stage-c", funnelId: "funnel", stageId: "stage-c", name: "Oportunidade", order: 4, won: false, lost: false },
+    ]);
+
+    expect(result.stages).toHaveLength(2);
+    expect(result.stages.find((stage) => stage.name === "Venda Realizada")).toMatchObject({ id: "funnel:stage-a", won: true });
+    expect(result.sourceToCanonicalId.get("funnel:stage-b")).toBe("funnel:stage-a");
+  });
+
+  it("keeps equal labels separated when they belong to different RD funnels", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel-a:stage", funnelId: "funnel-a", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel-b:stage", funnelId: "funnel-b", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+    ]);
+
+    expect(result.stages).toHaveLength(2);
+    expect(result.sourceToCanonicalId.get("funnel-a:stage")).not.toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
+  });
+
+  it("can merge equal labels across duplicate funnel snapshots", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel-a:stage", funnelId: "funnel-a", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel-b:stage", funnelId: "funnel-b", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+    ], { preserveFunnelBoundaries: false });
+
+    expect(result.stages).toHaveLength(1);
+    expect(result.sourceToCanonicalId.get("funnel-a:stage")).toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
+  });
+
+  it("excludes the deleted Junior lead stage only from Ranniely's student funnel", () => {
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(true);
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Lead do Dro Junior")).toBe(true);
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Paciente modelo", "Leads antigos do Dr Junior")).toBe(false);
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Novos leads")).toBe(false);
+  });
+
+  it("removes the deleted stage from every operational dashboard data source", () => {
+    const rows = filterOperationalRDDeals([
+      { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", id: "legacy" },
+      { rd_funnel_id: "aluna", rd_stage_name: "Venda Realizada", id: "sale" },
+      { rd_funnel_id: "model", rd_stage_name: "Leads Antigos do Junior", id: "model" },
+    ], [
+      { id: "aluna", name: "Dra. Ranniely Silva – Aluna" },
+      { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
+    ]);
+
+    expect(rows.map((row) => row.id)).toEqual(["sale", "model"]);
+  });
+
+  it("does not remove the same label from other Ranniely funnels", () => {
+    const funnels = [
+      { id: "aluna", name: "Dra. Ranniely Silva – Aluna" },
+      { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
+    ];
+    const deals = [
+      { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "legacy" },
+      { rd_funnel_id: "model", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "valid" },
+    ];
+    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set(["legacy"]));
+    expect(filterOperationalRDFunnelStages([
+      { rd_funnel_id: "aluna", name: "Leads Antigos do Junior" },
+      { rd_funnel_id: "aluna", name: "Novos Leads" },
+    ], funnels).map((stage) => stage.name)).toEqual(["Novos Leads"]);
+  });
+});

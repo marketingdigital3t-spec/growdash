@@ -1,0 +1,263 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { inspectMetaToken } from "../_shared/metaToken.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+
+const resultPage = (status: "success" | "error", message: string, accounts = 0) => {
+  const appUrl = (Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").replace(/\/$/, "");
+  const callbackUrl = new URL(`${appUrl}/meta-oauth-callback.html`);
+  callbackUrl.searchParams.set("status", status);
+  callbackUrl.searchParams.set("message", message);
+  callbackUrl.searchParams.set("accounts", String(accounts));
+
+  // Supabase's gateway may normalize Edge Function bodies to text/plain.
+  // Redirect the OAuth popup to a same-origin static page so the browser
+  // renders the result and can safely notify the opener via postMessage.
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: callbackUrl.toString(),
+      "Cache-Control": "no-store",
+    },
+  });
+};
+
+const sha256 = async (value: string) => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+type MetaAccount = {
+  id?: string;
+  account_id?: string;
+  name?: string;
+  currency?: string;
+  timezone_name?: string;
+  timezone_offset_hours_utc?: number;
+};
+
+type MetaPage<T> = {
+  data?: T[];
+  paging?: { cursors?: { after?: string }; next?: string };
+  error?: { code?: number; message?: string };
+};
+
+async function fetchPagedAccounts(graphVersion: string, path: string, accessToken: string) {
+  const accounts: MetaAccount[] = [];
+  let after: string | null = null;
+  const seenCursors = new Set<string>();
+  while (true) {
+    const accountsUrl = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
+    accountsUrl.searchParams.set("fields", "id,account_id,name,currency,timezone_name,timezone_offset_hours_utc");
+    accountsUrl.searchParams.set("limit", "100");
+    accountsUrl.searchParams.set("access_token", accessToken);
+    if (after) accountsUrl.searchParams.set("after", after);
+
+    const response = await fetchWithTimeout(accountsUrl, { headers: { Accept: "application/json" } }, 15_000);
+    const result = await response.json().catch(() => ({})) as MetaPage<MetaAccount>;
+    if (!response.ok || result.error) {
+      return { accounts, error: result.error?.message || `HTTP ${response.status}` };
+    }
+    accounts.push(...(Array.isArray(result.data) ? result.data : []));
+    after = result.paging?.cursors?.after ?? null;
+    if (!after || !result.paging?.next) break;
+    if (seenCursors.has(after)) {
+      return { accounts, error: "A Meta devolveu uma paginação circular; a lista não pôde ser reconciliada com segurança." };
+    }
+    seenCursors.add(after);
+  }
+  return { accounts, error: null as string | null };
+}
+
+Deno.serve(async (req) => {
+  if (req.method !== "GET") return resultPage("error", "Método inválido.");
+
+  const url = new URL(req.url);
+  const state = url.searchParams.get("state") ?? "";
+  if (!state) return resultPage("error", "O retorno da Meta não contém um estado de segurança válido.");
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const appId = Deno.env.get("META_APP_ID");
+    const appSecret = Deno.env.get("META_APP_SECRET");
+    if (!appId || !appSecret) return resultPage("error", "As credenciais do aplicativo Meta ainda não foram configuradas no servidor.");
+
+    const admin = createClient(supabaseUrl, serviceKey);
+    const stateHash = await sha256(state);
+    const { data: oauthState, error: stateError } = await admin
+      .from("meta_oauth_states")
+      .select("state_hash, user_id, expires_at")
+      .eq("state_hash", stateHash)
+      .maybeSingle();
+
+    // Consume immediately: a callback can never be replayed, even after an error.
+    if (oauthState) await admin.from("meta_oauth_states").delete().eq("state_hash", stateHash);
+    if (stateError || !oauthState || new Date(oauthState.expires_at).getTime() < Date.now()) {
+      return resultPage("error", "Esta tentativa expirou ou já foi utilizada. Inicie a conexão novamente.");
+    }
+
+    const metaError = url.searchParams.get("error_message")
+      ?? url.searchParams.get("error_description")
+      ?? url.searchParams.get("error");
+    if (metaError) return resultPage("error", "A Meta recusou a autorização.");
+
+    const code = url.searchParams.get("code");
+    if (!code) return resultPage("error", "A Meta não devolveu o código de autorização.");
+
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
+    const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
+      ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
+
+    const tokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);
+    tokenUrl.searchParams.set("client_id", appId);
+    tokenUrl.searchParams.set("client_secret", appSecret);
+    tokenUrl.searchParams.set("redirect_uri", redirectUri);
+    tokenUrl.searchParams.set("code", code);
+    const tokenResponse = await fetchWithTimeout(tokenUrl, { headers: { Accept: "application/json" } }, 15_000);
+    const tokenResult = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenResult.access_token) {
+      console.error("Meta short token exchange failed", tokenResult?.error?.code ?? tokenResponse.status);
+      const detail = tokenResult?.error?.message ? ` ${String(tokenResult.error.message)}` : "";
+      return resultPage("error", `A Meta não aceitou a troca do código de autorização.${detail}`);
+    }
+
+    const longTokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);
+    longTokenUrl.searchParams.set("grant_type", "fb_exchange_token");
+    longTokenUrl.searchParams.set("client_id", appId);
+    longTokenUrl.searchParams.set("client_secret", appSecret);
+    longTokenUrl.searchParams.set("fb_exchange_token", tokenResult.access_token);
+    const longResponse = await fetchWithTimeout(longTokenUrl, { headers: { Accept: "application/json" } }, 15_000);
+    const longResult = await longResponse.json().catch(() => ({}));
+    const accessToken = longResponse.ok && longResult.access_token
+      ? String(longResult.access_token)
+      : String(tokenResult.access_token);
+
+    const tokenInspection = await inspectMetaToken(accessToken, appId, appSecret);
+    if (!tokenInspection.isValid) {
+      return resultPage("error", tokenInspection.errorMessage || "A Meta não confirmou o novo token.");
+    }
+    // `/me/adaccounts` is the canonical endpoint. For Meta Login for
+    // Business, some users only expose assets through their Business Manager;
+    // use the business-owned and client-owned collections as a safe fallback.
+    const direct = await fetchPagedAccounts(graphVersion, "me/adaccounts", accessToken);
+    if (direct.error) console.warn("Meta direct ad accounts lookup failed; trying Business Manager assets", direct.error);
+
+    const accountsById = new Map<string, MetaAccount>();
+    for (const account of direct.accounts) {
+      const key = String(account.account_id ?? account.id ?? "").replace(/^act_/, "");
+      if (key) accountsById.set(key, account);
+    }
+
+    // Merge Business Manager assets as well: /me/adaccounts may omit client
+    // accounts that the profile can still manage.
+    {
+      const businessesResponse = await fetchWithTimeout(
+        `https://graph.facebook.com/${graphVersion}/me/businesses?fields=id&limit=100&access_token=${encodeURIComponent(accessToken)}`,
+        { headers: { Accept: "application/json" } }, 15_000);
+      const businessesResult = await businessesResponse.json().catch(() => ({})) as MetaPage<{ id?: string }>;
+      if (businessesResponse.ok && !businessesResult.error) {
+        for (const business of businessesResult.data ?? []) {
+          if (!business.id) continue;
+          for (const collection of ["owned_ad_accounts", "client_ad_accounts"]) {
+            const page = await fetchPagedAccounts(graphVersion, `${business.id}/${collection}`, accessToken);
+            if (page.error) {
+              console.warn("Meta business asset lookup skipped", business.id, collection, page.error);
+              continue;
+            }
+            for (const account of page.accounts) {
+              const key = String(account.account_id ?? account.id ?? "").replace(/^act_/, "");
+              if (key) accountsById.set(key, account);
+            }
+          }
+        }
+      }
+    }
+
+    const accounts = Array.from(accountsById.values());
+
+    if (accounts.length === 0) {
+      return resultPage("error", direct.error
+        ? "A autorização foi concluída, mas a Meta não liberou nenhuma conta de anúncio. Verifique ads_read, business_management e o acesso do usuário às contas."
+        : "Nenhuma conta de anúncio acessível foi encontrada nesse perfil da Meta.");
+    }
+
+    const { data: workspaceMembership } = await admin
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", oauthState.user_id)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    let saved = 0;
+    for (const account of accounts) {
+      const rawId = String(account.account_id ?? account.id ?? "").replace(/^act_/, "").trim();
+      if (!/^\d+$/.test(rawId)) continue;
+      const accountId = `act_${rawId}`;
+      const { data: existingRows } = await admin
+        .from("ad_accounts")
+        .select("id,connection_status,last_sync_success_at")
+        .eq("user_id", oauthState.user_id)
+        .in("account_id", [accountId, rawId])
+        .order("connection_status", { ascending: true })
+        .order("updated_at", { ascending: false });
+      // Prefer an already active canonical row; otherwise reuse the newest
+      // legacy row instead of inserting another copy on every OAuth refresh.
+      const existing = (existingRows || []).sort((a, b) => Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected"))[0];
+      const values = {
+        user_id: oauthState.user_id,
+        workspace_id: workspaceMembership?.workspace_id ?? null,
+        account_id: accountId,
+        provider_account_id: rawId,
+        name: String(account.name ?? accountId).slice(0, 255),
+        access_token: accessToken,
+        currency: account.currency ? String(account.currency).slice(0, 16) : null,
+        timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
+        timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
+        metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
+        // A successful OAuth authorization is authoritative for accounts that
+        // were expired/error. Keep an account explicitly disabled by the
+        // operator disabled, but do not leave a freshly authorized account
+        // stuck showing "reconnection required" because of its old status.
+        connection_status: existing?.connection_status === "disconnected"
+          ? "disconnected"
+          : "connected",
+        last_sync_error: null,
+        last_sync_error_code: null,
+        oauth_health_status: "unchecked",
+        oauth_checked_at: null,
+        oauth_permissions: tokenInspection.permissions,
+        token_issued_at: tokenInspection.issuedAt || new Date().toISOString(),
+        token_expires_at: tokenInspection.expiresAt,
+        token_refreshed_at: new Date().toISOString(),
+        token_refresh_source: "oauth",
+        // OAuth only imports credentials and account metadata; the first
+        // successful insights/leads sync must establish freshness.
+        last_sync_success_at: existing?.last_sync_success_at || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const operation = existing
+        ? admin.from("ad_accounts").update(values).eq("id", existing.id)
+        : admin.from("ad_accounts").insert(values);
+      const { error: saveError } = await operation;
+      if (saveError) console.error("Could not save Meta account", accountId, saveError.code);
+      else saved += 1;
+    }
+
+    if (saved === 0) {
+      const directDiagnostic = direct.error ? ` consulta direta: ${direct.error}` : " consulta direta sem contas";
+      return resultPage("error", `A Meta não retornou contas de anúncio utilizáveis para este usuário.${directDiagnostic}`);
+    }
+    const tokenValidity = tokenInspection.expiresAt
+      ? new Date(tokenInspection.expiresAt).toLocaleDateString("pt-BR")
+      : tokenInspection.dataAccessExpiresAt
+        ? `acesso aos dados até ${new Date(tokenInspection.dataAccessExpiresAt).toLocaleDateString("pt-BR")}`
+        : "validade não informada pela Meta";
+    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Token: ${tokenValidity}.`, saved);
+  } catch (error) {
+    console.error("meta-oauth-callback", error);
+    return resultPage("error", "Ocorreu uma falha interna ao concluir a conexão.");
+  }
+});

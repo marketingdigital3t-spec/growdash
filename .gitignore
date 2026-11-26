@@ -1,0 +1,88 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+html
+.env
+.env.*
+!.env.example
+deploy/.env
+.output
+.vinxi
+.tanstack/**
+
+# Resíduo de build do Next.js. O projeto é Vite; um build do Next.js deixado
+# pela metade gerava `.next/types/*.ts` que o ESLint varriava, produzindo 71
+# erros falsos e travando o loop-engineering. Ignorar aqui evita que o
+# diretório volte ao status do Git.
+.next
+.next.residuo-nextjs-orfao
+
+# Perfil persistente do Playwright usado pelo traffic-agent. Os cookies e a
+# sessão do Ads Manager neste diretório equivalem a acesso total à conta de
+# anúncios: nunca devem entrar no histórico do Git.
+work/
+traffic-agent-profile/
+
+# Relatórios e locks gerados pelo loop-engineering
+reports/*.lock/
+reports/*.json.lock/
+test-results/
+playwright-report/
+.nitro
+*.local
+*.tsbuildinfo
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+supabase/.temp/
+test-results/
+playwright-report/
+reports/*.json
+reports/*.md
+tests/visual/__screenshots__/growdash.spec.ts/auth.png
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.auth/
+.pnpm-store/
+
+# Scratch de trabalho do superpowers (ledger de planos)
+.superpowers/
+
+# Cópias de backup que o Claude Sonnet 5 Code cria ao editar ("arquivo 2.tsx").
+# Nenhuma é importada pelo projeto; versioná-las polui o lint, o TypeScript
+# e a revisão de diff.
+* 2.ts
+* 2.tsx
+* 2.json
+* 2.md
+* 2.jpg
+
+# Artefatos de demonstração e vídeo gerados localmente.
+growdash-demo.mp4
+growdash-video/
+
+# Worktrees do Claude Opus 5 Code. Cada um traz o proprio tsconfig.json, e o ESLint
+# encontra varias raizes candidatas e falha com "multiple candidate
+# TSConfigRootDirs are present" em todo arquivo — o que derrubou `npm run lint`
+# com milhares de erros e bloqueou o gate do loop-engineering.
+.claude/worktrees/

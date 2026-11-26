@@ -1,0 +1,104 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+
+const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+const sha256 = async (value: string) => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+const instagramError = (payload: any, fallback: string) => {
+  const message = String(payload?.error_message ?? payload?.error_description ?? payload?.error?.message ?? payload?.message ?? "").trim();
+  // Provider responses are displayed in the OAuth popup. Keep diagnostics
+  // useful while preventing accidental reflection of codes or credentials.
+  const safe = message.replace(/(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|authorization|code)\s*[:=]\s*[^\s,;]+/gi, "$1: [oculto]").slice(0, 240);
+  return safe ? `${fallback}: ${safe}` : fallback;
+};
+async function fetchProfile(url: URL, token: string) {
+  let lastResponse: Response | null = null;
+  let lastPayload: any = {};
+  // Instagram Login and older Basic Display-compatible accounts expose
+  // different identifier field names. Retry with the alternate field set
+  // instead of rejecting a valid OAuth callback on a field validation error.
+  for (const fields of [
+    "id,username,name,profile_picture_url,followers_count,media_count,account_type",
+    "user_id,username,name,profile_picture_url,followers_count,media_count,account_type",
+  ]) {
+    const attempt = new URL(url);
+    attempt.searchParams.set("fields", fields);
+    attempt.searchParams.set("access_token", token);
+    lastResponse = await fetchWithTimeout(attempt, {}, 15_000);
+    lastPayload = await lastResponse.json().catch(() => ({}));
+    if (lastResponse.ok && (lastPayload.id || lastPayload.user_id)) return { response: lastResponse, payload: lastPayload };
+  }
+  return { response: lastResponse, payload: lastPayload };
+}
+const page = (status: "success" | "error", message: string, socialAccountId?: string) => {
+  const payload = JSON.stringify({ type: "growdash-instagram-oauth", status, message, socialAccountId }).replaceAll("<", "\\u003c");
+  const appOrigin = new URL(Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").origin;
+  return new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Instagram</title><style>body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #444;border-radius:20px;background:#141414;padding:32px;text-align:center;box-shadow:0 24px 70px #000a}h1{color:${status === "success" ? "#f5f5f5" : "#ff7474"}}p{color:#c8c8c8;line-height:1.6}button{border:1px solid #f5f5f5;border-radius:11px;background:#f5f5f5;color:#101010;padding:12px 20px;font-weight:800}</style></head><body><main><h1>${status === "success" ? "Instagram conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},${JSON.stringify(appOrigin)})}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script></body></html>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
+};
+
+Deno.serve(async (req) => {
+  if (req.method !== "GET") return page("error", "Método inválido.");
+  const url = new URL(req.url);
+  const state = url.searchParams.get("state") ?? "";
+  if (!state) return page("error", "O retorno não contém o estado de segurança.");
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    // Do not use META_APP_* here: Facebook Login credentials are not accepted
+    // by Instagram Login and surface as the opaque "Invalid platform app".
+    const appId = Deno.env.get("INSTAGRAM_APP_ID");
+    const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
+    if (!appId || !appSecret) return page("error", "Credenciais próprias do Instagram Login não configuradas. Habilite o produto Instagram API with Instagram Login no app Meta e cadastre INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET.");
+    const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const stateHash = await sha256(state);
+    const { data: oauthState } = await admin.from("instagram_oauth_states").select("state_hash,user_id,expires_at").eq("state_hash", stateHash).maybeSingle();
+    if (oauthState) await admin.from("instagram_oauth_states").delete().eq("state_hash", stateHash);
+    if (!oauthState || new Date(oauthState.expires_at).getTime() < Date.now()) return page("error", "Esta tentativa expirou ou já foi utilizada.");
+    const denied = url.searchParams.get("error_description") ?? url.searchParams.get("error_message");
+    if (denied) return page("error", "O Instagram recusou a autorização.");
+    const code = url.searchParams.get("code")?.replace(/#_$/, "");
+    if (!code) return page("error", "O Instagram não devolveu o código de autorização.");
+    const redirectUri = Deno.env.get("INSTAGRAM_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/instagram-oauth-callback`;
+    const form = new URLSearchParams({ client_id: appId, client_secret: appSecret, grant_type: "authorization_code", redirect_uri: redirectUri, code });
+    const shortResponse = await fetchWithTimeout("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form }, 15_000);
+    const short = await shortResponse.json().catch(() => ({}));
+    if (!shortResponse.ok || !short.access_token) {
+      console.error("Instagram short token exchange failed", short?.error_type ?? shortResponse.status);
+      return page("error", instagramError(short, "O Instagram não aceitou a troca do código. Confira o App ID, o App Secret e a URL de redirecionamento cadastrada"));
+    }
+    const longUrl = new URL("https://graph.instagram.com/access_token");
+    longUrl.searchParams.set("grant_type", "ig_exchange_token");
+    longUrl.searchParams.set("client_secret", appSecret);
+    longUrl.searchParams.set("access_token", short.access_token);
+    const longResponse = await fetchWithTimeout(longUrl, {}, 15_000);
+    const long = await longResponse.json().catch(() => ({}));
+    const token = String(long.access_token ?? short.access_token);
+    const expiresIn = Number(long.expires_in ?? 3600);
+    const graphVersion = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
+    const profileUrl = new URL(`https://graph.instagram.com/${graphVersion}/me`);
+    const { response: profileResponse, payload: profile } = await fetchProfile(profileUrl, token);
+    // Instagram Login has returned both `id` and `user_id` across API versions.
+    // Accept either value so a valid professional account is not rejected after OAuth.
+    const profileId = String(profile.id ?? profile.user_id ?? "").trim();
+    if (!profileResponse?.ok || !profileId) {
+      console.error("Instagram profile lookup failed", profile?.error?.code ?? profileResponse?.status);
+      return page("error", instagramError(profile, "A conta foi autorizada, mas o perfil profissional não pôde ser lido. Use uma conta Business ou Creator"));
+    }
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const integrationValues = { api_token: token, is_active: true, provider_account_id: profileId, token_expires_at: expiresAt, updated_at: new Date().toISOString() };
+    const { data: existing } = await admin.from("integrations").select("id").eq("user_id", oauthState.user_id).eq("provider", "instagram_business").eq("provider_account_id", profileId).maybeSingle();
+    const integrationOp = existing
+      ? admin.from("integrations").update(integrationValues).eq("id", existing.id)
+      : admin.from("integrations").insert({ user_id: oauthState.user_id, provider: "instagram_business", ...integrationValues });
+    const { error: integrationError } = await integrationOp;
+    if (integrationError) throw integrationError;
+    const { data: socialAccount, error: accountError } = await admin.from("social_accounts").upsert({ user_id: oauthState.user_id, provider: "instagram", provider_account_id: profileId, username: profile.username ?? null, display_name: profile.name ?? profile.username ?? "Instagram", profile_picture_url: profile.profile_picture_url ?? null, followers_count: Number(profile.followers_count ?? 0), media_count: Number(profile.media_count ?? 0), connection_status: "connected", last_error: null, last_sync_at: new Date().toISOString() }, { onConflict: "user_id,provider,provider_account_id" }).select("id").single();
+    if (accountError) throw accountError;
+    return page("success", `@${profile.username ?? "perfil"} foi conectado com segurança.`, socialAccount?.id);
+  } catch (error) {
+    console.error("instagram-oauth-callback", error);
+    const message = error instanceof Error ? error.message : "Falha interna ao concluir a conexão.";
+    return page("error", `Falha ao concluir a conexão: ${message}`);
+  }
+});

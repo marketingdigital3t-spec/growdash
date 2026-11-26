@@ -1,0 +1,40 @@
+import { readFileSync } from "node:fs";
+
+describe("loop engineering workflow", () => {
+  it("runs detection and publishes only after explicit release gates", () => {
+    const workflow = readFileSync(".github/workflows/loop-engineering.yml", "utf8");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("schedule:");
+    expect(workflow).toContain('cron: "17 */3 * * *"');
+    expect(workflow).toContain("npm ci");
+    expect(workflow).toContain("npx playwright install chromium");
+    expect(workflow).toContain("npm run loop-engineering:detect");
+    expect(workflow).toContain("npm run loop-engineering:repair:auto");
+    expect(workflow).toContain("git push origin HEAD:main");
+    expect(workflow).toContain("actions/upload-artifact@v4");
+    expect(workflow).toContain("LOOP_ENGINEERING_AUTH_REQUIRED: \"1\"");
+    expect(workflow).toContain("LOOP_ENGINEERING_SENTRY_REQUIRED: \"1\"");
+    expect(workflow).toContain("GROWDASH_AUTH_STATE_B64: ${{ secrets.GROWDASH_AUTH_STATE_B64 }}");
+    expect(workflow).toContain("npm run test:sync");
+    expect(workflow).toContain("supabase db push --linked --dry-run");
+    expect(workflow).toContain("supabase db advisors --linked");
+    expect(workflow).toContain("SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}");
+    expect(workflow).toContain("SENTRY_ORG: ${{ vars.SENTRY_ORG }}");
+    expect(workflow).toContain("SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}");
+    expect(workflow).toContain("SENTRY_DSN: ${{ secrets.SENTRY_DSN }}");
+    expect(workflow).toContain("supabase secrets set --yes --project-ref cixnvosxqlacjbpymjha");
+    expect(workflow).toContain("base64 --decode | gzip -d > .auth/growdash.json");
+    expect(workflow).toContain("SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}");
+    expect(workflow).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}");
+    expect(workflow).toContain("supabase db push --linked --yes");
+    expect(workflow).toContain('supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha');
+    expect(workflow).toContain("wrangler pages deploy dist --project-name growdash");
+    expect(workflow).toContain("Smoke Edge Functions and production HTTP");
+    expect(workflow).toContain("Smoke authenticated production browser");
+    expect(workflow).toContain("GROWDASH_BASE_URL: https://growdash.com.br");
+    expect(workflow).toContain("Capture current Cloudflare production deployment");
+    expect(workflow).toContain("Create Sentry release and upload private source maps");
+    expect(workflow).toContain("Roll back Cloudflare canary after failed smoke");
+    expect(workflow).toContain("find dist -type f -name '*.map' -delete");
+  });
+});

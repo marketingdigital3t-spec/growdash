@@ -1,0 +1,60 @@
+import type { FunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
+import { BadgeDollarSign, Eye, Gauge, MessageCircle, MousePointerClick, Users, Waypoints } from "lucide-react";
+import { metricDescription } from "@/lib/metricPresentation";
+import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+
+const fmtInt = (value: number) => Math.round(value).toLocaleString("pt-BR");
+const fmtPct = (value: number) => `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+const fmtBRL = (value: number | null) => value == null
+  ? "—"
+  : value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+
+export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }) {
+  const cards = [
+    { label: "Investimento Meta", value: fmtBRL(metrics.spend), detail: "Meta Ads", icon: BadgeDollarSign },
+    { label: "Impressões", value: fmtInt(metrics.impressions), detail: `Alcance ${fmtInt(metrics.reach)}`, icon: Eye },
+    { label: "Cliques no link", value: fmtInt(metrics.clicks), detail: `CTR ${fmtPct(metrics.ctr)}`, icon: MousePointerClick },
+    { label: "Leads totais Meta", value: fmtInt(metrics.metaLeads), detail: `${fmtInt(metrics.formLeads)} formulário + ${fmtInt(metrics.siteLeads)} site + ${fmtInt(metrics.conversations)} conversa · CPL ${fmtBRL(metrics.metaCpl)}`, icon: Users },
+    { label: "Formulários", value: fmtInt(metrics.formLeads), detail: `CPL ${fmtBRL(metrics.formLeads > 0 ? metrics.spend / metrics.formLeads : null)} · Meta`, icon: Waypoints },
+    { label: "Leads de site", value: fmtInt(metrics.siteLeads), detail: `CPL ${fmtBRL(metrics.siteLeads > 0 ? metrics.spend / metrics.siteLeads : null)} · Meta`, icon: MousePointerClick },
+    { label: "Conversas iniciadas", value: fmtInt(metrics.conversations), detail: `CPL ${fmtBRL(metrics.conversations > 0 ? metrics.spend / metrics.conversations : null)} · Meta`, icon: MessageCircle },
+    { label: "CAC / ROAS", value: `${fmtBRL(metrics.cac)} / ${metrics.roas == null ? "—" : `${metrics.roas.toFixed(2)}x`}`, detail: `${metrics.sales} venda(s)`, icon: Gauge },
+  ];
+
+  const coverageTone = "text-foreground";
+
+  return (
+    <section className="space-y-3" aria-labelledby="funnel-media-overview-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="funnel-media-overview-title" className="text-base font-semibold">Meta Ads × RD Station</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Mídia e funil reconciliados para a conta, campanha e período selecionados.</p>
+          </div>
+          <div className={`rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-semibold ${coverageTone}`}>
+            Cobertura RD: {metrics.rdCoverage == null ? "sem base Meta" : fmtPct(metrics.rdCoverage)}
+          </div>
+      </div>
+      <div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          {cards.map(({ label, value, detail, icon: Icon }) => (
+            <MetricHelpTooltip key={label} title={label} description={metricDescription(label)} detail={`Fonte e contexto: ${detail}.`} className="h-full" showHint>
+              <div className="gd-metric-card gd-funnel-media-kpi h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">
+                <div className="flex items-start justify-between gap-2 pr-5">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
+                  <Icon className="h-4 w-4 shrink-0 text-foreground" />
+                </div>
+                <p className="mt-2 truncate text-lg font-bold text-foreground">{value}</p>
+                <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
+              </div>
+            </MetricHelpTooltip>
+          ))}
+        </div>
+        {metrics.metaLeads > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Diferença de leads RD − Meta: <strong className="text-foreground">{metrics.leadGap > 0 ? "+" : ""}{fmtInt(metrics.leadGap)}</strong>. A comparação respeita o mesmo período, mas pode variar conforme atribuição e preenchimento de UTMs.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}

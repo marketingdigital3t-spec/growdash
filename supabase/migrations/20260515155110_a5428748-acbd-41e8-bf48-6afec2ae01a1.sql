@@ -1,0 +1,1 @@
+ALTER TABLE public.adsets ADD COLUMN IF NOT EXISTS destination_type text;

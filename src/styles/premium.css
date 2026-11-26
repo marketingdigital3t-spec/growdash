@@ -1,0 +1,1505 @@
+/* ==========================================================================
+   Growdash Premium Layer — Fases Terra / Órbita / Galáxia
+   --------------------------------------------------------------------------
+   Authoritative visual contract for the platform. This file is imported AFTER
+   `index.css` so it wins over the historical theme phases (monochrome,
+   metallic-gold, space-phase) that still live in that 15k-line stylesheet.
+
+   Design contract:
+   - Terra (fase inicial): azul cósmico e prata.
+   - Órbita (fase de aceleração): dourado solar.
+   - Galáxia (fase de escala): púrpura e violeta neon.
+   - A fase carrega o ACENTO; o modo claro/escuro carrega as SUPERFÍCIES.
+   - Borders are light, never heavy lead-gray outlines.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Theme tokens (HSL triplets consumed by tailwind.config.ts)
+
+   Two independent dimensions:
+     - `data-platform-theme` = the palette (terra, orbita, galaxia)
+     - `.dark` on <html>        = the reading mode (light or dark)
+
+   Every combination is valid: terra+light, terra+dark, orbita+light,
+   orbita+dark, galaxia+light, galaxia+dark. The palette drives the ACCENT
+   colours (primary, accent secondary, glow); the mode drives the SURFACE
+   colours (background, card, text). That is why the palette block below only
+   sets accent tokens and the mode blocks set the surfaces.
+   -------------------------------------------------------------------------- */
+
+/* --- Palette base: Terra (azul cósmico) ------------------------------------
+   O seletor precisa casar com o valor real de data-platform-theme. A fase é
+   definida por useAccentTheme.ts como `terra` | `orbita` | `galaxia`; os
+   nomes antigos `emerald`/`obsidian` nunca casavam com o DOM e deixavam o
+   premium.css travado no azul para todas as fases.
+   -------------------------------------------------------------------------- */
+:root,
+html[data-platform-theme="terra"] {
+  --palette-accent: #00A8FF;
+  --palette-accent-bright: #38BDF8;
+  --palette-accent-soft: rgba(0, 168, 255, .16);
+  --palette-accent-rgb: 0, 168, 255;
+  --palette-secondary: #0284C7;
+  --palette-secondary-rgb: 2, 132, 199;
+  --card-glow-color: 0, 168, 255;
+  --purple-glow-color: 0, 168, 255;
+  --emerald-glow-color: 0, 168, 255;
+
+  --primary: 199 89% 48% !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --sidebar-ring: 199 89% 58% !important;
+  --gd-emerald: #00a8ff !important;
+  --gd-emerald-bright: #38bdf8 !important;
+  --gd-emerald-soft: rgba(0, 168, 255, .16) !important;
+  --gd-emerald-border: rgba(0, 168, 255, .35) !important;
+
+  --palette-glow-accent: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
+  --palette-glow-secondary: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
+  --palette-favicon-start: #D1FAE5;
+  --palette-favicon-mid: #38bdf8;
+  --palette-favicon-end: #00a8ff;
+}
+
+/* --- Palette: Órbita (dourado solar) -------------------------------------- */
+html[data-platform-theme="orbita"] {
+  --palette-accent: #FFC107 !important;
+  --palette-accent-bright: #FFE082 !important;
+  --palette-accent-soft: rgba(255, 193, 7, .16) !important;
+  --palette-accent-rgb: 255, 193, 7 !important;
+  --palette-secondary: #A66B00 !important;
+  --palette-secondary-rgb: 166, 107, 0 !important;
+  --card-glow-color: 255, 193, 7 !important;
+  --purple-glow-color: 255, 193, 7 !important;
+  --emerald-glow-color: 255, 193, 7 !important;
+  --primary: 45 100% 50% !important;
+  --ring: 45 100% 58% !important;
+  --sidebar-primary: 45 100% 50% !important;
+  --sidebar-ring: 45 100% 58% !important;
+  --gd-emerald: #ffc107 !important;
+  --gd-emerald-bright: #ffe082 !important;
+  --gd-emerald-soft: rgba(255, 193, 7, .16) !important;
+  --gd-emerald-border: rgba(255, 193, 7, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(255, 193, 7, 0.55), 0 0 10px 1px rgba(255, 224, 130, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(255, 193, 7, 0.40), 0 0 8px -2px rgba(255, 224, 130, 0.45) !important;
+  --palette-favicon-start: #FFF3C4;
+  --palette-favicon-mid: #FFE082;
+  --palette-favicon-end: #FFC107;
+}
+
+/* --- Palette: Galáxia (púrpura neon) ------------------------------------- */
+html[data-platform-theme="galaxia"] {
+  --palette-accent: #A855F7 !important;
+  --palette-accent-bright: #D8B4FE !important;
+  --palette-accent-soft: rgba(168, 85, 247, .16) !important;
+  --palette-accent-rgb: 168, 85, 247 !important;
+  --palette-secondary: #6C3483 !important;
+  --palette-secondary-rgb: 108, 52, 131 !important;
+  --card-glow-color: 168, 85, 247 !important;
+  --purple-glow-color: 168, 85, 247 !important;
+  --emerald-glow-color: 168, 85, 247 !important;
+  --primary: 271 91% 65% !important;
+  --ring: 271 91% 68% !important;
+  --sidebar-primary: 271 91% 65% !important;
+  --sidebar-ring: 271 91% 68% !important;
+  --gd-emerald: #a855f7 !important;
+  --gd-emerald-bright: #d8b4fe !important;
+  --gd-emerald-soft: rgba(168, 85, 247, .16) !important;
+  --gd-emerald-border: rgba(168, 85, 247, .35) !important;
+  --palette-glow-accent: 0 0 28px -2px rgba(168, 85, 247, 0.55), 0 0 10px 1px rgba(216, 180, 254, 0.65) !important;
+  --palette-glow-secondary: 0 0 24px -4px rgba(168, 85, 247, 0.40), 0 0 8px -2px rgba(216, 180, 254, 0.45) !important;
+  --palette-favicon-start: #F3E8FF;
+  --palette-favicon-mid: #D8B4FE;
+  --palette-favicon-end: #A855F7;
+}
+
+/* --- Mode: light surfaces -------------------------------------------------- */
+:root,
+html:not(.dark) {
+  color-scheme: light;
+
+  --background: 150 22% 96%;
+  --foreground: 160 41% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 160 41% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 160 41% 7%;
+  --primary: 163 94% 24%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 146 19% 93%;
+  --secondary-foreground: 160 41% 12%;
+  --muted: 146 19% 93%;
+  --muted-foreground: 156 16% 36%;
+  --accent: 151 53% 90%;
+  --accent-foreground: 163 88% 20%;
+  --destructive: 358 75% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 161 94% 30%;
+  --success-foreground: 0 0% 100%;
+  --warning: 32 95% 44%;
+  --warning-foreground: 0 0% 100%;
+  --border: 148 18% 86%;
+  --input: 146 16% 82%;
+  --ring: 161 94% 30%;
+  --radius: 0.875rem;
+  /* Bolinha do switch (toggle). No claro ela é branca sobre o trilho verde;
+     no escuro precisa ser clara sobre o trilho escuro, senão some.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
+
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 160 41% 12%;
+  --sidebar-primary: 163 94% 24%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 151 40% 93%;
+  --sidebar-accent-foreground: 163 88% 20%;
+  --sidebar-border: 148 18% 88%;
+  --sidebar-ring: 161 94% 30%;
+
+  /* Platform accents — driven by the palette, not by the reading mode. */
+  --brand-gold: var(--palette-accent);
+  --brand-gold-light: var(--palette-accent-bright);
+  --brand-bronze: var(--palette-accent);
+  --brand-accent-rgb: var(--palette-accent-rgb);
+
+  /* Design system semantic layer */
+  --bg-canvas: #F4F8F6;
+  --surface-card: rgba(255, 255, 255, 0.82);
+  --surface-raised: #FFFFFF;
+  --border-subtle: rgba(56, 189, 248, 0.15);
+  --border-strong: rgba(0, 168, 255, 0.25);
+  --text-primary: #0B1A15;
+  --text-secondary: #2D4A3E;
+  --text-muted: #4D6B5F;
+  --accent-primary: var(--palette-accent);
+  --accent-secondary: var(--palette-secondary);
+  --purple-accent: var(--palette-secondary);
+  --purple-glow-color: var(--card-glow-color);
+  --emerald-glow-color: var(--palette-accent-rgb);
+
+  --gd-surface-page: var(--bg-canvas);
+  --gd-surface-card: var(--surface-card);
+  /* Cor sólida equivalente ao gradiente de `--gd-surface-card`. Usada como
+     `background-color` de fallback para os cards que precisam de uma cor
+     opaca atrás do `backdrop-filter`. */
+  --gd-surface-card-color: var(--surface-card-color, var(--surface-card));
+  --gd-surface-raised: var(--surface-raised);
+  --gd-surface-control: var(--surface-raised);
+  --gd-border: var(--border-subtle);
+  --gd-border-subtle: var(--border-subtle);
+  --gd-border-focus: rgba(var(--palette-accent-rgb), 0.55);
+  --gd-content: var(--text-primary);
+  --gd-content-text: var(--text-primary);
+  --gd-content-muted: var(--text-muted);
+  --gd-content-faint: #6B8177;
+  --gd-content-disabled: #7C9189;
+  --gd-content-border: var(--border-subtle);
+  --gd-content-bg: var(--bg-canvas);
+  --gd-content-surface: var(--surface-card);
+  --gd-content-panel: var(--surface-raised);
+  --gd-shadow-card: 0 10px 30px -18px rgba(0, 168, 255, 0.28), 0 2px 6px -3px rgba(56, 189, 248, 0.18);
+  --gd-control-active-thumb: #FFFFFF;
+
+  --gd-status-critical: #DC2626;
+  --gd-status-attention: #D97706;
+  --gd-status-observation: #CA8A04;
+  --gd-status-initial: #2563EB;
+  --gd-status-healthy: #0284c7;
+  --gd-status-inactive: #64748B;
+
+  --gd-glow-emerald: 0 0 22px -4px rgba(4, 120, 87, 0.34), 0 0 8px -2px rgba(52, 211, 153, 0.34);
+  --gd-glow-purple: 0 0 24px -4px rgba(0, 168, 255, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.45);
+}
+
+/* --- Mode: dark surfaces (Esmeralda Puro — idêntico à Imagem 2 aprovada) ---- */
+html.dark {
+  color-scheme: dark;
+
+  --background: 220 40% 3.5%;
+  --foreground: 210 40% 98%;
+  --card: 222 35% 6%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 35% 6%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 12%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 215 25% 12%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 199 80% 14%;
+  --accent-foreground: 199 89% 94%;
+  --destructive: 358 75% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 199 89% 48%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 38 90% 8%;
+  --border: 215 25% 16%;
+  --input: 215 25% 14%;
+  --ring: 199 89% 58%;
+  --radius: 0.875rem;
+  /* Bolinha do switch no escuro: um branco puro sobre o trilho escuro. Com
+     `--background` (quase preto) a bolinha some e não dá para ler o estado.
+     Cor completa (hex) de propósito: o shorthand `background` recusa um
+     valor HSL sem tipo de cor e zera a propriedade. */
+  --switch-thumb: #FFFFFF;
+
+  --sidebar-background: 222 40% 4%;
+  --sidebar-foreground: 215 20% 85%;
+  --sidebar-primary: 199 89% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 25% 12%;
+  --sidebar-accent-foreground: 199 89% 94%;
+  --sidebar-border: 215 25% 14%;
+  --sidebar-ring: 199 89% 58%;
+
+  --brand-gold: var(--palette-accent-bright);
+  --brand-gold-light: var(--palette-accent-bright);
+  --brand-bronze: var(--palette-accent);
+  --brand-accent-rgb: var(--palette-accent-rgb);
+
+  --bg-canvas: #030712;
+  --surface-card: linear-gradient(145deg, rgba(8, 15, 30, 0.85), rgba(4, 8, 18, 0.95));
+  --surface-card-color: rgba(6, 12, 24, 0.88);
+  --surface-raised: rgba(10, 18, 36, 0.88);
+  --border-subtle: rgba(56, 189, 248, 0.22);
+  --border-strong: rgba(0, 168, 255, 0.42);
+  --text-primary: #FFFFFF;
+  --text-secondary: #D1FAE5;
+  --text-muted: #94A3B8;
+  --accent-primary: #38BDF8;
+  --accent-secondary: #00A8FF;
+  --purple-accent: #38BDF8;
+  --purple-glow-color: 16, 185, 129;
+  --emerald-glow-color: 16, 185, 129;
+
+  --gd-surface-page: var(--bg-canvas);
+  --gd-surface-card: var(--surface-card);
+  --gd-surface-raised: var(--surface-raised);
+  --gd-surface-control: var(--surface-raised);
+  --gd-border: var(--border-subtle);
+  --gd-border-subtle: var(--border-subtle);
+  --gd-border-focus: rgba(var(--palette-accent-rgb), 0.60);
+  --gd-content: var(--text-primary);
+  --gd-content-text: var(--text-primary);
+  --gd-content-muted: var(--text-muted);
+  --gd-content-faint: #7D8796;
+  --gd-content-disabled: #64748B;
+  --gd-content-border: var(--border-subtle);
+  --gd-content-bg: var(--bg-canvas);
+  --gd-content-surface: var(--surface-card);
+  --gd-content-panel: var(--surface-raised);
+  --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Bolinha de controle ativo: branca no escuro. Uma bolinha preta sumia
+     sobre o trilho escuro e o estado do toggle ficava ilegível. */
+  --gd-control-active-thumb: #FFFFFF;
+
+  --gd-status-critical: #F87171;
+  --gd-status-attention: #FBBF24;
+  --gd-status-observation: #FDE047;
+  --gd-status-initial: #60A5FA;
+  --gd-status-healthy: #34D399;
+  --gd-status-inactive: #94A3B8;
+
+  --gd-glow-emerald: 0 0 24px -4px rgba(52, 211, 153, 0.40), 0 0 8px -2px rgba(52, 211, 153, 0.50);
+  --gd-glow-purple: 0 0 28px -2px rgba(0, 168, 255, 0.55), 0 0 10px 1px rgba(56, 189, 248, 0.65);
+}
+
+/* --------------------------------------------------------------------------
+   2. Atmosphere — Galáxia Verde sobre Preto (fumaça cósmica + poeira estelar)
+   --------------------------------------------------------------------------
+   The legacy stylesheet pins `.brand-shell` to a transparent canvas with
+   `background-image: none !important`. The premium layer therefore targets
+   the same element with an equal-or-higher specificity so the galaxy is
+   actually painted instead of being silently dropped.
+
+   The reference is a deep-space emerald nebula: near-black void, a
+   diagonal band of radiant green smoke, and a field of fine stars.
+   -------------------------------------------------------------------------- */
+
+html .brand-shell.growdash-app-shell,
+html body .brand-shell.growdash-app-shell {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--bg-canvas) !important;
+  background-image:
+    /* Feixe diagonal de fumaça verde — o núcleo brilhante da galáxia */
+    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(56, 189, 248, 0.22) 0%, rgba(0, 168, 255, 0.12) 34%, transparent 68%),
+    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(0, 168, 255, 0.16) 0%, transparent 62%),
+    /* Halos esmeralda difusos que difumam a fumaça no vazio */
+    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(56, 189, 248, 0.14) 0%, transparent 58%),
+    radial-gradient(ellipse 34% 20% at 18% 74%, rgba(5, 150, 105, 0.16) 0%, transparent 60%),
+    /* Núcleo luminoso da galáxia */
+    radial-gradient(circle 320px at 68% 78%, rgba(56, 189, 248, 0.20) 0%, transparent 70%),
+    linear-gradient(158deg, rgba(0, 168, 255, 0.06) 0%, transparent 46%) !important;
+  background-attachment: fixed;
+}
+
+/* Tema Claro: mesma galáxia, respirando sobre um vazio quase branco */
+html:not(.dark) .brand-shell.growdash-app-shell {
+  background-image:
+    radial-gradient(ellipse 120% 42% at 62% 108%, rgba(0, 168, 255, 0.10) 0%, rgba(5, 150, 105, 0.06) 34%, transparent 68%),
+    radial-gradient(ellipse 90% 30% at 24% 22%, rgba(0, 168, 255, 0.08) 0%, transparent 62%),
+    radial-gradient(ellipse 46% 26% at 74% 62%, rgba(56, 189, 248, 0.07) 0%, transparent 58%),
+    radial-gradient(ellipse 34% 20% at 18% 74%, rgba(5, 150, 105, 0.08) 0%, transparent 60%),
+    radial-gradient(circle 320px at 68% 78%, rgba(0, 168, 255, 0.08) 0%, transparent 70%),
+    linear-gradient(158deg, rgba(0, 168, 255, 0.05) 0%, transparent 46%) !important;
+}
+
+/* Textura — ruído orgânico + poeira estelar fina sobre o vazio */
+html .brand-shell.growdash-app-shell::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='stars'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.85 0 0 0 0 1 0 0 0 0 0.92 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23stars)' opacity='0.5'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 460px 460px, 200px 200px;
+  content: "";
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   3. Elevation — Level 1 glass, Level 2 hover glow, Level 3 overlays
+   --------------------------------------------------------------------------
+   These rules mirror the legacy selector depth
+   (`html .brand-shell :is(page) :is(card)`) so the premium surface wins the
+   cascade even against the historical `!important` gradient overrides.
+   -------------------------------------------------------------------------- */
+
+/* Level 1 — glass surface. Uses `background: var(--surface-card)` because
+   gradients are images, not colors, and must not be assigned to
+   `background-color` (that invalidates the declaration and lets the legacy
+   slate-blue rules win the cascade). */
+.gd-glass-card {
+  background: var(--surface-card) !important;
+  background-color: var(--surface-card-color) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+html .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  /* `--gd-surface-card` pode ser um gradiente. Aplicá-lo em `background-color`
+     é inválido e o navegador IGNORA a declaração: o card fica sem fundo e o
+     `backdrop-filter` amostra o conteúdo que rola por trás, produzindo o
+     aspecto "lavado claro" durante o scroll. Use `background` (aceita
+     gradiente) e aponte a cor sólida no `background-color`. */
+  background-color: var(--gd-surface-card-color) !important;
+  background-image:
+    var(--gd-surface-card),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.09) 0%, transparent 15rem);
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  transition: border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi) {
+  background: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
+  border-color: rgba(56, 189, 248, 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(56, 189, 248, 0.14),
+    0 18px 40px -20px rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Ícone de status do card de KPI (quadradinho verde esmeralda com pulso neon — Imagem 2) */
+.brand-shell .gd-metric-card .gd-metric-icon,
+.brand-shell .dashboard-terra-card .gd-metric-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(0, 168, 255, 0.35) !important;
+  background: rgba(0, 168, 255, 0.12) !important;
+  color: #38bdf8 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 14px -3px rgba(0, 168, 255, 0.35) !important;
+}
+
+.brand-shell .gd-metric-card .gd-metric-icon svg,
+.brand-shell .dashboard-terra-card .gd-metric-icon svg {
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.65)) !important;
+}
+
+/* Luminous top edge — 100% pure to the active theme palette */
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::before {
+  display: block !important;
+  position: absolute;
+  inset: 0 10% auto 10%;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(0, 168, 255, 0.75), rgba(56, 189, 248, 0.65), transparent);
+  content: "";
+  opacity: 0.70;
+  pointer-events: none;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::after {
+  display: none !important;
+}
+
+/* Level 2 — hover elevation with Esmeralda Neon electric glow */
+.brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  box-shadow:
+    0 20px 48px -20px rgba(0, 168, 255, 0.70),
+    0 0 32px -4px rgba(56, 189, 248, 0.55),
+    0 0 10px 1px rgba(110, 231, 183, 0.80),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-3px);
+}
+
+html.dark .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card) {
+  border-color: rgba(0, 168, 255, 0.28) !important;
+}
+
+html.dark .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
+  border-color: rgba(56, 189, 248, 0.85) !important;
+  box-shadow:
+    0 20px 50px -20px rgba(0, 168, 255, 0.80),
+    0 0 34px -4px rgba(56, 189, 248, 0.65),
+    0 0 12px 2px rgba(110, 231, 183, 0.90),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  transform: translateY(-3px);
+}
+
+html:not(.dark) .brand-shell :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card):hover {
+  box-shadow:
+    0 22px 48px -26px rgba(0, 168, 255, 0.40),
+    0 0 0 1px rgba(0, 168, 255, 0.35),
+    0 0 24px -6px rgba(56, 189, 248, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Data typography — the number is the hero
+   -------------------------------------------------------------------------- */
+
+.brand-shell :is(.gd-metric-card, .dashboard-reference-kpi, .dashboard-reference-funnel,
+    .dashboard-reference-radar, .dashboard-financial-overview) :is(
+  .dashboard-terra-metric-value, .tabular-nums, [class*="tabular"]) {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+  letter-spacing: -0.03em;
+}
+
+.brand-shell :is(.gd-metric-card, .dashboard-reference-kpi) p:first-child {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--gd-content-muted) !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. Chrome — sidebar and topbar with deep glass and neon illumination
+   -------------------------------------------------------------------------- */
+
+.brand-shell .brand-sidebar {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(var(--palette-accent-rgb), 0.08) 0%, transparent 18rem),
+    linear-gradient(180deg, rgba(var(--palette-secondary-rgb), 0.05) 0%, transparent 32rem),
+    rgba(7, 9, 14, 0.82) !important;
+  border-right: 1px solid rgba(var(--palette-accent-rgb), 0.18) !important;
+  box-shadow:
+    1px 0 0 0 rgba(255, 255, 255, 0.04) inset,
+    12px 0 36px -12px rgba(0, 0, 0, 0.85),
+    0 0 30px -15px rgba(var(--palette-accent-rgb), 0.25) !important;
+  backdrop-filter: blur(24px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(170%) !important;
+  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Sidebar SEMPRE escura mesmo em html:not(.dark) */
+html:not(.dark) .brand-shell .brand-sidebar {
+  background:
+    linear-gradient(180deg, rgba(var(--palette-accent-rgb), 0.08) 0%, transparent 18rem),
+    linear-gradient(180deg, rgba(var(--palette-secondary-rgb), 0.05) 0%, transparent 32rem),
+    rgba(4, 7, 15, 0.96) !important;
+  border-right: 1px solid rgba(var(--palette-accent-rgb), 0.22) !important;
+  box-shadow:
+    1px 0 0 0 rgba(255, 255, 255, 0.04) inset,
+    12px 0 36px -12px rgba(0, 0, 0, 0.85),
+    0 0 30px -15px rgba(var(--palette-accent-rgb), 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Links da sidebar sempre com contraste escuro/branco */
+html:not(.dark) .brand-shell .brand-sidebar nav a {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+html:not(.dark) .brand-shell .brand-sidebar nav a:hover {
+  background: rgba(var(--palette-accent-rgb), 0.12) !important;
+  color: #ffffff !important;
+}
+
+
+
+.brand-shell .brand-topbar {
+  position: relative;
+  background: rgba(7, 9, 14, 0.75) !important;
+  border-bottom: 1px solid rgba(var(--palette-accent-rgb), 0.15) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  box-shadow: 0 8px 32px -16px rgba(0, 0, 0, 0.6) !important;
+}
+
+html:not(.dark) .brand-shell .brand-topbar {
+  background: rgba(255, 255, 255, 0.80) !important;
+  border-bottom: 1px solid rgba(var(--palette-accent-rgb), 0.12) !important;
+  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Linha luminosa na borda inferior da topbar */
+.brand-shell .brand-topbar::after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--palette-accent-rgb), 0.45) 40%, rgba(var(--palette-accent-bright), 0.6) 50%, rgba(var(--palette-accent-rgb), 0.45) 60%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   6. Premium Tabs with Glass and Neon Transition Motion
+   -------------------------------------------------------------------------- */
+
+.brand-shell [role="tablist"] {
+  position: relative;
+  background: rgba(6, 16, 11, 0.65) !important;
+  border: 1px solid rgba(var(--palette-accent-rgb), 0.25) !important;
+  backdrop-filter: blur(14px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+  border-radius: 999px !important;
+  padding: 4px !important;
+  gap: 3px !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+html:not(.dark) .brand-shell [role="tablist"] {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.16) !important;
+  box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.04), 0 4px 16px -8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.brand-shell [role="tab"] {
+  position: relative;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  transition: all 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  color: var(--gd-content-muted) !important;
+}
+
+.brand-shell [role="tab"]:hover:not([data-state="active"]) {
+  color: var(--text-primary) !important;
+  background: rgba(var(--palette-accent-rgb), 0.08) !important;
+}
+
+.brand-shell [role="tab"][data-state="active"],
+.brand-shell [role="tab"][aria-selected="true"] {
+  background: linear-gradient(135deg, rgba(var(--palette-accent-rgb), 0.95) 0%, rgba(var(--palette-accent-rgb), 0.75) 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow:
+    0 0 20px -3px rgba(var(--palette-accent-rgb), 0.65),
+    0 2px 8px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+html:not(.dark) .brand-shell [role="tab"][data-state="active"],
+html:not(.dark) .brand-shell [role="tab"][aria-selected="true"] {
+  color: #FFFFFF !important;
+  box-shadow:
+    0 0 16px -2px rgba(var(--palette-accent-rgb), 0.45),
+    0 4px 12px -3px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Conteúdo das abas com animação fluida de transição */
+.brand-shell [role="tabpanel"] {
+  animation: gd-tab-fade-in 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes gd-tab-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   7. Progress, status and accent discipline
+   -------------------------------------------------------------------------- */
+
+/* Progress and status — 100% pure to the active theme palette */
+.brand-shell .topbar-goal-progress-fill,
+.brand-shell .topbar-goal-progress-track .h-full {
+  background: linear-gradient(90deg, rgba(var(--palette-secondary-rgb), 0.95) 0%, rgba(var(--palette-accent-rgb), 0.98) 100%) !important;
+  box-shadow: 0 0 14px -3px rgba(var(--palette-accent-rgb), 0.75) !important;
+}
+
+.brand-shell .gd-progress-fill,
+.brand-shell [role="progressbar"] > div {
+  background: linear-gradient(90deg, rgba(var(--palette-secondary-rgb), 0.90) 0%, rgba(var(--palette-accent-rgb), 0.98) 100%) !important;
+}
+
+.brand-shell :is(.text-emerald-500, .text-emerald-600, .text-emerald-400) {
+  color: var(--accent-primary) !important;
+}
+
+.brand-shell :is(.text-amber-500, .text-amber-600, .text-orange-500) {
+  color: var(--gd-status-attention) !important;
+}
+
+/* On light surfaces the attention amber is unreadable at 3.19:1. */
+html:not(.dark) .brand-shell :is(.text-amber-500, .text-amber-600, .text-orange-500) {
+  color: var(--gd-attention-readable) !important;
+}
+
+.brand-shell :is(.text-rose-500, .text-red-500, .text-red-600) {
+  color: var(--gd-status-critical) !important;
+}
+
+.brand-shell :is(.bg-emerald-500\/10, .bg-emerald-500\/15, .bg-emerald-500\/20) {
+  background-color: rgba(var(--emerald-glow-color), 0.12) !important;
+}
+
+.brand-shell :is(.bg-amber-500\/10, .bg-amber-500\/15, .bg-amber-500\/20) {
+  background-color: rgba(217, 119, 6, 0.13) !important;
+}
+
+.brand-shell :is(.bg-rose-500\/10, .bg-rose-500\/12, .bg-rose-500\/15) {
+  background-color: rgba(220, 38, 38, 0.13) !important;
+}
+
+.brand-shell :is(.border-emerald-500\/25, .border-emerald-500\/20) {
+  border-color: rgba(var(--emerald-glow-color), 0.34) !important;
+}
+
+.brand-shell :is(.border-amber-500\/25, .border-amber-500\/30, .border-amber-500\/20) {
+  border-color: rgba(217, 119, 6, 0.38) !important;
+}
+
+.brand-shell :is(.border-rose-500\/25, .border-rose-500\/30) {
+  border-color: rgba(220, 38, 38, 0.40) !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. Form controls
+   -------------------------------------------------------------------------- */
+
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account) {
+  background: var(--gd-surface-raised) !important;
+  border-color: var(--gd-border) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .growdash-main :is(input, select, textarea):focus-visible {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--emerald-glow-color), 0.22) !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. Focus visibility — every interactive element
+   -------------------------------------------------------------------------- */
+
+.brand-shell :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-primary) !important;
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   9. Reduced motion — hard requirement from the design system
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell *,
+  .brand-shell *::before,
+  .brand-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. Theme switcher widgets (settings + profile)
+   -------------------------------------------------------------------------- */
+
+.gd-theme-swatch {
+  position: relative;
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--gd-border);
+  border-radius: 14px;
+  background: var(--gd-surface-card);
+  text-align: left;
+  transition: border-color 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, transform 220ms ease;
+}
+
+.gd-theme-swatch:hover {
+  border-color: rgba(var(--emerald-glow-color), 0.45);
+  box-shadow: 0 12px 30px -18px rgba(var(--emerald-glow-color), 0.55);
+  transform: translateY(-1px);
+}
+
+.gd-theme-swatch[aria-pressed="true"] {
+  border-color: rgba(var(--emerald-glow-color), 0.70);
+  box-shadow: 0 0 0 1px rgba(var(--emerald-glow-color), 0.28), 0 14px 34px -20px rgba(var(--emerald-glow-color), 0.75);
+}
+
+.gd-theme-swatch-preview {
+  position: relative;
+  display: block;
+  height: 62px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 11px;
+}
+
+.gd-theme-swatch-preview::after {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  content: "";
+  pointer-events: none;
+}
+
+/* Preview: Modo Escuro — preto cósmico com nebulosa e neon esmeralda */
+.gd-theme-swatch-preview-dark {
+  background:
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(0, 168, 255, 0.38) 0%, transparent 66%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(5, 150, 105, 0.30) 0%, transparent 62%),
+    linear-gradient(135deg, #0A120F 0%, #050A08 52%, #040907 100%);
+}
+
+/* Preview: Modo Claro — superfícies translúcidas com o mesmo neon esmeralda */
+.gd-theme-swatch-preview-light {
+  background:
+    radial-gradient(ellipse 70% 60% at 82% 12%, rgba(56, 189, 248, 0.20) 0%, transparent 66%),
+    radial-gradient(ellipse 60% 50% at 10% 90%, rgba(0, 168, 255, 0.26) 0%, transparent 62%),
+    linear-gradient(135deg, #FFFFFF 0%, #F4F8F6 52%, #E8F5EE 100%);
+}
+
+.gd-theme-swatch-preview i {
+  position: absolute;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.gd-theme-swatch-preview i:nth-child(1) {
+  top: 13px;
+  left: 13px;
+  width: 46%;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.55);
+}
+
+.gd-theme-swatch-preview i:nth-child(2) {
+  top: 26px;
+  left: 13px;
+  width: 30%;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.gd-theme-swatch-preview i:nth-child(3) {
+  top: 39px;
+  left: 13px;
+  width: 20%;
+  background: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.70);
+}
+
+.gd-theme-swatch-preview-light i:nth-child(1) {
+  background: rgba(11, 26, 21, 0.82);
+  box-shadow: none;
+}
+
+.gd-theme-swatch-preview-light i:nth-child(2) {
+  background: rgba(11, 26, 21, 0.42);
+}
+
+.gd-theme-swatch-preview-light i:nth-child(3) {
+  background: rgba(0, 170, 110, 0.62);
+  box-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+}
+/* --------------------------------------------------------------------------
+   12. Neutralizing legacy gradients — the nebula is the atmosphere
+   --------------------------------------------------------------------------
+   The historical stylesheet contains several competing theme layers whose
+   selectors reach a specificity of ~600 characters (for example
+   `.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section >
+   .dashboard-financial-overview > *`). Mirroring each one individually is
+   brittle, so the premium layer is anchored on a dedicated `.gd-premium`
+   class on `<html>`: one extra class raises specificity by a full step over
+   every legacy selector, so the rules below win the cascade.
+   -------------------------------------------------------------------------- */
+
+/* Shell-level semantic tokens — rebound at the `.gd-premium` depth. */
+html.gd-premium .brand-shell {
+  --gd-surface-page: var(--bg-canvas) !important;
+  --gd-surface-card: var(--surface-card) !important;
+  --gd-surface-raised: var(--surface-raised) !important;
+  --gd-surface-control: var(--surface-raised) !important;
+  --gd-content: var(--text-primary) !important;
+  --gd-content-text: var(--text-primary) !important;
+  --gd-content-muted: var(--text-muted) !important;
+  --gd-content-faint: var(--text-muted) !important;
+  --gd-content-bg: var(--bg-canvas) !important;
+  --gd-content-surface: var(--surface-card) !important;
+  --gd-content-panel: var(--surface-raised) !important;
+  --gd-border: var(--border-subtle) !important;
+  --gd-border-subtle: var(--border-subtle) !important;
+  --gd-content-border: var(--border-subtle) !important;
+  --gd-shadow-card: 0 18px 44px -26px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  --gd-control-active-thumb: #FFFFFF !important;
+}
+
+html.gd-premium:not(.dark) .brand-shell {
+  --gd-shadow-card: 0 10px 30px -18px rgba(0, 168, 255, 0.28), 0 2px 6px -3px rgba(56, 189, 248, 0.18) !important;
+  --gd-control-active-thumb: #FFFFFF !important;
+}
+
+/* Page shells must be transparent so the nebula painted on the app shell
+   becomes the atmosphere instead of a flat white or green fill. */
+html.gd-premium .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell),
+html.gd-premium .brand-shell[data-space-phase] :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--text-primary) !important;
+}
+
+/* Card surfaces — glass instead of the flat white/green gradients. */
+html.gd-premium .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *),
+html.gd-premium .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card,
+    .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *,
+    .dashboard-reference-kpi) {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background-color: var(--gd-surface-card) !important;
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.10) 0%, transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(var(--card-glow-color), 0.09) 0%, transparent 15rem) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+}
+
+/* Tema Escuro: Fundo dos cards idêntico à Imagem 2 (verde esmeralda florestal escuro sobre preto) */
+html.gd-premium.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
+  background-color: rgba(4, 9, 6, 0.78) !important;
+  background-image: linear-gradient(145deg, rgba(6, 12, 9, 0.72), rgba(3, 7, 5, 0.82)) !important;
+  border: 1px solid rgba(56, 189, 248, 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(56, 189, 248, 0.14),
+    0 18px 40px -20px rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* Tema Claro: Fundo translúcido branco elegante com borda esmeralda suave */
+html.gd-premium:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .rounded-2xl.border, .rounded-xl.border),
+html.gd-premium:not(.dark) .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background: rgba(255, 255, 255, 0.88) !important;
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  background-image: none !important;
+  border: 1px solid rgba(56, 189, 248, 0.18) !important;
+  box-shadow: 0 10px 30px -18px rgba(0, 168, 255, 0.22), 0 2px 6px -3px rgba(56, 189, 248, 0.10) !important;
+}
+
+/* Ícone de status dos cards de KPI com o quadradinho verde esmeralda idêntico à Imagem 2 */
+html.gd-premium .brand-shell .gd-metric-icon,
+html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(0, 168, 255, 0.35) !important;
+  background: rgba(0, 168, 255, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 12px -2px rgba(0, 168, 255, 0.30) !important;
+}
+
+html.gd-premium .brand-shell .gd-metric-icon svg,
+html.gd-premium .brand-shell .dashboard-terra-card .gd-metric-icon svg {
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.70)) !important;
+}
+
+/* Donut de distribuição por plataforma: harmônico em verde esmeralda */
+html.gd-premium .brand-shell .platform-distribution-card .recharts-pie-sector:first-child path {
+  fill: #00a8ff !important;
+}
+
+/* Legacy: `.brand-shell[data-dashboard-scene="true"] … blur(10px) !important` —
+   the dashboard scene pins a weaker blur. The premium glass uses a deeper
+   blur with saturation, so it reasserts itself at the `.gd-premium` depth. */
+html.gd-premium .brand-shell[data-dashboard-scene="true"] .dashboard-page
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card),
+html.gd-premium .brand-shell[data-dashboard-scene="true"] .dashboard-page
+  :is(.dashboard-primary-kpis > *, .dashboard-financial-overview > *) {
+  backdrop-filter: blur(14px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(135%) !important;
+}
+
+/* The goal strip is a data surface, not a sci-fi prop. */
+html.gd-premium .brand-shell[data-space-phase] .space-mission-strip,
+html.gd-premium .brand-shell .space-mission-strip {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-title,
+html.gd-premium .brand-shell[data-space-phase] .space-mission-strip > strong,
+html.gd-premium .brand-shell .space-mission-title,
+html.gd-premium .brand-shell .space-mission-strip > strong {
+  color: var(--accent-primary) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-title small,
+html.gd-premium .brand-shell .space-mission-title small {
+  color: var(--gd-content-muted) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-track,
+html.gd-premium .brand-shell .space-mission-track {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-raised) !important;
+}
+
+html.gd-premium .brand-shell[data-space-phase] .space-mission-track > span,
+html.gd-premium .brand-shell .space-mission-track > span {
+  background: linear-gradient(90deg, #059669 0%, #00a8ff 55%, #38bdf8 100%) !important;
+  box-shadow:
+    0 0 26px 3px rgba(0, 168, 255, 0.85),
+    0 0 12px 2px rgba(56, 189, 248, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+}
+
+html.gd-premium.dark .brand-shell .space-mission-track > span {
+  background: linear-gradient(90deg, #0284c7 0%, #00a8ff 50%, #38bdf8 100%) !important;
+  box-shadow:
+    0 0 28px 4px rgba(0, 168, 255, 0.90),
+    0 0 14px 2px rgba(56, 189, 248, 1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+/* --------------------------------------------------------------------------
+   13. Orbital Funnel & Anomaly Radar Neon Refinement (Reference: Galáxia)
+   -------------------------------------------------------------------------- */
+
+.brand-shell .dashboard-reference-radar,
+.brand-shell .dashboard-reference-funnel {
+  position: relative;
+  background: var(--gd-surface-card) !important;
+  border: 1px solid rgba(var(--palette-accent-rgb), 0.25) !important;
+  box-shadow:
+    0 0 24px -8px rgba(var(--palette-accent-rgb), 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+  transition: all 260ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.brand-shell .dashboard-reference-radar:hover,
+.brand-shell .dashboard-reference-funnel:hover {
+  border-color: rgba(var(--palette-accent-rgb), 0.55) !important;
+  box-shadow:
+    0 0 36px -6px rgba(var(--palette-accent-rgb), 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Radar plot com anéis concêntricos neon elétricos */
+.brand-shell .dashboard-reference-radar-plot {
+  border-color: rgba(var(--palette-accent-rgb), 0.6) !important;
+  box-shadow: 0 0 18px -4px rgba(var(--palette-accent-rgb), 0.45) !important;
+  background:
+    repeating-radial-gradient(circle, transparent 0 23%, rgba(var(--palette-accent-rgb), 0.28) 24% 24.8%),
+    linear-gradient(90deg, transparent 49.6%, rgba(var(--palette-accent-rgb), 0.35) 49.8% 50.2%, transparent 50.4%),
+    linear-gradient(0deg, transparent 49.6%, rgba(var(--palette-accent-rgb), 0.35) 49.8% 50.2%, transparent 50.4%) !important;
+}
+
+.brand-shell .dashboard-reference-radar-plot span {
+  background: linear-gradient(90deg, rgba(var(--palette-accent-rgb), 0.75), transparent 75%) !important;
+}
+
+.brand-shell .dashboard-reference-radar header span,
+.brand-shell .dashboard-reference-funnel header span {
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.brand-shell .dashboard-reference-radar header svg,
+.brand-shell .dashboard-reference-funnel header svg {
+  color: var(--palette-accent-bright) !important;
+  filter: drop-shadow(0 0 6px var(--palette-accent)) !important;
+}
+
+/* Funil orbital com contornos concêntricos neon */
+.brand-shell .dashboard-reference-funnel-step {
+  border-color: rgba(var(--palette-accent-rgb), 0.65) !important;
+  background: linear-gradient(180deg, rgba(var(--palette-secondary-rgb), 0.25), rgba(var(--palette-accent-rgb), 0.12)) !important;
+  box-shadow:
+    0 0 20px -2px rgba(var(--palette-accent-rgb), 0.38),
+    inset 0 0 16px rgba(var(--palette-accent-rgb), 0.18) !important;
+  transition: all 220ms ease;
+}
+
+.brand-shell .dashboard-reference-funnel-step:hover {
+  border-color: var(--palette-accent-bright) !important;
+  box-shadow:
+    0 0 28px rgba(var(--palette-accent-rgb), 0.65),
+    inset 0 0 20px rgba(var(--palette-accent-rgb), 0.3) !important;
+  transform: scale(1.02);
+}
+
+.brand-shell .dashboard-reference-orbit-rocket {
+  color: var(--palette-accent-bright) !important;
+  filter: drop-shadow(0 0 10px var(--palette-accent)) !important;
+}
+
+/* --------------------------------------------------------------------------
+   14. Neon Flash & Motion — the light travelling along the surfaces
+   --------------------------------------------------------------------------
+   A slow specular sweep runs across the luminous top edge of every glass
+   card, the sidebar accent rail and the primary buttons. The timing is
+   deliberately long (7s) so the effect reads as a living material rather
+   than an attention-seeking animation.
+   -------------------------------------------------------------------------- */
+
+@keyframes gd-neon-flash {
+  0% {
+    background-position: -140% 50%;
+    opacity: 0.25;
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 240% 50%;
+    opacity: 0.25;
+  }
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+    .dashboard-terra-card, .dashboard-widget-shell > *, .dashboard-reference-kpi)::before {
+  background-image: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.85) 45%, rgba(255, 255, 255, 0.95) 50%, rgba(56, 189, 248, 0.85) 55%, transparent 100%) !important;
+  background-size: 220% 100% !important;
+  background-repeat: no-repeat !important;
+  animation: gd-neon-flash 7s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+}
+
+/* Primary buttons carry the same travelling filament */
+.brand-shell .gd-highlight-action,
+.brand-shell button.gd-highlight-action {
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-shell .gd-highlight-action::after,
+.brand-shell button.gd-highlight-action::after {
+  background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.55) 48%, rgba(56, 189, 248, 0.85) 54%, transparent 72%) !important;
+  background-size: 240% 100% !important;
+  animation: gd-neon-flash 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+}
+
+/* The sidebar rail breathes with the same neon filament */
+.brand-shell .brand-sidebar::after {
+  background-image: linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.9) 22%, rgba(0, 168, 255, 0.35) 48%, transparent 78%) !important;
+  background-size: 100% 260% !important;
+  animation: gd-neon-flash 9s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+}
+
+/* --------------------------------------------------------------------------
+   15. Reduced transparency fallback
+   -------------------------------------------------------------------------- */
+
+@supports not (backdrop-filter: blur(1px)) {
+  .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card) {
+    background-color: var(--gd-surface-raised) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   15. Pure palette authority — one colour per theme, never a blend
+   --------------------------------------------------------------------------
+   The legacy stylesheet drives a large part of the dashboard through
+   `--gd-emerald` (icon chips, active tabs, active buttons, the current page
+   in the sidebar). Left alone it paints Obsidian with green accents on purple
+   cards. Every one of those surfaces is rebound here to the active palette so
+   Esmeralda is entirely green and Obsidian is entirely purple neon.
+
+   The same rule removes the last purple reflection from the Esmeralda cards.
+   -------------------------------------------------------------------------- */
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-metric-icon, .dashboard-reference-icon, .gd-platform-icon) {
+  background: rgba(var(--palette-accent-rgb), 0.14) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.32) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+/* The sidebar chip and the topbar avatar were the last surfaces painted with
+   a hard-coded emerald. They follow the palette like every other accent. */
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-chip,
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip,
+.brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link:hover .gd-sidebar-nav-chip,
+.brand-shell .gd-sidebar-nav-chip {
+  background: rgba(var(--palette-accent-rgb), 0.20) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.32) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell .brand-topbar .topbar-goal-progress-track {
+  background: rgba(var(--palette-accent-rgb), 0.16) !important;
+  border-color: rgba(var(--palette-accent-rgb), 0.35) !important;
+}
+
+.brand-shell .brand-topbar .topbar-goal-progress-fill {
+  background: var(--palette-accent) !important;
+  box-shadow: 0 0 10px rgba(var(--palette-accent-rgb), 0.55) !important;
+}
+
+.brand-shell :is(.brand-topbar, .brand-sidebar) :is([class*="border-primary"], .text-primary) {
+  border-color: rgba(var(--palette-accent-rgb), 0.65) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell .brand-sidebar span[class*="from-primary"] {
+  background-image: linear-gradient(135deg, rgba(var(--palette-accent-rgb), 0.90) 0%, rgba(var(--palette-accent-rgb), 0.45) 100%) !important;
+}
+
+.brand-shell :is(.bg-primary\/10, .bg-primary\/15, .bg-primary\/20) {
+  background-color: rgba(var(--palette-accent-rgb), 0.15) !important;
+}
+
+.brand-shell [class*="border-emerald"] {
+  border-color: rgba(var(--palette-accent-rgb), 0.35) !important;
+}
+
+.brand-shell [class*="text-emerald"] {
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(button[data-state="active"], [role="tab"][data-state="active"], [role="tab"][aria-selected="true"], .is-active) {
+  background: var(--palette-accent) !important;
+  border-color: var(--palette-accent) !important;
+  color: #062015 !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.text-emerald-400, .text-emerald-500, .text-emerald-600, .text-primary, [class*="text-primary"]) {
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.bg-emerald-500\/10, .bg-emerald-500\/15, .bg-emerald-500\/20) {
+  background-color: rgba(var(--palette-accent-rgb), 0.14) !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.border-emerald-500\/20, .border-emerald-500\/25) {
+  border-color: rgba(var(--palette-accent-rgb), 0.34) !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] {
+  border-color: rgba(var(--palette-accent-rgb), 0.38) !important;
+  box-shadow:
+    0 0 20px -4px rgba(var(--palette-accent-rgb), 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"]::before,
+.brand-shell .brand-sidebar nav a[data-state="active"]::before {
+  background: var(--palette-accent-bright) !important;
+  box-shadow: 0 0 12px 1px var(--palette-accent-bright), 0 0 4px var(--palette-accent) !important;
+}
+
+/* The platform switch keeps the same rule as every other control: the active
+   segment is filled with the palette accent, never with a fixed hue. */
+.brand-shell :is(.dashboard-page, .expert-dashboard) .gd-platform-segments [role="tab"][data-state="active"] {
+  background: var(--palette-accent) !important;
+  border-color: var(--palette-accent) !important;
+  color: #062015 !important;
+  box-shadow: none !important;
+}
+
+/* Charts inherit the palette through `--primary`, which is rebound per
+   palette, so no series is left painted in the other theme's colour. */
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.recharts-line-curve, .recharts-rectangle, .recharts-sector) {
+  stroke: var(--palette-accent) !important;
+}
+
+
+/* --------------------------------------------------------------------------
+   13. Phase palettes — Terra prata, Orbita dourada, Galaxia roxa
+   --------------------------------------------------------------------------
+   The premium layer is the authoritative theme, but it previously painted every
+   surface in a fixed emerald. That made the three mission phases visually
+   identical and broke the reference composition. Each phase now owns its
+   accent so the shell really is black + silver, black + gold, and black +
+   purple, exactly as the phase means.
+   -------------------------------------------------------------------------- */
+
+html[data-space-phase="terra"],
+.brand-shell[data-space-phase="terra"] {
+  /* FASE TERRA: AZUL CELESTE / CYAN ELETRICO + PRETO + FONTE BRANCA */
+  --phase-accent: 0, 168, 255;
+  --phase-accent-bright: #00d2ff;
+  --phase-accent-dim: #0284c7;
+  --palette-accent: #00a8ff !important;
+  --palette-accent-bright: #00d2ff !important;
+  --palette-accent-rgb: 0, 168, 255 !important;
+  --primary: 199 89% 48% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --primary-neon: #00d2ff !important;
+  --ring: 199 89% 58% !important;
+  --sidebar-primary: 199 89% 48% !important;
+  --card-glow-color: 0, 168, 255 !important;
+  --foreground: 0 0% 100% !important;
+  --text-primary: #ffffff !important;
+}
+html[data-space-phase="orbita"],
+.brand-shell[data-space-phase="orbita"] {
+  --phase-accent: 255, 193, 7;
+  --phase-accent-bright: #ffe082;
+  --phase-accent-dim: #a66b00;
+  --palette-accent: #FFC107 !important;
+  --palette-accent-bright: #ffe082 !important;
+  --palette-accent-rgb: 255, 193, 7 !important;
+  --primary: 45 100% 50% !important;
+  --primary-foreground: 45 40% 8% !important;
+  --primary-neon: #ffe082 !important;
+  --ring: 45 100% 58% !important;
+  --sidebar-primary: 45 100% 50% !important;
+  --card-glow-color: 255, 193, 7 !important;
+}
+html[data-space-phase="galaxia"],
+.brand-shell[data-space-phase="galaxia"] {
+  --phase-accent: 168, 85, 247;
+  --phase-accent-bright: #d8b4fe;
+  --phase-accent-dim: #6c3483;
+  --palette-accent: #A855F7 !important;
+  --palette-accent-bright: #d8b4fe !important;
+  --palette-accent-rgb: 168, 85, 247 !important;
+  --primary: 271 91% 65% !important;
+  --primary-foreground: 271 40% 8% !important;
+  --primary-neon: #d8b4fe !important;
+  --ring: 271 91% 68% !important;
+  --sidebar-primary: 271 91% 65% !important;
+  --card-glow-color: 168, 85, 247 !important;
+}
+
+/* Light-theme accent readability (GRO-A11Y-001) ---------------------------
+   The phase accent (for example #00d2ff in Terra) is tuned for the dark
+   reading mode. On light surfaces that same neon drops to roughly 1.45:1
+   against a pale accent chip, far below the WCAG 2.2 AA minimum of 4.5:1 for
+   normal text. Small badges inherit the same rule because they carry the
+   `text-emerald-*` utility.
+
+   The fix keeps the neon where it is legible (dark surfaces) and restores a
+   darkened accent for light surfaces. The contrast is verified by
+   src/lib/contrastPolicy.test.ts. */
+html:not(.dark) .brand-shell {
+  --gd-accent-readable: #0b6a9e;
+  --gd-success-readable: #167a43;
+  /* The attention amber (#f39c12) reaches 3.19:1 on white. The darker
+     variant keeps the semantic meaning and passes WCAG AA. */
+  --gd-attention-readable: #9a5b00;
+}
+
+/* Semantic tones for the funnel KPIs. They are deliberately not Tailwind
+   color utilities: the platform's generic accent selectors capture
+   `text-emerald-*` / `text-red-*` and repaint them with the phase neon, which
+   measures 3.3:1 on light surfaces. These classes keep the semantic meaning
+   and pass WCAG AA in both reading modes. */
+.brand-shell .gd-tone-positive { color: #4ade80; }
+.brand-shell .gd-tone-negative { color: #f87171; }
+
+html:not(.dark) .brand-shell .gd-tone-positive { color: var(--gd-success-readable); }
+html:not(.dark) .brand-shell .gd-tone-negative { color: #b42318; }
+
+/* `text-primary-soft` is not a Tailwind utility, so it never had a color of
+   its own and the elements inherited whatever the parent happened to use.
+   On light surfaces that landed on the pale slate (1.23:1). The token now
+   always resolves to a readable muted value. */
+.brand-shell .text-primary-soft {
+  color: var(--gd-content-muted);
+}
+
+html:not(.dark) .brand-shell
+  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.text-emerald-400, .text-emerald-500, .text-primary, [class*="text-primary"]) {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* `text-emerald-600` is the semantic success color. Its default value
+   (#16a34a) reaches only 3.3:1 on white, so the light theme keeps the
+   darker variant that the rest of the surface already uses. */
+html:not(.dark) .brand-shell .growdash-main .text-emerald-600 {
+  color: var(--gd-success-readable) !important;
+}
+
+/* `text-emerald-700` is not covered by the accent rule above, so it fell
+   back to the shared `--accent-primary` green, which measures 3.3:1 on
+   white. Pin it to the readable success color in the light theme.
+   The `dark:` variant in the same class list re-enabled the neon, so the
+   light-theme rule must come after it. */
+html:not(.dark) .brand-shell .growdash-main :is(.text-emerald-700, .text-emerald-600) {
+  color: var(--gd-success-readable) !important;
+}
+
+/* Cards follow the phase instead of the fixed emerald. */
+html.gd-premium.dark .brand-shell[data-space-phase]  :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass,
+      .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *,
+      .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *),
+html.gd-premium.dark .brand-shell[data-space-phase] .dashboard-page
+  :is(.dashboard-video-glass, .dashboard-glass-card, .gd-panel, .gd-metric-card,
+      .dashboard-terra-card, .dashboard-section > .dashboard-financial-overview > *,
+      .dashboard-section > .dashboard-charts > *, .dashboard-section > .dashboard-tables > *) {
+  background: linear-gradient(145deg, rgba(var(--phase-accent), 0.07), rgba(4, 5, 7, 0.86)) !important;
+  background-color: rgba(5, 6, 8, 0.82) !important;
+  border: 1px solid rgba(var(--phase-accent), 0.24) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--phase-accent), 0.16),
+    0 18px 40px -20px rgba(0, 0, 0, 0.78) !important;
+}
+
+/* The mission fuel bar, KPI cards and radar glow in the phase accent. */
+.brand-shell[data-space-phase] :is(.gd-fuel-fill, .gd-label, .text-primary-neon) {
+  color: var(--phase-accent-bright) !important;
+}
+
+/* The phase bright accent is tuned for the dark reading mode. On light
+   surfaces it drops to roughly 1.23:1, so the readable variant takes over.
+   The topbar keeps the neon because it always paints on a dark strip. */
+html:not(.dark) .brand-shell .growdash-main .text-primary-neon {
+  color: var(--gd-accent-readable) !important;
+}
+
+/* SVG map labels inherit the `text-primary` utility through `fill`. On the
+   light theme the phase palette resolves it to the pale slate (1.23:1), so
+   the readable accent takes over wherever the phase forces a fixed color. */
+html:not(.dark) .brand-shell .growdash-main :is(text, tspan).text-primary {
+  fill: var(--gd-accent-readable) !important;
+  color: var(--gd-accent-readable) !important;
+}
+.brand-shell[data-space-phase] .gd-fuel-fill {
+  background: linear-gradient(90deg, rgba(var(--phase-accent), 0.55), var(--phase-accent-bright)) !important;
+  box-shadow: 0 0 12px rgba(var(--phase-accent), 0.55) !important;
+}
+.brand-shell[data-space-phase] .gd-glow-border {
+  background: linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+    linear-gradient(135deg, rgba(var(--phase-accent), 0.55) 0%, rgba(var(--phase-accent), 0.22) 55%, rgba(255, 255, 255, 0.1) 100%) border-box !important;
+}
+.brand-shell[data-space-phase] .gd-glow-border:hover {
+  box-shadow: 0 0 30px -6px rgba(var(--phase-accent), 0.45) !important;
+}
+
+/* Motion system: restrained transforms, accent-aware metric hover, and phase transitions. */
+:root {
+  --gd-motion-fast: 180ms;
+  --gd-motion-phase: 600ms;
+  --gd-motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.brand-shell[data-space-phase] :is(.gd-metric-card, .gd-funnel-kpi, .gd-funnel-media-kpi) {
+  transition: box-shadow var(--gd-motion-fast) var(--gd-motion-ease),
+    border-color var(--gd-motion-phase) var(--gd-motion-ease),
+    background-color var(--gd-motion-phase) var(--gd-motion-ease),
+    transform var(--gd-motion-fast) var(--gd-motion-ease) !important;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .brand-shell[data-space-phase] :is(.gd-metric-card, .gd-funnel-kpi, .gd-funnel-media-kpi):hover {
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.12),
+      0 0 28px -7px var(--palette-accent-bright), 0 18px 42px rgba(0, 0, 0, 0.28) !important;
+  }
+}
+
+/* One CSS policy complements useReducedMotion() in MotionContainer. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --gd-motion-fast: 0ms; --gd-motion-phase: 0ms; }
+  .brand-shell[data-space-phase] :is(.gd-metric-card, .gd-funnel-kpi, .gd-funnel-media-kpi) {
+    transition-duration: 0ms !important;
+  }
+}

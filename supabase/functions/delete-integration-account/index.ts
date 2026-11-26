@@ -1,0 +1,163 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
+
+const normalize = (value: unknown) => String(value ?? "").trim();
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const caller = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const admin = createClient(supabaseUrl, serviceKey);
+    const { data: { user }, error: userError } = await caller.auth.getUser();
+    if (userError || !user) return json({ error: "Sessão inválida ou expirada" }, 401);
+
+    const body = await req.json().catch(() => ({}));
+    const provider = normalize(body?.provider).toLowerCase();
+    const accountId = normalize(body?.account_id);
+    const accountIds = Array.isArray(body?.account_ids)
+      ? body.account_ids.map(normalize).filter(Boolean).slice(0, 200)
+      : [];
+    const confirmation = normalize(body?.confirmation);
+    const { data: isMaster } = await admin.rpc("is_master", { _user_id: user.id });
+
+    if (provider === "meta") {
+      if (accountIds.length) {
+        if (confirmation !== "EXCLUIR CONTAS SELECIONADAS") {
+          return json({ error: "Digite EXCLUIR CONTAS SELECIONADAS para confirmar" }, 400);
+        }
+        const { data: accounts, error: accountsError } = await admin
+          .from("ad_accounts")
+          .select("id, user_id")
+          .in("id", accountIds);
+        if (accountsError) throw accountsError;
+        if (!accounts?.length) return json({ error: "Nenhuma conta Meta selecionada existe mais" }, 404);
+        if (!isMaster && accounts.some((account) => account.user_id !== user.id)) {
+          return json({ error: "Você não pode remover uma ou mais contas selecionadas" }, 403);
+        }
+        const { error: deleteError } = await admin.from("ad_accounts").delete().in("id", accounts.map((account) => account.id));
+        if (deleteError) throw deleteError;
+        return json({
+          ok: true,
+          provider: "meta",
+          deleted_count: accounts.length,
+          message: `${accounts.length} conta${accounts.length === 1 ? " foi" : "s foram"} removida${accounts.length === 1 ? "" : "s"} da Growdash. As contas de anúncios continuam existindo na Meta.`,
+        });
+      }
+      // Keep historical campaigns/insights intact, but hide every account
+      // imported by this profile from the integration inventory. A future
+      // OAuth connection clears this marker when it reuses the account row.
+      if (!accountId && confirmation === "DESCONECTAR META") {
+        const { error: disconnectError } = await admin
+          .from("ad_accounts")
+          .update({
+            // Keep the column constraint valid while ensuring no usable token
+            // remains; all sync jobs ignore accounts marked disconnected.
+            access_token: "",
+            connection_status: "disconnected",
+            last_sync_error: null,
+            last_sync_error_code: null,
+            metadata: { connection_method: "disconnected", profile_disconnected: true, disconnected_at: new Date().toISOString() },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+        if (disconnectError) throw disconnectError;
+        return json({
+          ok: true,
+          provider: "meta",
+          message: "Perfil Meta desconectado. Todas as contas foram removidas da integração; os dados históricos foram preservados.",
+        });
+      }
+      if (!accountId) return json({ error: "Conta Meta não informada" }, 400);
+      const { data: account, error: accountError } = await admin
+        .from("ad_accounts")
+        .select("id, user_id, name, account_id")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) return json({ error: "A conta Meta já foi removida ou não existe" }, 404);
+      if (account.user_id !== user.id && !isMaster) return json({ error: "Você não pode remover esta conta" }, 403);
+      if (confirmation !== account.name) {
+        return json({ error: `Digite exatamente o nome da conta: ${account.name}` }, 400);
+      }
+
+      const { error: deleteError } = await admin.from("ad_accounts").delete().eq("id", account.id);
+      if (deleteError) throw deleteError;
+      return json({
+        ok: true,
+        provider: "meta",
+        message: "A conexão e os dados sincronizados desta conta foram removidos da Growdash. A conta de anúncios continua existindo na Meta.",
+      });
+    }
+
+    if (provider === "rd_station_crm") {
+      const { data: integration, error: integrationError } = await admin
+        .from("integrations")
+        .select("id, user_id, provider")
+        .eq("provider", "rd_station_crm")
+        .eq("user_id", accountId || user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (integrationError) throw integrationError;
+      if (!integration) return json({ error: "A integração RD já foi removida ou não existe" }, 404);
+      if (integration.user_id !== user.id && !isMaster) return json({ error: "Você não pode remover esta integração" }, 403);
+      if (confirmation !== "EXCLUIR RD") {
+        return json({ error: "Digite EXCLUIR RD para confirmar" }, 400);
+      }
+
+      const { error: deleteError } = await admin.from("integrations").delete().eq("id", integration.id);
+      if (deleteError) throw deleteError;
+      return json({
+        ok: true,
+        provider: "rd_station_crm",
+        message: "A credencial do RD Station foi eliminada. Negócios já sincronizados foram preservados para auditoria.",
+      });
+    }
+
+    if (provider === "instagram") {
+      if (!accountId) return json({ error: "Perfil Instagram não informado" }, 400);
+      const { data: account, error: accountError } = await admin
+        .from("social_accounts")
+        .select("id, user_id, provider_account_id")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) return json({ error: "O perfil Instagram já foi removido ou não existe" }, 404);
+      if (account.user_id !== user.id && !isMaster) return json({ error: "Você não pode remover este perfil" }, 403);
+      if (confirmation !== "DESCONECTAR INSTAGRAM") return json({ error: "Confirmação inválida" }, 400);
+      const { error: disableError } = await admin.from("social_accounts").update({ connection_status: "disconnected", last_error: "Perfil desconectado pelo usuário" }).eq("id", account.id);
+      if (disableError) throw disableError;
+      await admin.from("integrations").update({ is_active: false, updated_at: new Date().toISOString() }).eq("user_id", account.user_id).eq("provider", "instagram_business").eq("provider_account_id", account.provider_account_id);
+      return json({ ok: true, provider: "instagram", message: "Perfil Instagram desconectado. Publicações e métricas históricas foram preservadas." });
+    }
+
+    return json({ error: "Provedor de integração inválido" }, 400);
+  } catch (error) {
+    console.error("delete-integration-account", error);
+    const message = error instanceof Error ? error.message : "Erro interno";
+    const friendly = /foreign key|violates/i.test(message)
+      ? "Existem registros vinculados que impedem a exclusão. Atualize o banco e tente novamente."
+      : message;
+    return json({ error: friendly }, 500);
+  }
+});

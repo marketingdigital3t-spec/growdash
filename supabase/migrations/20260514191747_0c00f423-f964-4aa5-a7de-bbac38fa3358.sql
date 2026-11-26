@@ -1,0 +1,2 @@
+ALTER TABLE public.account_lead_action DROP CONSTRAINT IF EXISTS account_lead_action_pkey;
+ALTER TABLE public.account_lead_action ADD CONSTRAINT account_lead_action_pkey PRIMARY KEY (ad_account_id, lp_lead_action);

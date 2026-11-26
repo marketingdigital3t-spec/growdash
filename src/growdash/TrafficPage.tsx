@@ -1,0 +1,478 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import {
+  BarChart3, Bot, CalendarRange, Check, ChevronLeft, ChevronRight, CircleAlert, Copy, CreditCard,
+  CircleDollarSign, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
+  Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video, GitCompareArrows,
+  WalletCards, Wrench, Zap, Tag,
+} from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { metricDescription } from "@/lib/metricPresentation";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useBudgetAnalysis, type BudgetAnalysisItem } from "@/hooks/useBudgetAnalysis";
+import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
+import { useSyncBalance } from "@/hooks/useSyncBalance";
+import { useInsights } from "@/hooks/useInsights";
+import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, useSales } from "@/hooks/useSales";
+import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
+import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getTrafficFunnelTemplates, type TrafficFunnelTemplate } from "@/lib/trafficFunnelTemplates";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LeadReportStudio } from "@/growdash/LeadReportStudio";
+import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
+import AudienceNamingStandardizer from "@/components/campaigns/AudienceNamingStandardizer";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { useAccountPixels, useSyncMetaPixels } from "@/hooks/useAccountPixels";
+import { useBudgetHistory } from "@/hooks/useBudgetHistory";
+import type { DatePreset } from "@/hooks/useDateFilter";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
+import CampaignsManager from "@/pages/Campaigns";
+import TrafficComparison from "@/components/campaigns/TrafficComparison";
+import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
+import funnelCaptacaoDireta from "@/assets/zntt-funnels/01-captacao-direta.png";
+import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratuita.png";
+import funnelDemandaReprimida from "@/assets/zntt-funnels/03-demanda-reprimida.png";
+import funnelSocialSeller from "@/assets/zntt-funnels/04-social-seller.png";
+
+const validTabs = new Set(["campaigns", "comparison", "budget", "ai", "funnels", "audiences", "tools"]);
+const tabs = [
+  { id: "campaigns", label: "Campanhas", icon: Megaphone },
+  { id: "comparison", label: "Comparação", icon: GitCompareArrows },
+  { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
+  { id: "ai", label: "Relatórios", icon: FileBarChart },
+  { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
+  { id: "audiences", label: "Padronizar públicos", icon: Tag },
+  { id: "tools", label: "Ferramentas Meta", icon: Wrench },
+] as const;
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+const funnelPreviewImages: Record<string, string> = {
+  "zntt-funnel-1": funnelCaptacaoDireta,
+  "zntt-funnel-2": funnelPilulaAulaGratuita,
+  "zntt-funnel-3": funnelDemandaReprimida,
+  "zntt-funnel-4": funnelSocialSeller,
+};
+
+export default function TrafficPage() {
+  const [params, setParams] = useSearchParams();
+  const [trafficNavExpanded, setTrafficNavExpanded] = useState(false);
+  const { toast } = useToast();
+  const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
+  const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
+  const scrollMode = activeTab === "campaigns" && !campaignAnalysisMode ? "locked" : "content";
+  useEffect(() => {
+    if (scrollMode === "locked") window.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollMode]);
+  const { adAccountId, setAdAccountId, adAccountIds, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
+  const { data: accounts = [] } = useAdAccounts();
+  const visibleAccounts = useMemo(() => businessUnitId
+    ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : accounts, [accounts, businessUnitId, segment]);
+  const account = visibleAccounts.find((item) => item.id === adAccountId);
+  const selectedForDisplay = adAccountIds.length ? adAccountIds : visibleAccounts.map((item) => item.id);
+
+  return (
+    <div className={cn(
+      "traffic-page-shell gd-module-shell relative mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] transition-[padding] duration-200",
+      activeTab === "campaigns"
+        ? campaignAnalysisMode
+          ? "space-y-3"
+          : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
+      : "space-y-3",
+    )}
+      data-scroll-mode={scrollMode}
+      data-traffic-tab={activeTab}
+    >
+      <aside data-traffic-nav data-expanded={trafficNavExpanded ? "true" : "false"} className="traffic-nav-rail" aria-label="Áreas de Tráfego Pago">
+        <div className="traffic-nav-rail-header">
+          <span className="traffic-nav-rail-title">Áreas</span>
+          <button
+            type="button"
+            data-traffic-nav-toggle
+            aria-expanded={trafficNavExpanded}
+            aria-label={trafficNavExpanded ? "Recolher áreas de Tráfego Pago" : "Expandir áreas de Tráfego Pago"}
+            title={trafficNavExpanded ? "Recolher navegação" : "Expandir navegação"}
+            onClick={() => setTrafficNavExpanded((expanded) => !expanded)}
+            className="traffic-nav-toggle"
+          >
+            {trafficNavExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
+        <div className="traffic-nav-items" role="tablist" aria-label="Áreas da operação de tráfego">
+          {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="tab" title={label} aria-label={label} aria-selected={activeTab === id} aria-current={activeTab === id ? "page" : undefined} onClick={() => setParams({ aba: id })} className={cn("traffic-nav-item", activeTab === id ? "traffic-area-tab-active" : "")}><Icon className="h-4 w-4 shrink-0" /><span className="traffic-nav-label">{label}</span></button>)}
+        </div>
+      </aside>
+
+      <div className="traffic-page-content min-w-0">
+        {activeTab !== "campaigns" && <GlobalScopeToolbar />}
+        {activeTab === "campaigns" && <CampaignsManager />}
+        {activeTab === "comparison" && <TrafficComparison />}
+        {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
+        {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} />}
+        {activeTab === "funnels" && <TrafficFunnels />}
+        {activeTab === "audiences" && <AudienceNamingStandardizer />}
+        {activeTab === "tools" && <MetaToolsWorkspace
+          accountId={account?.id}
+          providerAccountId={account?.account_id}
+          accountName={account?.name}
+          selectedAccountIds={selectedForDisplay}
+          accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, remaining_balance: item.remaining_balance, connection_status: item.connection_status, last_sync_success_at: item.last_sync_success_at, oauth_permissions: item.oauth_permissions }))}
+          startDate={startDate}
+          endDate={endDate}
+          onCampaigns={() => setParams({ aba: "campaigns" })}
+          onMissingAccount={() => toast({ title: "Selecione uma conta Meta", description: "Escolha uma conta específica acima para abrir a ferramenta no contexto correto." })}
+        />}
+      </div>
+    </div>
+  );
+}
+
+type MetaToolId = "reports" | "audiences" | "settings" | "billing" | "events" | "all";
+
+type InternalMetaAccount = {
+  id: string;
+  name: string;
+  remaining_balance?: number | null;
+  connection_status?: string | null;
+  last_sync_success_at?: string | null;
+  // Supabase exposes this JSON column as `Json`; keep the view tolerant of
+  // legacy rows while only counting an actual array of permissions.
+  oauth_permissions?: unknown;
+};
+
+function MetaToolsWorkspace({ accountId, providerAccountId: _providerAccountId, accountName, selectedAccountIds, accounts, startDate, endDate, onCampaigns, onMissingAccount }: {
+  accountId?: string;
+  providerAccountId?: string;
+  accountName?: string;
+  selectedAccountIds: string[];
+  accounts: InternalMetaAccount[];
+  startDate: Date;
+  endDate: Date;
+  onCampaigns: () => void;
+  onMissingAccount: () => void;
+}) {
+  const [selectedTool, setSelectedTool] = useState<MetaToolId>("reports");
+  const tools = [
+    { id: "reports" as const, title: "Relatórios de Anúncios", description: "Analise campanhas, investimento, resultados e vendas sem sair da Growdash.", icon: FileBarChart },
+    { id: "audiences" as const, title: "Públicos", description: "Padronize públicos e acompanhe a entrega sincronizada da Meta.", icon: UsersRound },
+    { id: "settings" as const, title: "Configurações de publicidade", description: "Confira conexão, permissões e saúde da conta selecionada.", icon: Settings2 },
+    { id: "billing" as const, title: "Cobrança e pagamentos", description: "Consulte saldo, investimento e histórico financeiro sincronizado.", icon: CreditCard },
+    { id: "events" as const, title: "Gerenciador de Eventos", description: "Veja Pixels, eventos e cobertura de rastreamento disponíveis.", icon: Network },
+    { id: "all" as const, title: "Todas as ferramentas", description: "Centralize os módulos internos da operação em um único painel.", icon: Wrench },
+  ];
+
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4">
+      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-black"><Wrench className="h-5 w-5 text-primary" />Ferramentas Meta</h2>
+          <p className="text-xs text-muted-foreground">{accountName ? `Conta selecionada: ${accountName}` : "Selecione uma conta para consultar o escopo específico."}</p>
+        </div>
+        <Button className="sm:ml-auto" onClick={onCampaigns}><Megaphone className="mr-2 h-4 w-4" />Criar ou editar campanha</Button>
+      </header>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {tools.map(({ id, title, description, icon: Icon }) => (
+          <button key={id} type="button" aria-pressed={selectedTool === id} onClick={() => setSelectedTool(id)} className={cn("group flex min-h-28 items-start gap-3 rounded-xl border bg-background p-4 text-left transition hover:border-primary/50 hover:bg-primary/5", selectedTool === id ? "border-primary/60 bg-primary/5 shadow-sm" : "border-border")}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+            <span className="min-w-0"><span className="flex items-center gap-2 font-black">{title}<ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition", selectedTool === id && "translate-x-0.5 text-primary")} /></span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span></span>
+          </button>
+        ))}
+      </div>
+      <MetaToolDetail tool={selectedTool} accountId={accountId} accountName={accountName} selectedAccountIds={selectedAccountIds} accounts={accounts} startDate={startDate} endDate={endDate} onMissingAccount={onMissingAccount} />
+      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-[11px] text-muted-foreground"><Check className="mr-2 inline h-4 w-4 text-emerald-500" />Os dados e análises ficam dentro da Growdash. Quando a Meta não entrega uma permissão ou métrica, mostramos o estado indisponível sem inventar valores.</p>
+    </section>
+  );
+}
+
+function MetaToolDetail({ tool, accountId, accountName, selectedAccountIds, accounts, startDate, endDate, onMissingAccount }: { tool: MetaToolId; accountId?: string; accountName?: string; selectedAccountIds: string[]; accounts: InternalMetaAccount[]; startDate: Date; endDate: Date; onMissingAccount: () => void }) {
+  const pixels = useAccountPixels();
+  const syncPixels = useSyncMetaPixels();
+  const budgetHistory = useBudgetHistory(accountId, startDate, endDate);
+  const account = accounts.find((item) => item.id === accountId);
+  const selectedCount = selectedAccountIds.length;
+
+  if (tool === "reports") return <div className="rounded-xl border border-border/70 bg-background/40 p-3"><AIAndLeadReports accountId={accountId || "all"} accountIds={selectedAccountIds} accounts={accounts.map((item) => ({ id: item.id, name: item.name }))} /></div>;
+  if (tool === "audiences") return <div className="rounded-xl border border-border/70 bg-background/40 p-3"><AudienceNamingStandardizer /></div>;
+  if (tool === "billing") {
+    if (!accountId) return <ToolUnavailable title="Cobrança e pagamentos" message="Selecione uma única conta Meta para consultar saldo e histórico financeiro." onAction={onMissingAccount} />;
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-primary" /><h3 className="font-black">Cobrança e pagamentos dentro da Growdash</h3></div><p className="text-xs text-muted-foreground">Saldo e transações oficiais sincronizados para {accountName || "a conta selecionada"}.</p>{budgetHistory.isLoading ? <ToolStatus text="Carregando snapshot financeiro…" /> : budgetHistory.isError ? <ToolStatus text="Não foi possível carregar o snapshot financeiro. O último valor válido foi preservado." tone="warning" /> : <div className="grid gap-2 sm:grid-cols-3"><ToolMetric label="Saldo atual" value={budgetHistory.data?.totals.currentBalance == null ? "Indisponível" : brl.format(budgetHistory.data.totals.currentBalance)} /><ToolMetric label="Investimento no período" value={brl.format(budgetHistory.data?.totals.spendSum || 0)} /><ToolMetric label="Aportes no período" value={brl.format(budgetHistory.data?.totals.topUpSum || 0)} /></div>}</section>;
+  }
+  if (tool === "events") {
+    if (!accountId) return <ToolUnavailable title="Gerenciador de Eventos" message="Selecione uma única conta Meta para consultar Pixels e eventos." onAction={onMissingAccount} />;
+    const accountPixels = pixels.data?.byAccount[accountId] || [];
+    const eventCount = accountPixels.reduce((sum, pixel) => sum + (pixels.data?.eventsByPixel[pixel.pixel_id]?.length || 0), 0);
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2"><Network className="h-4 w-4 text-primary" /><h3 className="font-black">Gerenciador de Eventos dentro da Growdash</h3></div><p className="mt-1 text-xs text-muted-foreground">Pixels e eventos persistidos pela sincronização oficial da conta.</p></div><Button size="sm" variant="outline" onClick={() => void syncPixels.mutateAsync(accountId)} disabled={syncPixels.isPending}><RefreshCw className={cn("mr-2 h-3.5 w-3.5", syncPixels.isPending && "animate-spin")} />{syncPixels.isPending ? "Sincronizando…" : "Atualizar eventos"}</Button></div>{pixels.isLoading ? <ToolStatus text="Carregando Pixels e eventos…" /> : pixels.isError ? <ToolStatus text="A consulta de Pixels falhou; nenhum evento foi inventado." tone="warning" /> : <div className="grid gap-2 sm:grid-cols-3"><ToolMetric label="Pixels" value={integer.format(accountPixels.length)} /><ToolMetric label="Eventos registrados" value={integer.format(eventCount)} /><ToolMetric label="Escopo" value={accountName || "Conta selecionada"} /></div>}{!pixels.isLoading && !accountPixels.length && <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">Nenhum Pixel sincronizado para esta conta.</p>}</section>;
+  }
+  if (tool === "settings") {
+    const permissionCount = Array.isArray(account?.oauth_permissions) ? account.oauth_permissions.length : 0;
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><Settings2 className="h-4 w-4 text-primary" /><h3 className="font-black">Configurações de publicidade</h3></div>{account ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><ToolMetric label="Conta" value={account.name} /><ToolMetric label="Conexão" value={account.connection_status || "Indisponível"} /><ToolMetric label="Última sincronização" value={account.last_sync_success_at ? new Date(account.last_sync_success_at).toLocaleString("pt-BR") : "Não confirmada"} /><ToolMetric label="Permissões lidas" value={permissionCount ? integer.format(permissionCount) : "Não informado"} /></div> : <ToolUnavailable title="Configurações de publicidade" message="Selecione uma conta Meta para ver o estado autorizado dentro da Growdash." onAction={onMissingAccount} />}</section>;
+  }
+  return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /><h3 className="font-black">Central de operação Growdash</h3></div><p className="text-xs text-muted-foreground">Todos os módulos abaixo permanecem na plataforma e respeitam o escopo de {selectedCount || "todas as"}{selectedCount === 1 ? " conta selecionada" : " contas autorizadas"}.</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{["Relatórios e IA", "Públicos e nomenclatura", "Configurações e permissões", "Cobrança e saldo", "Pixels e eventos", "Análise de funil e vendas"].map((label) => <div key={label} className="rounded-lg border border-border bg-card/70 px-3 py-3 text-xs font-bold">{label}<span className="mt-1 block text-[10px] font-normal text-muted-foreground">Disponível no menu interno da Growdash.</span></div>)}</div></section>;
+}
+
+function ToolMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 rounded-lg border border-border bg-card/70 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 truncate text-sm font-black" title={value}>{value}</p></div>; }
+function ToolStatus({ text, tone = "neutral" }: { text: string; tone?: "neutral" | "warning" }) { return <p className={cn("rounded-lg border px-3 py-2 text-xs", tone === "warning" ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300" : "border-border bg-card/60 text-muted-foreground")} role="status">{text}</p>; }
+function ToolUnavailable({ title, message, onAction }: { title: string; message: string; onAction: () => void }) { return <section className="rounded-xl border border-dashed border-primary/30 bg-primary/[.035] p-4"><h3 className="font-black">{title}</h3><p className="mt-1 text-xs text-muted-foreground">{message}</p><Button className="mt-3" size="sm" variant="outline" onClick={onAction}>Selecionar conta</Button></section>; }
+
+function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, endDate }: { accountId: string; selectedAccountIds: string[]; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [severityFilter, setSeverityFilter] = useState<"all" | BudgetAnalysisItem["severity"]>("all");
+  const all = useBudgetAnalysis();
+  const syncBalance = useSyncBalance();
+  // The budget analysis hook intentionally returns all authorized BMs. Apply
+  // both the business-unit scope and the user's multi-select here so the
+  // totals/cards never show unselected accounts.
+  const visibleAccountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
+  const selectedIds = useMemo(() => new Set(selectedAccountIds), [selectedAccountIds]);
+  const scopedRows = all.filter((item) => visibleAccountIds.has(item.id) && (selectedIds.size === 0 || selectedIds.has(item.id)) && (accountId === "all" || item.id === accountId));
+  const scopedAccounts = useMemo(() => selectedIds.size === 0 ? accounts : accounts.filter((account) => selectedIds.has(account.id)), [accounts, selectedIds]);
+  const severityCounts = scopedRows.reduce((counts, item) => ({
+    ...counts,
+    [item.severity]: counts[item.severity] + 1,
+  }), { critical: 0, warning: 0, info: 0 });
+  const rows = severityFilter === "all" ? scopedRows : scopedRows.filter((item) => item.severity === severityFilter);
+  const totals = scopedRows.reduce((sum, item) => ({
+    budget: sum.budget + item.dailyBudgetActive,
+    spend: sum.spend + item.avgDailySpend,
+    balance: sum.balance + Number(item.balance || 0),
+    projected: sum.projected + item.projectedSpendUntilMonday,
+    critical: sum.critical + (item.severity === "critical" ? 1 : 0),
+  }), { budget: 0, spend: 0, balance: 0, projected: 0, critical: 0 });
+  const refresh = async () => {
+    try {
+      await syncBalance.mutateAsync();
+      await queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["daily_spend_by_account"] });
+      await queryClient.invalidateQueries({ queryKey: ["daily_budget_active_by_account"] });
+      await queryClient.invalidateQueries({ queryKey: ["last_top_up"] });
+      await queryClient.invalidateQueries({ queryKey: ["next_top_up_estimate"] });
+      toast({ title: "Orçamentos atualizados", description: "Saldo reconsultado diretamente na Meta." });
+    } catch {
+      toast({ title: "Não foi possível atualizar os saldos", description: "A última informação confiável foi preservada.", variant: "destructive" });
+    }
+  };
+  const buffer = totals.balance - totals.projected;
+  const filters: Array<{ id: "all" | BudgetAnalysisItem["severity"]; label: string; count: number; dot: string; active: string }> = [
+    { id: "all", label: "Todas", count: scopedRows.length, dot: "bg-primary", active: "border-primary/60 bg-primary/10 text-primary" },
+    { id: "critical", label: "Críticas", count: severityCounts.critical, dot: "bg-red-500", active: "border-red-500/50 bg-red-500/10 text-red-500" },
+    { id: "warning", label: "Atenção", count: severityCounts.warning, dot: "bg-amber-400", active: "border-amber-400/50 bg-amber-400/10 text-amber-600 dark:text-amber-300" },
+    { id: "info", label: "Saudáveis", count: severityCounts.info, dot: "bg-emerald-500", active: "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <Kpi label="Orçamento diário ativo" value={brl.format(totals.budget)} note="Soma dos conjuntos ativos" />
+        <Kpi label="Gasto médio por dia" value={brl.format(totals.spend)} note="Média móvel dos últimos 7 dias" emphasis />
+        <Kpi label="Saldo informado" value={brl.format(totals.balance)} note="Saldo consolidado das contas" />
+        <Kpi label="Autonomia estimada" value={totals.spend > 0 ? `${Math.floor(totals.balance / totals.spend)} dias` : "Sem histórico"} note="Saldo ÷ gasto médio" />
+        <Kpi label="Necessidade até segunda" value={brl.format(totals.projected)} note="Projeção pelo ritmo atual" />
+        <Kpi label="Folga financeira" value={brl.format(buffer)} note={`${totals.critical} conta(s) em situação crítica`} emphasis={buffer < 0 || totals.critical > 0} />
+      </div>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <header className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center">
+          <div>
+            <h2 className="font-black">Análise de Orçamento por BM</h2>
+            <p className="text-xs text-muted-foreground">Clique em um estado para exibir somente as contas daquela classificação.</p>
+          </div>
+          <div className="growdash-scrollbar flex max-w-full gap-2 overflow-x-auto pb-1 xl:ml-auto xl:pb-0" role="group" aria-label="Filtrar contas por estado do orçamento">
+            {filters.map((filter) => {
+              const selected = severityFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  data-budget-severity-filter={filter.id}
+                  aria-pressed={selected}
+                  onClick={() => setSeverityFilter(filter.id)}
+                  className={cn(
+                    "flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-[10px] font-black transition hover:border-primary/35 hover:bg-muted",
+                    selected && filter.active,
+                  )}
+                >
+                  <span className={cn("h-2.5 w-2.5 rounded-full", filter.dot)} />
+                  {filter.label}
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground">{filter.count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={refresh} disabled={syncBalance.isPending}><RefreshCw className={cn("mr-2 h-4 w-4", syncBalance.isPending && "animate-spin")} />{syncBalance.isPending ? "Consultando Meta…" : "Atualizar saldos"}</Button>
+        </header>
+
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-muted/25 px-4 py-2 text-[10px] text-muted-foreground">
+          <span data-budget-filter-result>{rows.length} de {scopedRows.length} conta(s) exibida(s)</span>
+          {severityFilter !== "all" && <button type="button" className="font-bold text-primary hover:underline" onClick={() => setSeverityFilter("all")}>Limpar filtro</button>}
+        </div>
+
+        <div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">
+          {rows.map((item) => <BudgetAccountCard key={item.id} item={item} />)}
+          {rows.length === 0 && <Empty text={severityFilter === "all" ? "Nenhuma conta com orçamento ou saldo disponível." : "Nenhuma conta encontrada neste estado."} />}
+        </div>
+      </section>
+      <CampaignAttentionPanel accountId={accountId} accounts={scopedAccounts} startDate={startDate} endDate={endDate} />
+    </div>
+  );
+}
+
+function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
+  const { data: lastTopUp } = useLastTopUp(item.id);
+  const { data: nextTopUp } = useNextTopUpEstimate(item.id);
+  const use = item.dailyBudgetActive > 0 ? Math.min(100, item.avgDailySpend / item.dailyBudgetActive * 100) : 0;
+  const urgent = item.severity === "critical" && ((item.balance != null && item.balance <= 0) || (item.daysBalanceLasts != null && item.daysBalanceLasts <= 2));
+  const mondayBuffer = item.balance == null ? null : item.balance - item.projectedSpendUntilMonday;
+  const severitySurface = item.severity === "critical"
+    ? "border-red-500/60 bg-red-500/[.12]"
+    : item.severity === "warning"
+      ? "border-amber-500/55 bg-amber-500/[.1]"
+      : "border-emerald-500/55 bg-emerald-500/[.1]";
+  return <article data-budget-account-severity={item.severity} className={cn("rounded-xl border p-4", severitySurface, urgent && "shadow-[0_0_26px_-12px_rgba(239,68,68,.8)]")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{item.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{item.summary}</p></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-black uppercase", item.severity === "critical" ? "bg-red-500/10 text-red-500" : item.severity === "warning" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>{item.severity === "critical" ? "Crítico" : item.severity === "warning" ? "Atenção" : "Saudável"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3"><SmallMetric label="Orçamento diário (ativos)" value={brl.format(item.dailyBudgetActive)} /><SmallMetric label="Gasto médio/dia" value={brl.format(item.avgDailySpend)} /><SmallMetric label="Saldo restante" value={item.balance == null ? "Não informado" : brl.format(item.balance)} /><SmallMetric label="Saldo dura" value={item.daysBalanceLasts == null ? "Sem estimativa" : `${item.daysBalanceLasts} dia(s)`} /><SmallMetric label={`Previsão próximos ${item.daysUntilMonday} dias`} value={brl.format(item.projectedSpendUntilMonday)} /><SmallMetric label="Folga até segunda" value={mondayBuffer == null ? "Saldo não informado" : brl.format(mondayBuffer)} /></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", use > 100 ? "bg-red-500" : use > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${Math.min(use, 100)}%` }} /></div><div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-[10px] text-muted-foreground"><p>⏱ Próxima recarga: {nextTopUp?.hasEnoughHistory && nextTopUp.estimatedDate ? <b className="text-foreground">~ {format(nextTopUp.estimatedDate, "dd/MM/yyyy")} · {brl.format(nextTopUp.avgAmount)}</b> : <i>histórico insuficiente</i>}</p><p>⊕ Último aporte: {lastTopUp ? <b className="text-foreground">{brl.format(Number(lastTopUp.delta))} em {format(new Date(lastTopUp.event_at), "dd/MM/yyyy")}</b> : <i>nenhum aporte registrado</i>}</p>{item.reasons.length > 0 && <p><CircleAlert className="mr-1 inline h-3.5 w-3.5" />{item.reasons[0]}</p>}</div></article>;
+}
+
+function AIAndLeadReports({ accountId, accountIds, accounts }: { accountId: string; accountIds: string[]; accounts: Array<{ id: string; name: string; attribution_window?: string | null }> }) {
+  const { preset, setPreset, customRange, setCustomRange, startDate, endDate, funnelIds } = useGlobalFilters();
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(accounts.filter((account: any) => accountIds.includes(account.id)).map((account: any) => [account.id, account.attribution_window || "account_default"])),
+    [accountIds, accounts],
+  );
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, accountIds.length > 0);
+  const single = accountId !== "all" ? accountId : undefined;
+  const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, adAccountIds: accountIds, attributionWindowsByAccount, startDate, endDate, enabled: accountIds.length > 0 });
+  const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, funnelIds, enabled: accountIds.length > 0 });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, funnelIds, enabled: accountIds.length > 0 });
+  const audienceCampaignIds = useMemo(() => Array.from(new Set(insights.map((item) => item.campaign_id).filter((id): id is string => !!id))), [insights]);
+  const audience = useAudienceProfileData({ deals, campaignIds: audienceCampaignIds, accountIds, startDate, endDate });
+  const { toast } = useToast();
+  // `insights.leads` is a legacy aggregate and is never the primary KPI.
+  // Actions are resolved once per alias and then summed as forms + site + conversations.
+  const saleTotals = aggregateSales(sales);
+  const won = saleTotals.totalQuantity;
+  const revenue = saleTotals.totalNet;
+  // Traffic KPIs and campaign rows use the same account/date/window-scoped
+  // Meta adapter. Never fall back to an unconfirmed parallel action query.
+  const metaLeads = metaTraffic.data.totalLeads;
+  const conversations = metaTraffic.data.conversations;
+  const canonicalSpend = metaTraffic.data.spend;
+  const metaSpendAvailable = metaTraffic.data.metricAvailability.spend?.available ?? metaTraffic.data.available;
+  const metaLeadsAvailable = metaTraffic.data.metricAvailability.leads?.available ?? false;
+  const byCampaign = useMemo(() => {
+    const map = new Map<string, { key: string; accountId: string; name: string; leads: number; spend: number; conversations: number }>();
+    const seen = new Set<string>();
+    for (const item of insights as any[]) {
+      const name = item.campaign_name || "Sem campanha";
+      const accountId = String(item.ad_account_id || "");
+      const campaignId = String(item.campaign_id || name);
+      const key = `${accountId}|${campaignId}`;
+      const row = map.get(key) || { key, accountId, name, leads: 0, spend: 0, conversations: 0 };
+      const adKey = String(item.ad_id || "");
+      const actions = metaTraffic.data.leadBreakdownByAd[adKey];
+      row.spend += Number(item.spend || 0);
+      if (!seen.has(adKey)) {
+        // `leadBreakdownByAd` follows the canonical action contract and
+        // exposes `total` (forms + site + conversations). Reading the old
+        // `totalLeads` name made the campaign report show zero leads while
+        // the account KPI was populated.
+        row.leads += Number(actions?.total || 0);
+        row.conversations += Number(actions?.conversations || 0);
+        seen.add(adKey);
+      }
+      map.set(key, row);
+    }
+    return Array.from(map.values()).sort((a, b) => b.leads - a.leads);
+  }, [insights, metaTraffic.data.leadBreakdownByAd]);
+  const scopedAccounts = accounts.filter((account) => accountIds.includes(account.id));
+  const reportAccountLabel = scopedAccounts.length === 1 ? scopedAccounts[0].name : "Contas selecionadas";
+  const copyReport = async () => { const metaSummary = metaSpendAvailable && metaLeadsAvailable ? `Meta Ads: ${integer.format(metaLeads)} resultados (${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas iniciadas) | ${brl.format(canonicalSpend)} investidos | custo por resultado ${brl.format(metaLeads ? canonicalSpend / metaLeads : 0)}` : `Meta Ads: dados indisponíveis ou cobertura não confirmada (${metaTraffic.data.unavailableReason || "aguardando sincronização"})`; const report = `Relatório de resultados Meta — ${reportAccountLabel}\nPeríodo: ${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}\n${metaSummary}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita líquida`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
+  return <div className="space-y-4">
+    <section className="gd-panel p-4 sm:p-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div><p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">Tráfego Pago · Relatórios</p><h2 className="mt-1 text-lg font-black">Relatório de qualidade de leads</h2><p className="mt-1 text-xs text-muted-foreground">Mídia, funil e vendas no mesmo escopo de conta, período e atribuição.</p></div>
+        <span className="rounded-full border border-border bg-background/60 px-3 py-1 text-[10px] font-bold text-muted-foreground">{scopedAccounts.length} conta(s) no escopo</span>
+      </header>
+      <div className="mt-4 space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={scopedAccounts.length === 1 ? scopedAccounts[0].name : "Contas selecionadas"} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} /><FunnelAudienceProfile deals={deals} campaignIds={audienceCampaignIds} accountIds={accountIds} startDate={startDate} endDate={endDate} data={audience.data} loading={audience.isLoading} /></div>
+      {scopedAccounts.length ? <div className={cn("mt-4 grid items-stretch gap-4", scopedAccounts.length > 1 ? "md:grid-cols-2" : "grid-cols-1")}>{scopedAccounts.map((account) => <AccountLeadReportCard key={account.id} account={account} preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} funnelIds={funnelIds} />)}</div> : <div className="mt-4"><Empty text="Nenhuma conta de anúncio selecionada para gerar relatórios." /></div>}
+    </section>
+    {accountIds.length > 0 ? <><div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"><Kpi label="Resultados Meta" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaLeadsAvailable ? integer.format(metaLeads) : "Indisponível"} note={metaLeadsAvailable ? `${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas` : metaTraffic.data.metricAvailability.leads?.reason || "Aguardando confirmação das ações Meta"} /><Kpi label="Conversas iniciadas" value={metaLeadsAvailable ? integer.format(conversations) : "Indisponível"} note="Evento de conversa Meta" /><Kpi label="Investimento" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaSpendAvailable ? brl.format(canonicalSpend) : "Aguardando sincronização"} note={metaTraffic.data.status === "stale" ? "Meta · cobertura indisponível ou desatualizada" : "Meta Ads · fonte oficial"} /><Kpi label="Custo por resultado" value={metaSpendAvailable && metaLeadsAvailable ? brl.format(metaLeads ? canonicalSpend / metaLeads : 0) : "—"} note="Investimento ÷ resultados Meta" emphasis /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={`${loadingSales ? "…" : won} venda(s) confirmada(s)`} /><Kpi label="Receita líquida RD" value={loadingSales ? "Carregando…" : brl.format(revenue)} note={metaSpendAvailable && canonicalSpend > 0 ? `ROAS Growdash/RD ${(revenue / canonicalSpend).toFixed(2)}x` : "Sem gasto Meta confirmado"} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Consolidado de leads por campanha</h2><p className="text-xs text-muted-foreground">Resumo agregado das contas selecionadas. Os relatórios individuais ficam nos cards acima.</p></div><Button variant="outline" size="sm" onClick={copyReport} className="sm:ml-auto"><Copy className="mr-2 h-4 w-4" />Copiar resumo</Button></header><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Campanha</th><th className="px-4 py-3 text-right">Investimento</th><th className="px-4 py-3 text-right">Leads</th><th className="px-4 py-3 text-right">Conversas iniciadas</th><th className="px-4 py-3 text-right">CPL</th></tr></thead><tbody>{byCampaign.map((row) => <tr key={row.key} className="border-t border-border"><td className="px-4 py-3 font-bold">{row.name}</td><td className="px-4 py-3 text-right">{metaSpendAvailable ? brl.format(row.spend) : "—"}</td><td className="px-4 py-3 text-right">{metaLeadsAvailable ? integer.format(row.leads) : "—"}</td><td className="px-4 py-3 text-right">{metaLeadsAvailable ? integer.format(row.conversations) : "—"}</td><td className="px-4 py-3 text-right">{metaSpendAvailable && metaLeadsAvailable ? brl.format(row.leads ? row.spend / row.leads : 0) : "—"}</td></tr>)}</tbody></table></div></section></> : null}
+  </div>;
+}
+
+function AccountLeadReportCard({ account, preset, onPresetChange, customRange, onCustomRangeChange, startDate, endDate, funnelIds }: { account: { id: string; name: string; attribution_window?: string | null }; preset: DatePreset; onPresetChange: (preset: DatePreset) => void; customRange: { from: Date; to: Date }; onCustomRangeChange: (range: { from: Date; to: Date }) => void; startDate: Date; endDate: Date; funnelIds: string[] }) {
+  const { toast } = useToast();
+  const attributionWindowsByAccount = useMemo(() => ({ [account.id]: account.attribution_window || "account_default" }), [account.attribution_window, account.id]);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: [account.id], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, true);
+  const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: account.id, adAccountIds: [account.id], attributionWindowsByAccount, startDate, endDate, enabled: true });
+  const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: account.id, adAccountIds: [account.id], funnelIds, enabled: true });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: account.id, adAccountIds: [account.id], funnelIds, enabled: true });
+  const saleTotals = aggregateSales(sales);
+  const metaLeadsAvailable = metaTraffic.data.metricAvailability.leads?.available ?? false;
+  const spendAvailable = metaTraffic.data.metricAvailability.spend?.available ?? metaTraffic.data.available;
+  const leads = metaTraffic.data.totalLeads;
+  const conversations = metaTraffic.data.conversations;
+  const spend = metaTraffic.data.spend;
+  const copySummary = async () => { await navigator.clipboard.writeText(`Relatório de resultados Meta — ${account.name}\nPeríodo: ${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}\nResultados: ${metaLeadsAvailable ? integer.format(leads) : "indisponível"} · Conversas: ${metaLeadsAvailable ? integer.format(conversations) : "indisponível"}\nInvestimento: ${spendAvailable ? brl.format(spend) : "indisponível"}\nRD: ${integer.format(deals.length)} negócios · ${saleTotals.totalQuantity} vendas · ${brl.format(saleTotals.totalNet)}`); toast({ title: "Resumo da conta copiado" }); };
+  return <article className="flex min-w-0 h-full flex-col rounded-2xl border border-border bg-card/70 p-3 shadow-sm">
+    <header className="flex items-start justify-between gap-3 border-b border-border/70 pb-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conta de anúncio</p><h3 className="mt-1 truncate text-base font-black" title={account.name}>{account.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{format(businessCalendarDate(startDate), "dd/MM/yyyy")}–{format(businessCalendarDate(endDate), "dd/MM/yyyy")}</p></div><Button size="sm" variant="outline" className="shrink-0" onClick={copySummary}><Copy className="mr-1.5 h-3.5 w-3.5" />Resumo</Button></header>
+    <div className="mt-3 grid auto-rows-fr grid-cols-2 gap-2 xl:grid-cols-4"><Kpi label="Resultados" value={loadingMeta ? "Carregando…" : metaLeadsAvailable ? integer.format(leads) : "—"} note={metaLeadsAvailable ? `${integer.format(leads - conversations)} leads + ${integer.format(conversations)} conversas` : "Cobertura Meta indisponível"} /><Kpi label="Investimento" value={loadingMeta ? "Carregando…" : spendAvailable ? brl.format(spend) : "—"} note="Meta Ads" /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={loadingSales ? "Vendas carregando…" : `${saleTotals.totalQuantity} venda(s)`} /><Kpi label="Receita RD" value={loadingSales ? "Carregando…" : brl.format(saleTotals.totalNet)} note={spend > 0 ? `ROAS ${(saleTotals.totalNet / spend).toFixed(2)}x` : "Sem investimento confirmado"} /></div>
+    <div className="mt-3"><LeadReportStudio accountId={account.id} accountName={account.name} accounts={[account]} onAccountChange={() => undefined} preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} insights={insights} deals={deals} sales={sales} /></div>
+  </article>;
+}
+
+function TrafficFunnels() {
+  const [previewTemplate, setPreviewTemplate] = useState<TrafficFunnelTemplate | null>(null);
+  const templates = getTrafficFunnelTemplates();
+  const templateCount = templates.length;
+
+  return <div className="space-y-4">
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <header className="border-b border-border px-4 py-5 sm:px-6">
+        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary"><GitBranch className="h-5 w-5" /></span><div><h2 className="text-xl font-black">Funis de tráfego</h2><p className="text-xs text-muted-foreground">{templateCount} playbooks oficiais da ZNTT Academy. Escolha o processo que a campanha irá executar.</p></div></div>
+      </header>
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="rounded-xl border border-border bg-muted/[0.035] px-4 py-3"><h3 className="font-black">Biblioteca ZNTT Academy</h3><p className="mt-1 text-xs text-muted-foreground">Os quatro processos abaixo substituem os modelos genéricos. Cada funil mantém seu próprio caminho, operação comercial e indicadores.</p></div>
+        {templates.map((template, templateIndex) => <article key={template.id} className="grid overflow-hidden rounded-2xl border border-border bg-muted/[0.08] xl:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="flex flex-col border-b border-border p-5 xl:border-b-0 xl:border-r">
+            <span className="w-fit rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">ZNTT-{String(templateIndex + 1).padStart(2, "0")}</span>
+            <h4 className="mt-3 text-lg font-black leading-tight">{template.name.replace(/^\d+\.\s*/, "")}</h4>
+            <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground"><li>→ {template.bestFor}</li><li>→ {template.primaryKpi}</li><li>→ Rascunho seguro</li></ul>
+            <Button variant="outline" size="sm" className="mt-5 w-full" onClick={() => setPreviewTemplate(template)}>Visualizar funil</Button>
+          </aside>
+          <div className="growdash-scrollbar flex items-stretch gap-2 overflow-x-auto p-5">
+            {template.stages.map((stage, index) => {
+              const icons = [Video, UsersRound, Smartphone, Zap, Target, MessageCircle, MousePointerClick];
+              const StageIcon = icons[index % icons.length];
+              return <div key={`${template.id}-${stage}`} className="flex min-w-0 shrink-0 items-center gap-2">
+                <div className="flex min-h-[145px] w-[205px] flex-col rounded-xl border border-border bg-background p-4">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><StageIcon className="h-4 w-4" /></span>
+                  <strong className="mt-3 text-sm leading-tight">{index + 1}. {stage}</strong>
+                  <span className="mt-1 text-[9px] font-black uppercase tracking-[.08em] text-primary">{index === 0 ? "Entrada" : index === template.stages.length - 1 ? "Resultado" : "Progressão"}</span>
+                  <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{index === 0 ? template.strategy : index === template.stages.length - 1 ? `Conclusão acompanhada por ${template.primaryKpi}.` : "Avance somente quem cumpriu o sinal de intenção desta etapa."}</p>
+                </div>
+                {index < template.stages.length - 1 && <ChevronRight className="h-5 w-5 shrink-0 text-primary" />}
+              </div>;
+            })}
+          </div>
+          <footer className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground xl:col-span-2"><CircleAlert className="mr-1 inline h-3.5 w-3.5 text-amber-500" /><b className="text-foreground">Regra de segurança:</b> {template.guardrail}</footer>
+        </article>)}
+      </div>
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
+        <DialogContent className="max-h-[92vh] max-w-[96vw] overflow-y-auto p-4 sm:p-6">
+          {previewTemplate && <><DialogHeader><DialogTitle>{previewTemplate.name}</DialogTitle><DialogDescription>Playbook visual oficial da ZNTT Academy.</DialogDescription></DialogHeader><img src={funnelPreviewImages[previewTemplate.id]} alt={`Playbook visual: ${previewTemplate.name}`} className="mt-4 h-auto w-full rounded-lg border border-border" /></>}
+        </DialogContent>
+      </Dialog>
+    </section>
+  </div>;
+}
+
+function Kpi({ label, value, note, emphasis }: { label: string; value: string; note: string; emphasis?: boolean }) { return <article className={cn("gd-metric-card min-w-0 cursor-default overflow-hidden rounded-xl border border-border bg-card p-4", emphasis && "border-primary/60 bg-primary/5")} title={metricDescription(label)}><p className="min-h-[2.25em] break-words text-[9px] font-black uppercase leading-tight tracking-[.12em] text-muted-foreground">{label}</p><p className="mt-2 truncate text-xl font-black" title={value}>{value}</p><p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{note}</p></article>; }
+function SmallMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background p-3"><span className="line-clamp-2 text-[9px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block truncate text-xs" title={value}>{value}</strong></div>; }
+function Empty({ text }: { text: string }) { return <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card p-6 text-center text-xs text-muted-foreground">{text}</div>; }

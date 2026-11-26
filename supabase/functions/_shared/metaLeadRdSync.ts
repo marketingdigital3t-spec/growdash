@@ -1,0 +1,674 @@
+import { executeRDWrite } from "./rdWrite.ts";
+import { fetchWithTimeout, remainingSyncTimeoutMs } from "../../../src/lib/syncReliabilityPolicy.ts";
+import {
+  normalizeMetaPlatform,
+  normalizeMetaPlacement,
+  extractPhoneVariants,
+  phonesMatch,
+} from "./metaDeliveryNormalization.ts";
+import { extractMetaFormAnswers } from "../../../src/lib/metaFormAnswers.ts";
+
+type AdminClient = any;
+
+type MetaLead = {
+  meta_lead_id: string;
+  ad_account_id: string | null;
+  campaign_id: string | null;
+  adset_id: string | null;
+  ad_id: string | null;
+  form_id: string | null;
+  campaign_name: string | null;
+  adset_name: string | null;
+  ad_name: string | null;
+  form_name: string | null;
+  platform: string | null;
+  placement: string | null;
+  is_organic: boolean | null;
+  email: string | null;
+  phone: string | null;
+  full_name?: string | null;
+  created_time: string;
+  raw: Record<string, unknown> | null;
+  /** Respostas do questionário do formulário nativo, extraídas do field_data. */
+  lead_situacao_profissional?: string | null;
+  lead_especialidade?: string | null;
+  lead_faturamento?: string | null;
+  lead_urgencia?: string | null;
+  lead_objetivo?: string | null;
+};
+
+type RdDeal = {
+  id: string;
+  user_id: string;
+  rd_connection_id: string | null;
+  rd_deal_id: string;
+  ad_account_id: string | null;
+  meta_lead_id?: string | null;
+  meta_form_id?: string | null;
+  meta_campaign_id?: string | null;
+  meta_adset_id?: string | null;
+  meta_ad_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_adset_name?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_name?: string | null;
+  meta_platform?: string | null;
+  meta_placement?: string | null;
+  meta_is_organic?: boolean | null;
+  meta_attribution_method?: string | null;
+  meta_attribution_status?: string | null;
+  contact_name?: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  lead_created_at: string | null;
+  stage_updated_at: string | null;
+  closed_at: string | null;
+  raw: Record<string, any> | null;
+};
+
+type TrackingResult = {
+  status: "written" | "skipped" | "partial" | "failed";
+  rd_deal_id?: string;
+  reason?: string;
+  note?: "written" | "skipped";
+  custom_fields?: "written" | "skipped";
+  form_answer_unmapped?: string[];
+  verified?: boolean;
+  error?: string;
+};
+
+const TRACKING_FIELDS = [
+  { key: "campaign_name", label: "Campanha", aliases: ["campanha", "campaign", "campaign_name", "nome campanha", "nome da campanha"] },
+  { key: "adset_name", label: "Conjunto", aliases: ["conjunto", "adset", "adset_name", "nome conjunto", "nome do conjunto"] },
+  { key: "ad_name", label: "Anúncio", aliases: ["anuncio", "anúncio", "ad", "ad_name", "nome anuncio", "nome anúncio"] },
+  { key: "form_name", label: "Formulário", aliases: ["formulario", "formulário", "form", "form_name", "nome formulario", "nome formulário"] },
+  { key: "platform", label: "Plataforma", aliases: ["plataforma", "platform", "publisher_platform", "site_source_name", "origem plataforma"] },
+  { key: "placement", label: "Posicionamento", aliases: ["posicionamento", "placement", "platform_position"] },
+] as const;
+
+function clean(value: unknown): string | null {
+  const text = value == null ? "" : String(value).trim();
+  return text || null;
+}
+
+/** Hydrate names when a Meta lead payload contains only immutable IDs. */
+async function enrichLeadFromCatalog(admin: AdminClient, input: MetaLead): Promise<MetaLead> {
+  const lead = { ...input };
+  try {
+    if (lead.ad_id && (!clean(lead.ad_name) || !clean(lead.adset_id) || !clean(lead.campaign_id))) {
+      const { data } = await admin.from("ads").select("id,name,adset_id").eq("id", lead.ad_id).maybeSingle();
+      if (data) {
+        lead.ad_name ||= data.name || null;
+        lead.adset_id ||= data.adset_id || null;
+      }
+    }
+    if (lead.adset_id && (!clean(lead.adset_name) || !clean(lead.campaign_id))) {
+      const { data } = await admin.from("adsets").select("id,name,campaign_id").eq("id", lead.adset_id).maybeSingle();
+      if (data) {
+        lead.adset_name ||= data.name || null;
+        lead.campaign_id ||= data.campaign_id || null;
+      }
+    }
+    if (lead.campaign_id && !clean(lead.campaign_name)) {
+      const { data } = await admin.from("campaigns").select("id,name").eq("id", lead.campaign_id).maybeSingle();
+      if (data) lead.campaign_name ||= data.name || null;
+    }
+  } catch {
+    // The immutable IDs and original lead remain usable when the catalog is
+    // temporarily unavailable; attribution will be repaired on the next run.
+  }
+  return lead;
+}
+
+async function persistLeadCatalogNames(admin: AdminClient, lead: MetaLead) {
+  if (!lead.meta_lead_id) return;
+  const patch = {
+    campaign_id: lead.campaign_id,
+    adset_id: lead.adset_id,
+    ad_id: lead.ad_id,
+    campaign_name: lead.campaign_name,
+    adset_name: lead.adset_name,
+    ad_name: lead.ad_name,
+  };
+  if (!Object.values(patch).some((value) => clean(value))) return;
+  await admin.from("meta_leads").update(patch).eq("meta_lead_id", lead.meta_lead_id);
+}
+
+function norm(value: unknown): string {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeEmail(value: unknown): string | null {
+  const email = clean(value)?.toLowerCase() || null;
+  return email && email.includes("@") ? email : null;
+}
+
+function normalizePhone(value: unknown): string | null {
+  const phone = clean(value)?.replace(/\D/g, "") || "";
+  return phone || null;
+}
+
+function dateOf(value: unknown): number | null {
+  if (!value) return null;
+  const timestamp = Date.parse(String(value));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function leadHasCompleteTracking(lead: MetaLead): boolean {
+  return Boolean(lead.campaign_id && lead.adset_id && lead.ad_id && lead.form_id)
+    && TRACKING_FIELDS.every((field) => clean(lead[field.key]));
+}
+
+function trackingFingerprint(lead: MetaLead): string {
+  return [
+    `campaign_id=${clean(lead.campaign_id) || ""}`,
+    `adset_id=${clean(lead.adset_id) || ""}`,
+    `ad_id=${clean(lead.ad_id) || ""}`,
+    `form_id=${clean(lead.form_id) || ""}`,
+    ...TRACKING_FIELDS.map((field) => `${field.key}=${clean(lead[field.key]) || ""}`),
+  ].join("|");
+}
+
+function attributionMethod(deal: RdDeal, lead: MetaLead) {
+  const emailMatches = Boolean(normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email));
+  const phoneMatches = Boolean(phonesMatch(lead.phone, deal.contact_phone));
+  if (emailMatches && phoneMatches) return "meta_form_email_phone_exact";
+  if (emailMatches) return "meta_form_email_exact";
+  if (phoneMatches) return "meta_form_phone_exact";
+  const nameMatches = Boolean(clean(lead.full_name) && clean(deal.contact_name) && norm(lead.full_name) === norm(deal.contact_name));
+  if (nameMatches) return "meta_form_name_match";
+  return deal.meta_attribution_method || "meta_lead_webhook";
+}
+
+/**
+ * Keep the Growdash mirror usable even when RD field writes are disabled or
+ * the provider rejects an optional custom field. The CRM reads these columns,
+ * while the RD write remains separately governed and audited below.
+ */
+async function mirrorAttribution(admin: AdminClient, deal: RdDeal, lead: MetaLead) {
+  const value = (incoming: unknown, existing: unknown) => clean(incoming) || clean(existing) || null;
+  const meta_campaign_id = value(lead.campaign_id, deal.meta_campaign_id);
+  const meta_adset_id = value(lead.adset_id, deal.meta_adset_id);
+  const meta_ad_id = value(lead.ad_id, deal.meta_ad_id);
+  const meta_form_id = value(lead.form_id, deal.meta_form_id);
+  const meta_campaign_name = value(lead.campaign_name, deal.meta_campaign_name);
+  const meta_adset_name = value(lead.adset_name, deal.meta_adset_name);
+  const meta_ad_name = value(lead.ad_name, deal.meta_ad_name);
+  const meta_form_name = value(lead.form_name, deal.meta_form_name);
+  const rawPlatform = value(lead.platform, deal.meta_platform);
+  const rawPlacement = value(lead.placement, deal.meta_placement);
+  const meta_platform = normalizeMetaPlatform(rawPlatform) || (lead.meta_lead_id ? "Meta Ads" : null);
+  const meta_placement = normalizeMetaPlacement(rawPlacement) || null;
+  const meta_is_organic = typeof lead.is_organic === "boolean" ? lead.is_organic : deal.meta_is_organic ?? null;
+  const hasAny = Boolean(meta_campaign_id || meta_adset_id || meta_ad_id || meta_form_id || meta_campaign_name || meta_adset_name || meta_ad_name || meta_form_name || meta_platform || meta_placement);
+  const complete = Boolean(meta_campaign_id && meta_adset_id && meta_ad_id && meta_form_id && meta_campaign_name && meta_adset_name && meta_ad_name && meta_form_name && meta_platform && meta_placement);
+  const { error } = await admin.from("rd_deals").update({
+    meta_lead_id: clean(lead.meta_lead_id) || deal.meta_lead_id || null,
+    meta_form_id,
+    meta_campaign_id,
+    meta_adset_id,
+    meta_ad_id,
+    meta_campaign_name,
+    meta_adset_name,
+    meta_ad_name,
+    meta_form_name,
+    meta_platform,
+    meta_placement,
+    meta_is_organic,
+    meta_attribution_method: attributionMethod(deal, lead),
+    meta_attribution_status: complete ? "exact" : hasAny ? "partial" : "unavailable",
+    meta_attributed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", deal.id).eq("rd_connection_id", deal.rd_connection_id);
+  if (error) throw error;
+  return { complete, status: complete ? "exact" : hasAny ? "partial" : "unavailable" } as const;
+}
+
+async function stableUuid(value: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+  digest[6] = (digest[6] & 0x0f) | 0x50;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function fieldLabel(field: any): string {
+  return String(field?.custom_field?.label || field?.label || field?.custom_field_id?.label || field?.name || "").trim();
+}
+
+function fieldValue(field: any): string | null {
+  const value = field?.value ?? field?.values ?? null;
+  if (Array.isArray(value)) return clean(value[0]);
+  if (value && typeof value === "object") return clean(value.label ?? value.value);
+  return clean(value);
+}
+
+function customFieldPatch(raw: Record<string, any> | null, configs: any[], lead: MetaLead) {
+  const source = raw?.deal_custom_fields;
+  if (!Array.isArray(source) || source.length === 0) return null;
+  let changed = false;
+  const next = source.map((field: any) => {
+    const label = norm(fieldLabel(field));
+    const config = configs.find((item) => {
+      const aliases = [item?.rd_field_label, ...(item?.rd_field_aliases || [])].filter(Boolean);
+      return aliases.some((alias: string) => norm(alias) === label);
+    });
+    const target = TRACKING_FIELDS.find((item) => {
+      const aliases = config
+        ? [config.rd_field_label, ...(config.rd_field_aliases || [])]
+        : item.aliases;
+      return aliases.some((alias: string) => norm(alias) === label);
+    });
+    if (!target) return field;
+    const value = clean(lead[target.key]);
+    if (!value || fieldValue(field) === value) return field;
+    changed = true;
+    const updated = { ...field };
+    if (Array.isArray(field?.values)) updated.values = [value];
+    else updated.value = value;
+    return updated;
+  });
+  return changed ? next : null;
+}
+
+function noteBody(lead: MetaLead): string {
+  const lines = [
+    "Rastreamento Meta Ads — Growdash",
+    `Lead Meta: ${lead.meta_lead_id}`,
+    `Campanha: ${clean(lead.campaign_name) || "Não informado"}`,
+    `Conjunto: ${clean(lead.adset_name) || "Não informado"}`,
+    `Anúncio: ${clean(lead.ad_name) || "Não informado"}`,
+    `Formulário: ${clean(lead.form_name) || "Não informado"}`,
+    `Plataforma: ${clean(lead.platform) || "Não informado"}`,
+    `Posicionamento: ${clean(lead.placement) || "Não informado"}`,
+  ];
+  return lines.join("\n");
+}
+
+async function providerDealReadback(token: string, rdDealId: string, expectedFields: any[] | null, deadlineAt?: number) {
+  const response = await fetchWithTimeout(
+    `https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(rdDealId)}?token=${encodeURIComponent(token)}`,
+    {},
+    remainingSyncTimeoutMs(deadlineAt ?? Number.POSITIVE_INFINITY),
+  );
+  if (!response.ok) return false;
+  if (!expectedFields?.length) return true;
+  const payload = await response.json().catch(() => ({}));
+  const fields = Array.isArray(payload?.deal_custom_fields)
+    ? payload.deal_custom_fields
+    : Array.isArray(payload?.deal?.deal_custom_fields)
+      ? payload.deal.deal_custom_fields
+      : Array.isArray(payload?.custom_fields)
+        ? payload.custom_fields
+        : [];
+  return expectedFields.every((expected: any) => {
+    const label = fieldLabel(expected);
+    const current = fields.find((item: any) => norm(fieldLabel(item)) === norm(label));
+    return current && fieldValue(current) === fieldValue(expected);
+  });
+}
+
+function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score: number } {
+  const metaIdMatches = Boolean(clean(lead.meta_lead_id) && clean(lead.meta_lead_id) === clean(deal.meta_lead_id));
+  if (metaIdMatches) return { match: true, score: 100 };
+  const emailMatches = !!normalizeEmail(lead.email) && normalizeEmail(lead.email) === normalizeEmail(deal.contact_email);
+  const phoneMatches = phonesMatch(lead.phone, deal.contact_phone);
+  const normLeadName = norm(lead.full_name || "");
+  const normDealName = norm(deal.contact_name || "");
+  const nameMatches = Boolean(
+    normLeadName.length >= 6 &&
+    normDealName.length >= 6 &&
+    normLeadName.split(/\s+/).length >= 2 &&
+    normDealName.split(/\s+/).length >= 2 &&
+    normLeadName === normDealName
+  );
+  if (!emailMatches && !phoneMatches && !nameMatches) return { match: false, score: 0 };
+  const leadAt = dateOf(lead.created_time);
+  const dealAt = dateOf(deal.lead_created_at || deal.stage_updated_at || deal.closed_at);
+  const distance = leadAt != null && dealAt != null ? Math.abs(leadAt - dealAt) : 0;
+  // Se for apenas por nome, limite de 30 dias para evitar falso-positivo de homônimos
+  if (!emailMatches && !phoneMatches && nameMatches && distance > 30 * 24 * 60 * 60 * 1000) return { match: false, score: 0 };
+  if (distance > 180 * 24 * 60 * 60 * 1000) return { match: false, score: 0 };
+  const baseScore = (emailMatches && phoneMatches ? 40 : emailMatches ? 30 : phoneMatches ? 25 : 15);
+  return { match: true, score: baseScore - distance / 1e12 };
+}
+
+async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal, deadlineAt?: number): Promise<TrackingResult> {
+  if (!deal.rd_connection_id) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_missing" };
+  const trackingComplete = leadHasCompleteTracking(lead);
+
+  // Persist the attribution in the local mirror before checking RD write
+  // permission. A disabled RD write must not make a real Meta lead disappear
+  // from the CRM details view.
+  try {
+    await mirrorAttribution(admin, deal, lead);
+  } catch (error) {
+    return { status: "failed", rd_deal_id: deal.rd_deal_id, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  const { data: connection, error: connectionError } = await admin
+    .from("rd_account_connections")
+    .select("id,user_id,api_token,status,write_enabled")
+    .eq("id", deal.rd_connection_id)
+    .maybeSingle();
+  if (connectionError) return { status: "failed", rd_deal_id: deal.rd_deal_id, error: connectionError.message };
+  if (!connection?.write_enabled) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_write_disabled" };
+  if (connection.status !== "connected" || !connection.api_token) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_not_ready" };
+
+  const { data: configs } = lead.ad_account_id
+    ? await admin
+      .from("rd_field_configs")
+      .select("rd_field_label,rd_field_aliases,rd_source")
+      .eq("ad_account_id", lead.ad_account_id)
+      .eq("rd_source", "deal")
+    : { data: [] };
+  const patchedFields = customFieldPatch(deal.raw, configs || [], lead);
+  const fingerprint = trackingFingerprint(lead);
+  const noteCorrelation = await stableUuid(`meta-rd-note:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
+  const result: TrackingResult = {
+    status: trackingComplete ? "written" : "partial",
+    rd_deal_id: deal.rd_deal_id,
+    note: "skipped",
+    custom_fields: "skipped",
+    reason: trackingComplete ? undefined : "meta_tracking_incomplete",
+  };
+
+  try {
+    const noteWrite = await executeRDWrite({
+      admin,
+      userId: connection.user_id,
+      connectionId: connection.id,
+      action: "add_note",
+      target: { rd_deal_id: deal.rd_deal_id, meta_lead_id: lead.meta_lead_id },
+      before: {},
+      after: { body: noteBody(lead), fingerprint },
+      correlationId: noteCorrelation,
+      method: "POST",
+      path: "/activities",
+      body: { deal_id: deal.rd_deal_id, type: "note", description: noteBody(lead) },
+      deadlineAt,
+    });
+    result.note = noteWrite.skipped ? "skipped" : "written";
+
+    // 1. Custom fields de rastreamento (campanha/conjunto/anúncio/formulário/plataforma/posicionamento)
+    if (patchedFields) {
+      const fieldCorrelation = await stableUuid(`meta-rd-fields:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
+      const fieldWrite = await executeRDWrite({
+        admin,
+        userId: connection.user_id,
+        connectionId: connection.id,
+        action: "update_deal",
+        target: { rd_deal_id: deal.rd_deal_id, meta_lead_id: lead.meta_lead_id },
+        before: { deal_custom_fields: deal.raw?.deal_custom_fields || [] },
+        after: { deal_custom_fields: patchedFields, fingerprint },
+        correlationId: fieldCorrelation,
+        method: "PUT",
+        path: `/deals/${encodeURIComponent(deal.rd_deal_id)}`,
+        body: { deal: { deal_custom_fields: patchedFields } },
+        deadlineAt,
+      });
+      result.custom_fields = fieldWrite.skipped ? "skipped" : "written";
+    }
+
+    // 2. Respostas do questionário do formulário nativo (situação profissional, especialidade,
+    //    faturamento, urgência, objetivo). Só escreve se houver resposta preenchida e um campo
+    //    customizado do RD mapeado via rd_field_configs.
+    const formAnswers: Record<string, string> = {};
+    for (const key of ["lead_situacao_profissional", "lead_especialidade", "lead_faturamento", "lead_urgencia", "lead_objetivo"]) {
+      const value = clean(lead[key]);
+      if (value) formAnswers[key] = value;
+    }
+    let formAnswerWriteSkipped = false;
+    if (Object.keys(formAnswers).length) {
+      const formCorrelation = await stableUuid(`meta-rd-form-answers:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
+      const formPatch = formAnswerFieldPatch(deal.raw, configs || [], formAnswers);
+      if (formPatch.fields) {
+        const formFieldWrite = await executeRDWrite({
+          admin,
+          userId: connection.user_id,
+          connectionId: connection.id,
+          action: "update_deal",
+          target: { rd_deal_id: deal.rd_deal_id, meta_lead_id: lead.meta_lead_id },
+          before: { deal_custom_fields: deal.raw?.deal_custom_fields || [] },
+          after: { deal_custom_fields: formPatch.fields, fingerprint },
+          correlationId: formCorrelation,
+          method: "PUT",
+          path: `/deals/${encodeURIComponent(deal.rd_deal_id)}`,
+          body: { deal: { deal_custom_fields: formPatch.fields } },
+          deadlineAt,
+        });
+        formAnswerWriteSkipped = formFieldWrite.skipped;
+        if (!formFieldWrite.skipped && formPatch.fields !== patchedFields) {
+          // Se o rastreamento já escreveu, o form patch deve ser aplicado sobre o resultado do rastreamento,
+          // não sobre o campo original. A leitura abaixo é best-effort: se não houver patchedFields,
+          // o formWrite já escreveu sozinho.
+          result.custom_fields = result.custom_fields || "written";
+        }
+      }
+      result.form_answer_unmapped = formPatch.unmapped;
+    }
+
+    const fieldsForReadback = formPatch?.fields ?? patchedFields;
+    result.verified = await providerDealReadback(String(connection.api_token), deal.rd_deal_id, fieldsForReadback, deadlineAt);
+    if (!result.verified) {
+      result.status = "failed";
+      result.error = "RD readback did not confirm the tracking update";
+    }
+    return result;
+  } catch (error) {
+    return { status: "failed", rd_deal_id: deal.rd_deal_id, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLead | null> {
+  const { data, error } = await admin
+    .from("meta_leads")
+    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw,lead_situacao_profissional,lead_especialidade,lead_faturamento,lead_urgencia,lead_objetivo")
+    .eq("meta_lead_id", metaLeadId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const enriched = await enrichLeadFromCatalog(admin, data);
+  if (enriched.campaign_name !== data.campaign_name || enriched.adset_name !== data.adset_name || enriched.ad_name !== data.ad_name || enriched.adset_id !== data.adset_id || enriched.campaign_id !== data.campaign_id) {
+    await persistLeadCatalogNames(admin, enriched);
+  }
+  return enriched;
+}
+
+async function queryDealsForLead(admin: AdminClient, lead: MetaLead, scoped: boolean): Promise<RdDeal[]> {
+  const candidates: RdDeal[] = [];
+  const email = normalizeEmail(lead.email);
+  const phone = normalizePhone(lead.phone);
+  const select = "id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_name,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw";
+  const applyScope = (query: any) => scoped && lead.ad_account_id ? query.eq("ad_account_id", lead.ad_account_id) : query;
+  if (lead.meta_lead_id) {
+    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
+      .eq("meta_lead_id", lead.meta_lead_id)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (email) {
+    const { data, error } = await applyScope(admin.from("rd_deals").select(select))
+      .ilike("contact_email", email)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (phone) {
+    const phoneVariants = extractPhoneVariants(phone);
+    for (const variant of phoneVariants.slice(0, 4)) {
+      const { data, error } = await applyScope(admin.from("rd_deals").select(select))
+        .eq("contact_phone", variant)
+        .limit(50);
+      if (!error && data) candidates.push(...data);
+    }
+    if (!candidates.length) {
+      const { data: formatted, error: formattedError } = await applyScope(admin.from("rd_deals").select(select))
+        .not("contact_phone", "is", null)
+        .order("lead_created_at", { ascending: false })
+        .limit(2000);
+      if (!formattedError && formatted) {
+        candidates.push(...(formatted || []).filter((deal: RdDeal) => phonesMatch(deal.contact_phone, phone)));
+      }
+    }
+  }
+  if (lead.full_name && norm(lead.full_name).length >= 6) {
+    const { data: byName } = await applyScope(admin.from("rd_deals").select(select))
+      .ilike("contact_name", `%${lead.full_name.trim()}%`)
+      .limit(20);
+    if (byName) candidates.push(...byName);
+  }
+  return candidates;
+}
+
+async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdDeal[]> {
+  let candidates = await queryDealsForLead(admin, lead, true);
+  // Historical RD rows may not carry the Meta account mapping. Only widen the
+  // query after the strict account scope has produced no candidate; the final
+  // identifier and time-window checks still reject unrelated deals.
+  if (!candidates.length) candidates = await queryDealsForLead(admin, lead, false);
+  const unique = [...new Map(candidates.map((deal) => [deal.rd_deal_id, deal])).values()];
+  return unique
+    .map((deal: RdDeal) => ({ deal, match: dealMatchesLead(deal, lead) }))
+    .filter((item: any) => item.match.match)
+    .sort((a: any, b: any) => b.match.score - a.match.score)
+    .map((item: any) => item.deal);
+}
+
+async function queryLeadsForDeal(admin: AdminClient, deal: RdDeal, scoped: boolean): Promise<MetaLead[]> {
+  const candidates: MetaLead[] = [];
+  const email = normalizeEmail(deal.contact_email);
+  const phone = normalizePhone(deal.contact_phone);
+  const select = "meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,full_name,created_time,raw";
+  const applyScope = (query: any) => scoped && deal.ad_account_id ? query.eq("ad_account_id", deal.ad_account_id) : query;
+  if (deal.meta_lead_id) {
+    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
+      .eq("meta_lead_id", deal.meta_lead_id)
+      .limit(1);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (email) {
+    const { data, error } = await applyScope(admin.from("meta_leads").select(select))
+      .ilike("email", email)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (phone) {
+    const phoneVariants = extractPhoneVariants(phone);
+    for (const variant of phoneVariants.slice(0, 4)) {
+      const { data, error } = await applyScope(admin.from("meta_leads").select(select))
+        .eq("phone", variant)
+        .limit(50);
+      if (!error && data) candidates.push(...data);
+    }
+    if (!candidates.length) {
+      const { data: formatted, error: formattedError } = await applyScope(admin.from("meta_leads").select(select))
+        .not("phone", "is", null)
+        .order("created_time", { ascending: false })
+        .limit(2000);
+      if (!formattedError && formatted) {
+        candidates.push(...(formatted || []).filter((lead: MetaLead) => phonesMatch(lead.phone, phone)));
+      }
+    }
+  }
+  if (deal.contact_name && norm(deal.contact_name).length >= 6) {
+    const { data: byName } = await applyScope(admin.from("meta_leads").select(select))
+      .ilike("full_name", `%${deal.contact_name.trim()}%`)
+      .limit(20);
+    if (byName) candidates.push(...byName);
+  }
+  return candidates;
+}
+
+async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLead | null> {
+  let candidates = await queryLeadsForDeal(admin, deal, true);
+  if (!candidates.length) candidates = await queryLeadsForDeal(admin, deal, false);
+  return [...new Map(candidates.map((lead) => [lead.meta_lead_id, lead])).values()]
+    .map((lead: MetaLead) => ({ lead, match: dealMatchesLead(deal, lead) }))
+    .filter((item: any) => item.match.match)
+    .sort((a: any, b: any) => b.match.score - a.match.score)
+    .map((item: any) => item.lead)[0] || null;
+}
+
+export async function syncMetaLeadToRD(admin: AdminClient, metaLeadId: string, deadlineAt?: number) {
+  try {
+    const lead = await loadLead(admin, metaLeadId);
+    if (!lead) return { status: "skipped", reason: "meta_lead_not_found" };
+    const deals = await findDealsForLead(admin, lead);
+    if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
+    const results = [];
+    for (const deal of deals.slice(0, 3)) results.push(await writeAttribution(admin, lead, deal, deadlineAt));
+    return { status: results.some((item) => item.status === "written") ? "written" : results[0]?.status || "skipped", results };
+  } catch (error) {
+    return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Conversation and CRM webhooks do not have a native Meta Lead ID. They can
+ * still be linked to an RD negotiation when the connector supplies a stable
+ * contact identifier and the attribution came from a Meta referral.
+ */
+export async function syncCrmLeadToRD(admin: AdminClient, crmLeadId: string) {
+  try {
+    const { data: row, error } = await admin.from("crm_leads")
+      .select("id,ad_account_id,meta_lead_id,form_id,campaign_id,adset_id,ad_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,first_received_at,last_received_at,payload")
+      .eq("id", crmLeadId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) return { status: "skipped", reason: "crm_lead_not_found" };
+    if (!row.email && !row.phone) return { status: "skipped", reason: "crm_contact_identifier_missing" };
+    if (!row.campaign_id && !row.ad_id && !row.campaign_name && !row.ad_name) return { status: "skipped", reason: "meta_referral_missing" };
+    const lead = await enrichLeadFromCatalog(admin, {
+      meta_lead_id: row.meta_lead_id || `crm:${row.id}`,
+      ad_account_id: row.ad_account_id,
+      campaign_id: row.campaign_id || null,
+      adset_id: row.adset_id || null,
+      ad_id: row.ad_id || null,
+      form_id: row.form_id || null,
+      campaign_name: row.campaign_name || null,
+      adset_name: row.adset_name || null,
+      ad_name: row.ad_name || null,
+      form_name: row.form_name || null,
+      platform: row.platform || null,
+      placement: row.placement || null,
+      is_organic: typeof row.is_organic === "boolean" ? row.is_organic : null,
+      email: row.email || null,
+      phone: row.phone || null,
+      created_time: row.first_received_at || row.last_received_at || new Date().toISOString(),
+      raw: row.payload || null,
+    });
+    const deals = await findDealsForLead(admin, lead);
+    if (!deals.length) return { status: "skipped", reason: "rd_deal_not_found" };
+    const results = [];
+    for (const deal of deals.slice(0, 3)) results.push(await writeAttribution(admin, lead, deal));
+    return { status: results.some((item) => item.status === "written") ? "written" : results[0]?.status || "skipped", results };
+  } catch (error) {
+    return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function syncRDDealToMeta(admin: AdminClient, connectionId: string, rdDealId: string) {
+  try {
+    const { data: deal, error } = await admin
+      .from("rd_deals")
+      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,meta_lead_id,meta_form_id,meta_campaign_id,meta_adset_id,meta_ad_id,meta_campaign_name,meta_adset_name,meta_ad_name,meta_form_name,meta_platform,meta_placement,meta_is_organic,meta_attribution_method,meta_attribution_status,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
+      .eq("rd_connection_id", connectionId)
+      .eq("rd_deal_id", rdDealId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!deal) return { status: "skipped", reason: "rd_deal_not_found" };
+    const lead = await findLeadForDeal(admin, deal as RdDeal);
+    if (!lead) return { status: "skipped", reason: "meta_lead_not_found" };
+    return await writeAttribution(admin, await enrichLeadFromCatalog(admin, lead), deal as RdDeal);
+  } catch (error) {
+    return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+  }
+}

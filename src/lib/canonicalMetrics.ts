@@ -1,0 +1,99 @@
+import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { businessDateKey } from "@/lib/businessDate";
+
+export type CanonicalWonDeal = {
+  rd_deal_id: string;
+  rd_connection_id?: string | null;
+  ad_account_id?: string | null;
+  win?: boolean | null;
+  rd_stage_name?: string | null;
+  closed_at?: string | null;
+  stage_updated_at?: string | null;
+  updated_at?: string | null;
+  amount_total?: number | null;
+  amount_total_effective?: number | null;
+};
+
+/** The only timestamp used for a won RD deal. A stage update is a legacy
+ * fallback, never an override for a real closing timestamp. */
+export function canonicalWonDate(deal: Pick<CanonicalWonDeal, "closed_at" | "stage_updated_at">) {
+  // A missing close and missing transition is unknown, not a sale dated by
+  // lead creation. Never invent a financial/conversion date.
+  return deal.closed_at || deal.stage_updated_at || null;
+}
+
+/** Calendar boundaries for the business timezone used by the RD operation. */
+export function saoPauloDayBounds(startDate: Date, endDate: Date) {
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
+  return {
+    start: new Date(`${start}T00:00:00-03:00`),
+    end: new Date(`${end}T23:59:59.999-03:00`),
+  };
+}
+
+export function isCanonicalWonDealInPeriod(
+  deal: Pick<CanonicalWonDeal, "win" | "rd_stage_name" | "closed_at" | "stage_updated_at">,
+  startDate: Date,
+  endDate: Date,
+) {
+  if (!isCanonicalWonDeal(deal)) return false;
+  const value = canonicalWonDate(deal);
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+  const bounds = saoPauloDayBounds(startDate, endDate);
+  return timestamp >= bounds.start.getTime() && timestamp <= bounds.end.getTime();
+}
+
+/** A single, shared definition of a won RD deal used by every KPI surface. */
+export function isCanonicalWonDeal(deal: Pick<CanonicalWonDeal, "win" | "rd_stage_name">) {
+  // The current RD stage is authoritative whenever it is available. A stale
+  // `win` flag can remain true after a deal is reopened or moved to another
+  // stage; trusting it unconditionally makes Growdash count a sale that RD
+  // does not show in its Venda Realizada filter. Only legacy rows without a
+  // stage may fall back to the provider's terminal flag.
+  if (String(deal.rd_stage_name || "").trim()) return isWonRDStageName(deal.rd_stage_name);
+  return deal.win === true;
+}
+/** Deduplicates snapshots by the provider identity, retaining the first row. */
+export function canonicalWonDealIds<T extends CanonicalWonDeal>(deals: T[]) {
+  const ids = new Set<string>();
+  for (const deal of deals) {
+    const rawId = String(deal.rd_deal_id || "").trim();
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${rawId}`;
+    if (rawId && isCanonicalWonDeal(deal)) {
+      ids.add(rawId);
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+
+export function canonicalWonDeals<T extends CanonicalWonDeal>(deals: T[]) {
+  const seen = new Set<string>();
+  return deals.filter((deal) => {
+    const providerId = String(deal.rd_deal_id || "").trim();
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${providerId}`;
+    // A row without the provider identity is an incomplete sync artifact,
+    // never an independent sale. This keeps snapshots from inflating KPIs.
+    if (!providerId || !isCanonicalWonDeal(deal) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * Canonical RD sales for a calendar scope. Every report that displays a
+ * quantity of realized sales should use this set, rather than counting rows
+ * from `sales` or the current pipeline stage. The closing timestamp is the
+ * business date; stage_updated_at is only the legacy fallback when closing
+ * was not persisted by the provider.
+ */
+export function canonicalWonDealsInPeriod<T extends CanonicalWonDeal>(
+  deals: T[],
+  startDate: Date,
+  endDate: Date,
+) {
+  return canonicalWonDeals(deals).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
+}

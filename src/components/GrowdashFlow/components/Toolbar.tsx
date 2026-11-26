@@ -1,0 +1,60 @@
+import {
+  Circle,
+  Diamond,
+  Hand,
+  ImagePlus,
+  Minus,
+  MousePointer2,
+  MoveUpRight,
+  Pencil,
+  Repeat2,
+  Square,
+  StickyNote,
+  Type,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { ToolType } from "../types";
+
+const TOOLS: Array<{ tool: ToolType; label: string; shortcut: string; icon: typeof MousePointer2 }> = [
+  { tool: "select", label: "Selecionar", shortcut: "V", icon: MousePointer2 },
+  { tool: "hand", label: "Mover canvas", shortcut: "H", icon: Hand },
+  { tool: "rectangle", label: "Retângulo", shortcut: "R", icon: Square },
+  { tool: "ellipse", label: "Elipse", shortcut: "O", icon: Circle },
+  { tool: "diamond", label: "Losango", shortcut: "D", icon: Diamond },
+  { tool: "line", label: "Linha", shortcut: "L", icon: Minus },
+  { tool: "arrow", label: "Seta conectável", shortcut: "A", icon: MoveUpRight },
+  { tool: "text", label: "Texto", shortcut: "T", icon: Type },
+  { tool: "freehand", label: "Desenho livre", shortcut: "P", icon: Pencil },
+  { tool: "image", label: "Imagem", shortcut: "I", icon: ImagePlus },
+  { tool: "sticky", label: "Nota adesiva", shortcut: "N", icon: StickyNote },
+];
+
+export function Toolbar({ tool, onToolChange, onImage, keepToolActive, onKeepToolActive }: { tool: ToolType; onToolChange: (tool: ToolType) => void; onImage: () => void; keepToolActive: boolean; onKeepToolActive: (value: boolean) => void }) {
+  return <div aria-label="Ferramentas de desenho" className="growdash-flow-toolbar growdash-flow-chrome absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-2xl p-1.5 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
+    {TOOLS.map((item, index) => {
+      const Icon = item.icon;
+      const active = tool === item.tool;
+      return <button
+        key={item.tool}
+        type="button"
+        title={`${item.label} (${item.shortcut})`}
+        aria-label={item.label}
+        aria-pressed={active}
+        onClick={() => item.tool === "image" ? onImage() : onToolChange(item.tool)}
+        className={cn(
+          "growdash-flow-control group relative grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+          active && "growdash-flow-control-active",
+          index === 2 && "ml-1 border-l-primary/20",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        <span className="growdash-flow-tooltip pointer-events-none absolute top-11 hidden whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold shadow-xl group-hover:block">{item.label} · {item.shortcut}</span>
+      </button>;
+    })}
+    <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border/70" />
+    <button type="button" title="Manter ferramenta ativa" aria-label="Manter ferramenta ativa" aria-pressed={keepToolActive} onClick={() => onKeepToolActive(!keepToolActive)} className={cn("growdash-flow-control group relative grid h-9 w-9 shrink-0 place-items-center rounded-xl", keepToolActive && "growdash-flow-control-active")}>
+      <Repeat2 className="h-4 w-4" />
+      <span className="growdash-flow-tooltip pointer-events-none absolute top-11 hidden whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold shadow-xl group-hover:block">Manter ferramenta ativa</span>
+    </button>
+  </div>;
+}

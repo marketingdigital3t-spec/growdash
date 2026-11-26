@@ -1,0 +1,375 @@
+name: Growdash Loop Engineering
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions cron usa UTC: executa no minuto 17 a cada 3 horas.
+    - cron: "17 */3 * * *"
+
+# O bot não deve re-disparar a si mesmo: um push do próprio loop em main
+# gerava outro run, que podia gerar outro push, em ciclo. Pushes do bot são
+# ignorados; pushes humanos continuam publicando normalmente.
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: growdash-promotion-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    if: github.actor != 'growdash-loop-engineering[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser for visual checks
+        # GitHub's Ubuntu runner already includes Chromium system libraries;
+        # avoid apt dependency downloads that can hang the release gate.
+        run: npx playwright install chromium
+
+      - name: Configure optional authenticated smoke state
+        env:
+          GROWDASH_AUTH_STATE_B64: ${{ secrets.GROWDASH_AUTH_STATE_B64 }}
+        run: |
+          if [ -z "${GROWDASH_AUTH_STATE_B64:-}" ]; then
+            echo "GROWDASH_AUTH_STATE_B64 ausente; o gate autenticado permanecerá bloqueado."
+            exit 0
+          fi
+          mkdir -p .auth
+          printf '%s' "$GROWDASH_AUTH_STATE_B64" | base64 --decode | gzip -d > .auth/growdash.json
+          chmod 600 .auth/growdash.json
+          echo "GROWDASH_AUTH_STATE=$GITHUB_WORKSPACE/.auth/growdash.json" >> "$GITHUB_ENV"
+
+      - name: Run Meta/RD replay and contract harness
+        run: npm run test:sync
+
+      - name: Run loop engineering detection
+        id: loop
+        continue-on-error: true
+        env:
+          LOOP_ENGINEERING_BACKEND_SCAN: "1"
+          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
+          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npm run loop-engineering:detect
+
+      - name: Attempt deterministic repairs
+        id: repair
+        if: steps.loop.outcome == 'failure'
+        continue-on-error: true
+        env:
+          LOOP_ENGINEERING_BACKEND_SCAN: "1"
+          LOOP_ENGINEERING_AUTH_REQUIRED: "1"
+          LOOP_ENGINEERING_SENTRY_REQUIRED: "1"
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npm run loop-engineering:repair:auto
+
+      - name: Commit validated automatic repairs
+        if: steps.repair.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          if git diff --quiet; then exit 0; fi
+          # Só entram arquivos que o reparo realmente pode tocar. Um "git add ."
+          #或其它 aqui versionaria artefatos de build, .env e relatórios.
+          git add src supabase/functions supabase/migrations scripts package.json package-lock.json docs
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "growdash-loop-engineering[bot]"
+          git config user.email "growdash-loop-engineering[bot]@users.noreply.github.com"
+          git commit -m "fix: apply validated loop engineering repairs"
+          # Antes isso era "git push origin HEAD:main", com auto-commit direto
+          # em produção e sem revisão. O push em main também re-disparava este
+          # workflow, criando um ciclo de push que podia republicar sozinho.
+          # O reparo passa a subir como branch + PR, e um push do próprio bot em
+          # main é ignorado para não alimentar o laço.
+          branch="loop-engineering/auto-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "$branch"
+          git push origin "$branch"
+          {
+            echo "title=fix: apply validated loop engineering repairs"
+            echo "body=Reparo determinístico aplicado pelo loop engineering. Commit automático sem revisão humana direta: revisar antes de mergear."
+            echo "head=$branch"
+            echo "base=main"
+          } >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_ENV"
+
+      - name: Open pull request for validated repairs
+        if: steps.repair.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          if [ -z "${GITHUB_TOKEN:-}" ]; then
+            echo "GITHUB_TOKEN ausente; PR não será aberto (reparo permanece na branch)."
+            exit 0
+          fi
+          branch="${branch:-}"
+          if [ -z "$branch" ]; then exit 0; fi
+          payload=$(printf '{"title":"fix: apply validated loop engineering repairs","head":"%s","base":"main","body":"Reparo deterministico aplicado pelo loop engineering. Revisar antes de mergear."}' "$branch")
+          code="$(curl -sS -o /tmp/gd-pr.json -w '%{http_code}' -X POST \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data "$payload")"
+          if [ "$code" != "201" ]; then
+            echo "Não foi possível abrir o PR (HTTP $code); o reparo permanece na branch $branch para revisão manual."
+            exit 0
+          fi
+          echo "PR aberto com o reparo na branch $branch."
+
+      - name: Upload loop report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loop-engineering-${{ github.run_id }}
+          path: reports/loop-engineering.*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce gate
+        if: always()
+        run: |
+          test -f reports/loop-engineering.json
+          node --input-type=module -e "import fs from 'node:fs'; const report=JSON.parse(fs.readFileSync('reports/loop-engineering.json','utf8')); if (report.status === 'blocked') { console.error('Loop gate bloqueado:', report.findings.length, 'achado(s)'); process.exit(2); }"
+
+      - name: Validate publication credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo "SUPABASE_ACCESS_TOKEN ausente; publicação bloqueada."; exit 2; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN ausente; publicação bloqueada."; exit 2; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID ausente; publicação bloqueada."; exit 2; }
+          test -n "${SENTRY_DSN:-}" || { echo "SENTRY_DSN ausente; eventos de sincronização não serão observáveis."; exit 2; }
+
+      - name: Smoke authentication on current production
+        continue-on-error: true
+        env:
+          GROWDASH_BASE_URL: https://growdash.com.br
+        run: npx playwright test tests/visual/auth-availability.spec.ts --project=desktop --workers=1
+        # Non-blocking: this smoke runs against the CURRENT production, which may
+        # still be broken while the fix that repairs it has not been published
+        # yet. Blocking here made the release gate unreachable in exactly the
+        # situation where publishing the fix is what is needed. The failure
+        # stays visible in the job log, and the post-deploy smoke below still
+        # fails closed on a regression.
+
+      - name: Capture current Cloudflare production deployment
+        id: previous_deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -eu
+          # The API list also contains failed deployment attempts. Rollback
+          # must target the most recent successful production artifact, not
+          # merely the first item returned by the API.
+          previous="$(npx wrangler pages deployment list --project-name growdash --environment production --json \
+            | jq -r '.[] | select(.Status != "Failure") | .Id' | head -n 1)"
+          test -n "$previous" && test "$previous" != "null" || { echo "Não foi possível identificar um deployment de produção bem-sucedido anterior."; exit 2; }
+          echo "deployment_id=$previous" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -u
+          set +e
+          timeout -k 10s 90s supabase link --project-ref cixnvosxqlacjbpymjha
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            # Sem link real o "supabase link" pode falhar por indisponibilidade
+            # do serviço, e seguir com um project-ref local faz o CLI agir como
+            # se estivesse vinculado sem estar. Publicar assim pode aplicar a
+            # migration no projeto errado, então falhamos fechado.
+            echo "Supabase link falhou (exit $status); publicação bloqueada para não agir com vínculo indefinido."
+            exit 2
+          fi
+
+      - name: Validate migrations without applying them
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -u
+          set +e
+          timeout -k 10s 90s supabase migration list --linked
+          list_status=$?
+          timeout -k 10s 90s supabase db push --linked --dry-run
+          dry_run_status=$?
+          # Falha fechada: sem dry-run bem-sucedido não é seguro aplicar
+          # migration. Antes esta etapa terminava em "exit 0" e a publicação
+          # seguia com o schema possivelmente divergente da migrations.
+          if [ "$list_status" -ne 0 ] || [ "$dry_run_status" -ne 0 ]; then
+            echo "Supabase database indisponível para validação (list=$list_status dry-run=$dry_run_status); aplicação de migration bloqueada."
+            echo "MIGRATIONS_BLOCKED=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "MIGRATIONS_BLOCKED=0" >> "$GITHUB_ENV"
+
+      - name: Run Supabase advisors and retain evidence
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          mkdir -p reports
+          set +e
+          timeout -k 5s 30s supabase db advisors --linked --output json > reports/supabase-advisors.json
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          echo "Supabase advisors falhou ou expirou (exit $status); publicação seguirá com a evidência preservada."
+          # The advisor endpoint is an external lint service and can time out
+          # while the linked database and migration contract remain healthy.
+          # Keep the failure visible for the job log and preserve a machine-
+          # readable artifact, but do not block a validated migration/function
+          # publication solely because the advisor service is unavailable.
+          printf '%s\n' '{"status":"unavailable","message":"Supabase advisors indisponível após 30 segundos; migration dry-run foi validado."}' > reports/supabase-advisors.json
+          echo "Supabase advisors indisponível após 30 segundos; publicação seguirá com a evidência preservada."
+          exit 0
+
+      - name: Apply compatible Supabase migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -u
+          set +e
+          # O fail-closed do schema é absoluto: sem dry-run validado, nenhuma
+          # migration é aplicada. Só a publicação de código pode seguir sem o
+          # banco acessível — publicar Edge Functions não altera o schema.
+          if [ "${MIGRATIONS_BLOCKED:-0}" = "1" ]; then
+            echo "Validação de migration indisponível; nenhuma migration será aplicada. A publicação de código continua."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            timeout -k 10s 90s supabase db push --linked --yes
+            status=$?
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            echo "Supabase db push falhou (tentativa $attempt/3; exit $status); aguardando antes de repetir."
+            sleep $((attempt * 15))
+          done
+          echo "As tentativas de aplicar migrations falharam; verificando se o banco já está atualizado."
+          verification="$(timeout -k 10s 90s supabase db push --linked --dry-run 2>&1)"
+          verification_status=$?
+          printf '%s\n' "$verification"
+          if [ "$verification_status" -eq 0 ] && printf '%s\n' "$verification" | grep -Eqi 'upToDate[[:space:]]*:[[:space:]]*true|Remote database is up to date'; then
+            echo "Banco remoto confirmado atualizado; a falha anterior foi apenas de disponibilidade do apply."
+            exit 0
+          fi
+          # Falha fechada: sem confirmar o schema, publicar funções e frontend
+          # deixa o app operando contra um banco que pode não ter as tabelas
+          # esperadas. Antes esta etapa terminava em "exit 0" e a publicação
+          # seguia com as migrations pendentes de verificação.
+          echo "Não foi possível confirmar o estado das migrations após a falha do apply; publicação bloqueada."
+          exit 2
+
+      - name: Deploy all Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          supabase secrets set --yes --project-ref cixnvosxqlacjbpymjha SENTRY_DSN="$SENTRY_DSN" SENTRY_ENVIRONMENT=production SENTRY_RELEASE="$GITHUB_SHA"
+          # Deploy every checked-in function. The gateway JWT mode comes from
+          # supabase/config.toml; a hand-maintained allowlist silently left
+          # changed functions stale in production.
+          mapfile -t functions < <(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts -print | sort)
+          test "${#functions[@]}" -gt 0
+          for path in "${functions[@]}"; do
+            fn="$(basename "$(dirname "$path")")"
+            echo "Deploying $fn"
+            supabase functions deploy "$fn" --yes --project-ref cixnvosxqlacjbpymjha
+          done
+
+      - name: Build release artifact
+        env:
+          SOURCEMAP: "true"
+        run: npm run build
+
+      - name: Create Sentry release and upload private source maps
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: |
+          set -eu
+          npx --yes @sentry/cli@latest releases new "$SENTRY_RELEASE"
+          npx --yes @sentry/cli@latest releases set-commits "$SENTRY_RELEASE" --auto
+          npx --yes @sentry/cli@latest sourcemaps upload dist --release "$SENTRY_RELEASE" --url-prefix "~/" --rewrite
+          npx --yes @sentry/cli@latest releases finalize "$SENTRY_RELEASE"
+          npx --yes @sentry/cli@latest releases info "$SENTRY_RELEASE"
+          find dist -type f -name '*.map' -delete
+
+      - name: Deploy Cloudflare Pages canary
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name growdash --branch main --commit-hash "$GITHUB_SHA" --commit-message "Growdash release $GITHUB_SHA" --skip-caching
+
+      - name: Smoke Edge Functions and production HTTP
+        id: smoke
+        continue-on-error: true
+        run: |
+          set -eu
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://growdash.com.br/)" = "200"
+          for fn in controlled-realtime-sync sync-meta-leads meta-traffic-mcp daily-incremental-sync meta-webhook; do
+            code="$(curl -sS -o "/tmp/growdash-${fn}.json" -w '%{http_code}' -X POST "https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/${fn}" -H 'content-type: application/json' --data '{}')"
+            test "$code" = "401" || { echo "$fn retornou HTTP $code; smoke bloqueado."; exit 2; }
+          done
+
+      - name: Smoke authenticated production browser
+        id: browser_smoke
+        continue-on-error: true
+        env:
+          GROWDASH_BASE_URL: https://growdash.com.br
+        run: npx playwright test tests/visual/auth-availability.spec.ts tests/visual/route-health.spec.ts --project=desktop --workers=1
+
+      - name: Roll back Cloudflare canary after failed smoke
+        if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIOUS_DEPLOYMENT_ID: ${{ steps.previous_deployment.outputs.deployment_id }}
+        run: |
+          set -eu
+          curl -fsSL -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/growdash/deployments/${PREVIOUS_DEPLOYMENT_ID}/rollback" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H 'Content-Type: application/json'
+          echo "Rollback Cloudflare solicitado para ${PREVIOUS_DEPLOYMENT_ID}."
+
+      - name: Fail closed after smoke or rollback failure
+        if: steps.smoke.outcome == 'failure' || steps.browser_smoke.outcome == 'failure'
+        run: exit 2

@@ -1,0 +1,109 @@
+import { useEffect, useRef } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { edgeFunctionErrorDetails, getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
+import { withRequestTimeout } from "@/lib/resilience";
+
+export function useMetaOAuth() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const oauthPopup = useRef<Window | null>(null);
+
+  const connect = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Entre na Growdash antes de conectar a Meta.");
+
+      // Safari may reuse a named popup that is already on facebook.com. Do
+      // not access popup.document after opening: that cross-origin read throws
+      // and prevents the OAuth URL from ever being assigned.
+      const popup = window.open("about:blank", "_blank", "popup,width=620,height=760");
+      // In-app browsers frequently block popups. Keep the OAuth request
+      // usable by falling back to a same-tab redirect after the URL is ready.
+      oauthPopup.current = popup;
+      let result = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+      if (result.error) {
+        const details = await edgeFunctionErrorDetails(result.error);
+        if (details.status === 401) {
+          // A tab can keep a stale access token while the auth context still
+          // has a user. Refresh once before telling the user to log in again.
+          let refreshed: Awaited<ReturnType<typeof supabase.auth.refreshSession>> | null = null;
+          let refreshFailedByNetwork = false;
+          try {
+            refreshed = await withRequestTimeout(supabase.auth.refreshSession(), 10_000);
+          } catch {
+            refreshFailedByNetwork = true;
+          }
+          if (refreshed?.data.session && !refreshed.error) {
+            result = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+          } else {
+            popup?.close();
+            oauthPopup.current = null;
+            const refreshStatus = Number((refreshed?.error as { status?: unknown } | null)?.status);
+            if (refreshFailedByNetwork || !Number.isFinite(refreshStatus) || refreshStatus >= 500) {
+              throw new Error("O serviço de autenticação da Growdash está temporariamente indisponível. Tente novamente em instantes.");
+            }
+            throw new Error("Sua sessão da Growdash expirou. Entre novamente para conectar a Meta.");
+          }
+        }
+      }
+      const { data, error } = result;
+      if (error || !data?.authUrl) {
+        popup?.close();
+        oauthPopup.current = null;
+        if (data?.error) throw new Error(`${data.error}${data.action ? ` ${data.action}` : ""}`);
+        const details = await edgeFunctionErrorDetails(error);
+        if (details.retryable || Number(details.status) >= 500) {
+          throw new Error("O serviço de autenticação da Growdash está temporariamente indisponível. Tente novamente em instantes.");
+        }
+        throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível iniciar a conexão com a Meta."));
+      }
+
+      if (popup) popup.location.replace(data.authUrl);
+      else window.location.assign(data.authUrl);
+    },
+    onError: (error: Error) => toast({
+      title: "Não foi possível conectar",
+      description: error.message,
+      variant: "destructive",
+    }),
+  });
+
+  useEffect(() => {
+    // The OAuth callback is served by Supabase and then redirected to the
+    // same-origin Growdash static page so browsers render it as HTML. Accept
+    // both origins while still rejecting messages from every other window.
+    const expectedOrigins = new Set([
+      new URL(SUPABASE_URL).origin,
+      window.location.origin,
+      "https://growdash.com.br",
+      "https://www.growdash.com.br",
+    ]);
+    const receiveOAuthResult = (event: MessageEvent) => {
+      if (!expectedOrigins.has(event.origin) || event.source !== oauthPopup.current) return;
+      if (event.data?.type !== "growdash-meta-oauth") return;
+
+      oauthPopup.current = null;
+      if (event.data.status === "success") {
+        toast({
+          title: "Meta Ads conectado!",
+          description: event.data.message || "As contas de anúncio foram adicionadas.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      } else {
+        toast({
+          title: "Conexão não concluída",
+          description: event.data.message || "A Meta não autorizou a conexão.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    window.addEventListener("message", receiveOAuthResult);
+    return () => window.removeEventListener("message", receiveOAuthResult);
+  }, [queryClient, toast]);
+
+  return connect;
+}

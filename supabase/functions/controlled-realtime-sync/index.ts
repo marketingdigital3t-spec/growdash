@@ -1,0 +1,583 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { canRunSelectedMetaLeadSync, controlledFunctionError, controlledSyncErrorMessage, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
+import { classifySyncErrorCode } from "../../../src/lib/syncContract.ts";
+import { filterRDFunnelsByAccountScope } from "../../../src/lib/rdFunnelScope.ts";
+import { aggregateSyncStatus, finishSyncExecution, startSyncExecution } from "../_shared/syncExecution.ts";
+import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+type SyncProvider = "meta" | "rd" | "balance";
+
+type SyncBody = {
+  adAccountId?: string;
+  adAccountIds?: string[];
+  campaignIds?: string[];
+  funnelIds?: string[];
+  startDate?: string;
+  endDate?: string;
+  timezone?: string;
+  attributionWindow?: string;
+  includeMeta?: boolean;
+  includeRD?: boolean;
+  includeBalance?: boolean;
+  force?: boolean;
+  realtime?: boolean;
+  /** Fast entry path: persist daily Insights only; auxiliary blocks continue
+   * in the global/background cycle and must not delay the selected snapshot. */
+  fast?: boolean;
+  syncMode?: "recent_window" | "selected_period";
+  recentHours?: number;
+};
+
+type RunResult = {
+  provider: SyncProvider;
+  status?: "success" | "partial" | "stale" | "failed" | "blocked";
+  scope?: string;
+  skipped?: boolean;
+  reason?: string;
+  synced?: number;
+  errors?: unknown;
+  warnings?: unknown;
+  block_status?: Record<string, unknown>;
+  synced_at?: string;
+  freshness_seconds?: number | null;
+};
+
+// A UI pode chamar esta função ao abrir, ao recuperar foco e a cada cinco minutos.
+// A trava persistida garante que várias abas/dispositivos nunca multipliquem o
+// consumo das APIs para a mesma conta/funil.
+const CONTROLLED_SYNC_INTERVAL_MS = 5 * 60 * 1_000;
+const RETRY_AFTER_FAILURE_MS = 60 * 1_000;
+const LOCK_TTL_MS = 7 * 60 * 1_000;
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const startedAt = Date.now();
+  let syncRunId: string | null = null;
+  let executionAdmin: any = null;
+
+  try {
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader) return json({ error: "Missing auth" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+    executionAdmin = admin;
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) return json({ error: "Unauthorized" }, 401);
+
+    let body: SyncBody = {};
+    try { body = await req.json(); } catch { body = {}; }
+
+    const today = dateInSaoPaulo(new Date());
+    const startDate = body.startDate || today;
+    const endDate = body.endDate || today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+      return json({ error: "startDate/endDate inválidos; use YYYY-MM-DD e um intervalo crescente." }, 400);
+    }
+    const accountScope = (body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : []).sort().join(",") || "all";
+    const campaignScope = (body.campaignIds || []).slice().sort().join(",") || "all-campaigns";
+    const syncMode = body.syncMode === "recent_window" ? "recent_window" : "selected_period";
+    const recentHours = Number.isFinite(Number(body.recentHours)) ? Math.max(1, Math.min(24, Number(body.recentHours))) : 5;
+    const recentWindow = syncMode === "recent_window"
+      ? recentWindowForTimezone(new Date(), body.timezone || "America/Sao_Paulo", recentHours)
+      : null;
+    const syncStartDate = recentWindow?.startDate || startDate;
+    const syncEndDate = recentWindow?.endDate || endDate;
+    const scopeKey = `${accountScope}:${campaignScope}:${syncMode}:${syncStartDate}:${syncEndDate}:${body.attributionWindow || "account_default"}:${body.timezone || "account"}`;
+    syncRunId = await startSyncExecution(admin, {
+      userId: user.id,
+      provider: "controlled",
+      triggerSource: body.fast ? "controlled_fast" : body.realtime === false ? "controlled_manual" : "controlled_realtime",
+      scopeKey,
+      scope: {
+        ad_account_ids: body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : [],
+        campaign_ids: body.campaignIds || [],
+        start_date: syncStartDate,
+        end_date: syncEndDate,
+        attribution_window: body.attributionWindow || "account_default",
+        timezone: body.timezone || "account",
+        sync_mode: syncMode,
+      },
+    });
+    const includeMeta = body.includeMeta !== false;
+    const includeRD = body.includeRD !== false;
+    const includeBalance = body.includeBalance !== false;
+    const force = body.force === true;
+    const realtime = body.realtime !== false;
+    const fast = body.fast === true;
+    const results: RunResult[] = [];
+
+    if (includeBalance) {
+      results.push(await runControlled({
+        admin,
+        userId: user.id,
+        provider: "balance",
+        scopeKey,
+        force,
+        run: () => invokeFunction(supabaseUrl, authHeader, "sync-meta-balance", {
+          adAccountId: body.adAccountId,
+          adAccountIds: body.adAccountIds,
+        }),
+      }));
+    }
+
+    if (includeMeta) {
+      results.push(await runControlled({
+        admin,
+        userId: user.id,
+        provider: "meta",
+        scopeKey: `${scopeKey}:${today}`,
+        force,
+        run: async () => {
+          // O horário depende dos totais diários; executar em sequência evita
+          // corrida e discrepância entre cards e gráficos por hora.
+          const insights = await invokeFunction(supabaseUrl, authHeader, "sync-meta-insights", {
+            adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            campaignIds: body.campaignIds,
+            startDate: syncStartDate,
+            endDate: syncEndDate,
+            timezone: body.timezone,
+            attributionWindow: body.attributionWindow,
+            syncMode,
+            recentHours,
+            fast,
+            // Omitting dates lets sync-meta-insights resolve "today" in each
+            incremental: true,
+            includeBreakdowns: false,
+          });
+          if (!canRunSelectedMetaLeadSync(insights)) return insights;
+
+          // Leads/forms are an auxiliary Meta resource. Run it after the
+          // daily snapshot, but do not invalidate daily KPIs when its token,
+          // permission or form discovery is temporarily unavailable.
+          if (fast && syncMode === "recent_window") {
+            return {
+              data: {
+                success: true,
+                status: insights.data?.status || "success",
+                synced: Number(insights.data?.synced || 0),
+                warnings: [
+                  insights.data?.errors,
+                  "Leads/forms, hourly, breakdowns, saldo e RD continuarão em segundo plano.",
+                ].filter(Boolean),
+                block_status: {
+                  insights: insights.data?.status || "success",
+                  leads: "pending",
+                  hourly: "pending",
+                },
+                synced_at: insights.data?.synced_at,
+              },
+            };
+          }
+          if (fast) {
+            // Leads/forms are reconciled after the primary response by the
+            // client in a separate background request. Waiting for that
+            // paginated Graph resource here made every manual refresh feel
+            // blocked even though the KPI snapshot was already available.
+            return {
+              data: {
+                success: true,
+                status: insights.data?.status || "success",
+                synced: Number(insights.data?.synced || 0),
+                warnings: [
+                  "Leads/forms Meta, hourly, breakdowns, saldo e RD continuarão em segundo plano.",
+                ].filter(Boolean),
+                block_status: {
+                  insights: insights.data?.status || "success",
+                  leads: "pending",
+                  hourly: "pending",
+                },
+                synced_at: insights.data?.synced_at,
+              },
+            };
+          }
+
+          const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
+            adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            ...(syncMode === "selected_period" ? { startDate: syncStartDate, endDate: syncEndDate } : {}),
+            recentStartAt: recentWindow?.startAt,
+            recentEndAt: recentWindow?.endAt,
+            triggerSource: "controlled_realtime",
+          });
+
+          const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
+            adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            campaignIds: body.campaignIds,
+            startDate: syncStartDate,
+            endDate: syncEndDate,
+            timezone: body.timezone,
+            attributionWindow: body.attributionWindow,
+          });
+          const warnings = [
+            leads.error || leads.data?.error,
+            leads.data?.errors,
+            leads.data?.status === "partial" ? "Leads/forms Meta parcialmente atualizados." : null,
+            hourly.data?.errors,
+            hourly.data?.status === "partial" ? "Distribuição horária Meta parcialmente atualizada." : null,
+            hourly.error,
+          ].filter(Boolean);
+          const status = insights.data?.status === "partial"
+            ? "partial"
+            : insights.data?.status === "failed"
+              ? "failed"
+              : selectedMetaSyncIsPartial(insights, leads)
+                ? "partial"
+                : "success";
+          return {
+            data: {
+              // The controlled result is successful when the primary daily
+              // snapshot is successful. Auxiliary warnings remain structured
+              // and are retried on the next cycle without a red global state.
+              success: true,
+              status,
+              synced: Number(insights.data?.synced || 0) + Number(hourly.data?.synced || 0),
+              warnings: warnings.length ? warnings : undefined,
+              block_status: {
+                insights: insights.data?.status || "success",
+                leads: leads.data?.status || (leads.error ? "error" : "success"),
+                hourly: hourly.data?.status || (hourly.error ? "error" : "success"),
+              },
+            },
+          };
+        },
+      }));
+    }
+
+    if (includeRD) {
+      // RD funnels are an independent source, but the selected account scope
+      // still bounds automatic reconciliation so an unrelated pipeline cannot
+      // delay the visible workspace snapshot.
+      const selectedAccountIds = Array.from(new Set([
+        ...(body.adAccountIds ?? []),
+        ...(body.adAccountId ? [body.adAccountId] : []),
+      ].map(String).filter((id) => id && id !== "all")));
+      const funnels = await listAccessibleFunnels(admin, user.id, body.funnelIds, selectedAccountIds);
+      if (funnels.length === 0) {
+        results.push({ provider: "rd", skipped: true, reason: "Nenhum funil RD vinculado para sincronizar." });
+      } else {
+        for (const funnel of funnels) {
+          results.push(await runControlled({
+            admin,
+            userId: user.id,
+            provider: "rd",
+            scopeKey: `funnel:${funnel.id}:${syncMode}:${syncStartDate}:${syncEndDate}:${body.timezone || "America/Sao_Paulo"}`,
+            force,
+            run: () => invokeFunction(supabaseUrl, authHeader, "rd-sync-deals", {
+              funnel_id: funnel.id,
+              ...(syncMode === "selected_period" ? { start_date: startDate, end_date: endDate } : {}),
+              realtime,
+              analytics_mode: syncMode === "selected_period" && realtime,
+              // No explicit dates: the current RD pipeline is a snapshot of
+              // all open/current deals, not a lead-entry report for São Paulo.
+              // Analytics mode walks every RD status segment and up to the
+              // complete bounded page budget instead of only the first 200
+              // records. This keeps all connected funnels represented in the
+              // near-realtime snapshot; manual full_history remains the
+              // authoritative unbounded reconciliation.
+              // The five-minute cycle must stay bounded. Full pagination is
+              // reserved for the historical/backfill job; otherwise one
+              // large funnel keeps the whole UI in "syncing" and no snapshot
+              // is refreshed for any other account.
+              // A realtime cycle must finish inside the Edge runtime budget.
+              // Each deal may require a detail and contact request; allowing
+              // 200 items here left sync_runs orphaned before the snapshot was
+              // committed. Repeated five-minute cycles cover the remainder.
+              // A five-minute cycle only needs to cover the newest changes.
+              // Keeping the automatic batch small prevents a large funnel
+              // from holding the database lock long enough to hit the
+              // statement timeout. Later cycles continue from the provider's
+              // current snapshot without replaying unchanged rows.
+              max_pages: realtime ? 1 : 50,
+              max_deals: realtime ? 10 : 3_000,
+              trigger_source: realtime ? "auto_realtime" : "manual",
+            }),
+          }));
+        }
+      }
+    }
+
+    const metaResult = results.find((result) => result.provider === "meta");
+    const warnings = results.flatMap((result) => {
+      if (result.provider !== "meta" || result.warnings == null) return [];
+      return Array.isArray(result.warnings) ? result.warnings : [result.warnings];
+    });
+    const aggregateStatus = aggregateSyncStatus(results.map((result) => result.status));
+    await finishSyncExecution(admin, syncRunId, {
+      status: aggregateStatus,
+      success: !["failed", "blocked"].includes(aggregateStatus),
+      error: results.find((result) => result.errors)?.errors,
+      warnings,
+      lastValidSnapshotAt: results.map((result) => result.synced_at).filter(Boolean).sort().at(-1) || null,
+      recordsUpserted: results.reduce((total, result) => total + Number(result.synced || 0), 0),
+    });
+    return json({
+      success: !["failed", "blocked"].includes(aggregateStatus),
+      status: aggregateStatus,
+      sync_run_id: syncRunId,
+      // Consumers that monitor one provider must not infer its health from
+      // another provider's pending pages. Keep the aggregate for audit
+      // screens, while exposing the per-provider statuses explicitly.
+      meta_status: metaResult?.status || (metaResult?.skipped ? "skipped" : "unknown"),
+      rd_status: results.find((result) => result.provider === "rd")?.status || "skipped",
+      balance_status: results.find((result) => result.provider === "balance")?.status || "skipped",
+      freshness_seconds: metaResult?.freshness_seconds ?? null,
+      synced_at: metaResult?.synced_at || null,
+      scope: {
+        ad_account_ids: body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : [],
+        campaign_ids: body.campaignIds || [],
+        start_date: startDate,
+        end_date: endDate,
+        attribution_window: body.attributionWindow || "account_default",
+        timezone: body.timezone || "account",
+      },
+      synchronized_date: endDate,
+      sync_mode: syncMode,
+      recent_window: recentWindow,
+      snapshot_available: results.some((result) => Boolean(result.synced_at)),
+      recent_sync_status: results.some((result) => result.status === "failed") ? "error" : results.some((result) => result.status === "partial") ? "partial" : "updated",
+      last_success_at: results.map((result) => result.synced_at).filter(Boolean).sort().at(-1) || null,
+      duration_ms: Date.now() - startedAt,
+      warnings: warnings.length ? warnings : undefined,
+      results,
+    });
+  } catch (error) {
+    if (syncRunId) await finishSyncExecution(executionAdmin, syncRunId, { status: "failed", error: (error as Error).message });
+    return json({ error: (error as Error).message }, 500);
+  }
+});
+
+async function runControlled(args: {
+  admin: any;
+  userId: string;
+  provider: SyncProvider;
+  scopeKey: string;
+  force: boolean;
+  run: () => Promise<any>;
+}): Promise<RunResult> {
+  const { admin, userId, provider, scopeKey, force, run } = args;
+  const now = new Date();
+  const { data: current } = await admin
+    .from("realtime_sync_state")
+    .select("status,last_started_at,last_success_at,last_error,locked_until")
+    .eq("user_id", userId)
+    .eq("provider", provider)
+    .eq("scope_key", scopeKey)
+    .maybeSingle();
+
+  // A forced refresh may bypass the five-minute freshness interval, but it
+  // must never bypass an active lock. Doing so creates concurrent writers and
+  // can mix partial snapshots from different runs.
+  if (current?.locked_until && new Date(current.locked_until).getTime() > now.getTime()) {
+    return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já em andamento.", synced_at: current.last_success_at || undefined };
+  }
+
+  const reference = current?.status === "success" ? current.last_success_at : current?.last_started_at;
+  const minInterval = current?.status === "failed" ? RETRY_AFTER_FAILURE_MS : CONTROLLED_SYNC_INTERVAL_MS;
+  if (!force && reference) {
+    const elapsed = now.getTime() - new Date(reference).getTime();
+    if (elapsed < minInterval) {
+      return {
+        provider,
+        scope: scopeKey,
+        skipped: true,
+        reason: `Dados ainda atuais; próxima atualização em ${Math.ceil((minInterval - elapsed) / 60_000)} min.`,
+        synced_at: current.last_success_at || undefined,
+      };
+    }
+  }
+
+  const lockedUntil = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
+  const { data: acquired, error: lockError } = await admin.rpc("acquire_realtime_sync_lock", {
+    p_user_id: userId,
+    p_provider: provider,
+    p_scope_key: scopeKey,
+    p_now: now.toISOString(),
+    p_locked_until: lockedUntil,
+  });
+  if (lockError) throw lockError;
+  if (!acquired) return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já está em andamento.", synced_at: current?.last_success_at || undefined };
+
+  try {
+    const response = await run();
+    const payload = response?.data ?? response ?? {};
+    // RD serializa a sincronização por funil. Um 409/ already_running é um
+    // lock legítimo de outra execução, não uma falha de credencial ou dados.
+    if (String(payload?.status || "") === "already_running" || String(payload?.status || "") === "running") {
+      await admin.from("realtime_sync_state").update({
+        status: "success",
+        last_finished_at: new Date().toISOString(),
+        last_error: null,
+        locked_until: null,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
+      return { provider, scope: scopeKey, status: "success", skipped: true, reason: payload?.message || "Sincronização já está em andamento." };
+    }
+    const partial = String(payload?.status || "") === "partial";
+    const explicitStatus = String(payload?.status || "").toLowerCase();
+    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["failed", "blocked"].includes(explicitStatus));
+    const stale = !hasError && !partial && (explicitStatus === "stale" || explicitStatus === "stale_snapshot");
+    const finishedAt = new Date().toISOString();
+    const error = hasError
+      ? controlledSyncErrorMessage(
+        provider,
+        response?.error,
+        payload,
+      )
+      : null;
+
+    await admin.from("realtime_sync_state").update({
+      status: hasError ? "failed" : partial ? "partial" : stale ? "stale" : "success",
+      last_finished_at: finishedAt,
+      last_success_at: hasError || partial || stale ? current?.last_success_at ?? null : finishedAt,
+      last_error: hasError
+        ? error
+        : partial || stale
+          ? controlledSyncErrorMessage(provider, null, payload)
+          : null,
+      locked_until: null,
+      updated_at: finishedAt,
+    }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
+
+    return {
+      provider,
+      status: hasError ? "failed" : partial ? "partial" : stale ? "stale" : "success",
+      scope: scopeKey,
+      synced: Number(payload?.synced || payload?.deals || payload?.updated || 0),
+      errors: hasError || partial || stale
+        ? (error || controlledSyncErrorMessage(provider, null, payload))
+        : undefined,
+      warnings: payload?.warnings,
+      block_status: payload?.block_status,
+      synced_at: typeof payload?.synced_at === "string" ? payload.synced_at : finishedAt,
+      freshness_seconds: payload?.freshness_seconds == null ? null : Number(payload.freshness_seconds),
+    };
+  } catch (error) {
+    const finishedAt = new Date().toISOString();
+    await admin.from("realtime_sync_state").update({
+      status: "failed",
+      last_finished_at: finishedAt,
+      last_error: (error as Error).message,
+      locked_until: null,
+      updated_at: finishedAt,
+    }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
+    const message = error instanceof Error ? error.message : String(error);
+    return { provider, scope: scopeKey, status: "failed", errors: `${classifySyncErrorCode(error)}: ${message}` };
+  }
+}
+
+async function invokeFunction(supabaseUrl: string, authHeader: string, name: string, body: Record<string, unknown>) {
+  // RD realtime snapshots can legitimately take 40–55s for a bounded funnel.
+  // Keep the coordinator alive long enough to receive the completed response;
+  // the per-funnel lock and max-pages/max-deals bounds still prevent an
+  // unbounded run. Aborting at 30s made successful RD runs look failed in the
+  // dashboard while the Edge function continued and persisted the snapshot.
+  const isRD = name === "rd-sync-deals";
+  const delays = isRD ? [800, 2_000] : [800, 2_000, 5_000];
+  const timeoutMs = isRD ? 90_000 : 45_000;
+  let last: { error?: unknown; data?: any } | null = null;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetchWithTimeout(`${supabaseUrl}/functions/v1/${name}`, {
+          method: "POST",
+          headers: { Authorization: authHeader, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        }, 15_000);
+      } finally {
+        clearTimeout(timeout);
+      }
+      const data = await response.json().catch(() => null);
+      if (response.ok) return { data };
+      if (response.status === 409 && data?.status === "already_running") {
+        return { data: { ...data, success: true, status: "running" } };
+      }
+      const normalized = controlledFunctionError(
+        name,
+        response.status,
+        data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : null,
+      );
+      last = normalized;
+      // A Postgres statement timeout is produced after the database has
+      // already cancelled the transaction. Retrying immediately only makes
+      // another worker contend for the same funnel and can leave an orphaned
+      // auto run behind. The next scheduled cycle is the safe retry point.
+      if (/statement timeout|canceling statement/i.test(String(data?.error || last.error || ""))) break;
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === delays.length - 1) break;
+      const retryAfter = Number(response.headers.get("Retry-After") || 0);
+      await sleep(retryAfter > 0 ? retryAfter * 1_000 : delays[attempt]);
+    } catch (error) {
+      last = { error: error instanceof DOMException && error.name === "AbortError" ? `${name} excedeu ${Math.round(timeoutMs / 1000)}s; snapshot anterior preservado.` : (error as Error).message };
+      if (attempt === delays.length - 1) break;
+      await sleep(delays[attempt]);
+    }
+  }
+  return last || { error: `${name} failed` };
+}
+
+async function listAccessibleFunnels(admin: any, userId: string, requestedFunnelIds?: string[], selectedAccountIds: readonly string[] = []) {
+  // A CRM reader may use a funnel owned by another account through
+  // user_rd_funnel_access. The previous owner-only query silently skipped
+  // those funnels during automatic sync, while the CRM itself could display
+  // their already-stored deals.
+  const { data: grants, error: grantsError } = await admin
+    .from("user_rd_funnel_access")
+    .select("rd_funnel_id")
+    .eq("user_id", userId);
+  if (grantsError) throw grantsError;
+  const grantedIds = (grants || []).map((row: any) => String(row.rd_funnel_id)).filter(Boolean);
+
+  let query = admin.from("rd_funnels")
+    .select("id,ad_account_id,rd_funnel_id,name,user_id")
+    .eq("is_active", true)
+    .not("rd_funnel_id", "is", null);
+  if (grantedIds.length) {
+    query = query.or(`user_id.eq.${userId},id.in.(${grantedIds.join(",")})`);
+  } else {
+    query = query.eq("user_id", userId);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const accessible = filterRDFunnelsByAccountScope(data || [], selectedAccountIds, requestedFunnelIds || []);
+  if (!requestedFunnelIds?.length) return accessible;
+  const requested = new Set(requestedFunnelIds);
+  return accessible.filter((funnel: any) => requested.has(String(funnel.id)) || requested.has(String(funnel.rd_funnel_id)));
+}
+
+function dateInSaoPaulo(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}

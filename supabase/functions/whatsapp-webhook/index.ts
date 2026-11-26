@@ -1,0 +1,165 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
+import { extractMetaMessagingAttribution, upsertMetaMessagingCrmLead } from "../_shared/metaMessagingAttribution.ts";
+import { syncCrmLeadToRD } from "../_shared/metaLeadRdSync.ts";
+import { scheduleWhatsAppFollowups } from "../_shared/whatsappFollowups.ts";
+import { fetchWithTimeout } from "../../../src/lib/syncReliabilityPolicy.ts";
+
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+function parseSafeDate(timestamp: unknown): string {
+  const num = Number(timestamp);
+  if (Number.isFinite(num) && num > 0) {
+    const ms = num < 1e11 ? num * 1000 : num;
+    return new Date(ms).toISOString();
+  }
+  return new Date().toISOString();
+}
+
+async function validSignature(rawBody: string, header: string | null) {
+  const secret = Deno.env.get("WHATSAPP_APP_SECRET") ?? Deno.env.get("META_APP_SECRET") ?? "";
+  if (!secret || !header || !/^sha256=[a-f0-9]{64}$/i.test(header)) return false;
+  const expected = new Uint8Array(header.slice(7).match(/.{2}/g)!.map((pair) => Number.parseInt(pair, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return await crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(rawBody));
+}
+
+async function resolveReferralAd(admin: any, workspaceId: string, adId: string | null) {
+  if (!adId) return { accountId: null, tracking: null };
+  const { data: ad } = await admin.from("ads").select("id,name,adset_id").eq("id", adId).maybeSingle();
+  if (!ad?.adset_id) return { accountId: null, tracking: { ad_id: adId, ad_name: null, adset_id: null, adset_name: null, campaign_id: null, campaign_name: null } };
+  const { data: adset } = await admin.from("adsets").select("id,name,campaign_id").eq("id", ad.adset_id).maybeSingle();
+  const { data: campaign } = adset?.campaign_id
+    ? await admin.from("campaigns").select("id,name,ad_account_id").eq("id", adset.campaign_id).maybeSingle()
+    : { data: null };
+  if (!campaign?.ad_account_id) return { accountId: null, tracking: { ad_id: adId, ad_name: ad.name || null, adset_id: adset?.id || null, adset_name: adset?.name || null, campaign_id: campaign?.id || null, campaign_name: campaign?.name || null } };
+  const { data: account } = await admin.from("ad_accounts").select("id,workspace_id").eq("id", campaign.ad_account_id).eq("workspace_id", workspaceId).maybeSingle();
+  return {
+    accountId: account?.id || null,
+    tracking: { ad_id: adId, ad_name: ad.name || null, adset_id: adset?.id || null, adset_name: adset?.name || null, campaign_id: campaign.id || null, campaign_name: campaign.name || null },
+  };
+}
+
+Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  if (req.method === "GET") {
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token");
+    const challenge = url.searchParams.get("hub.challenge");
+    if (mode === "subscribe" && token && token === Deno.env.get("WHATSAPP_VERIFY_TOKEN")) return new Response(challenge || "", { status: 200 });
+    return new Response("Forbidden", { status: 403 });
+  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const rawBody = await req.text();
+  const signatureSecret = Deno.env.get("WHATSAPP_APP_SECRET") ?? Deno.env.get("META_APP_SECRET") ?? "";
+  if (!(await validSignature(rawBody, req.headers.get("x-hub-signature-256")))) {
+    return json({ error: signatureSecret ? "Assinatura Meta inválida" : "Webhook WhatsApp sem segredo de assinatura configurado" }, signatureSecret ? 401 : 503);
+  }
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let payload: any;
+  try {
+    payload = JSON.parse(rawBody || "{}");
+  } catch {
+    return json({ error: "Payload JSON inválido" }, 400);
+  }
+  const workflowUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`;
+  const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
+  const results: Array<Record<string, unknown>> = [];
+  for (const entry of payload.entry || []) {
+    for (const change of entry.changes || []) {
+      if (change.field !== "messages") continue;
+      const value = change.value || {};
+      const phoneNumberId = value.metadata?.phone_number_id;
+      if (!phoneNumberId) continue;
+      const { data: number, error: numberError } = await admin.from("whatsapp_numbers").select("id,workspace_id,agent_id,mode,ad_account_id").eq("phone_number_id", phoneNumberId).maybeSingle();
+      if (numberError) return json({ error: "Não foi possível carregar o número WhatsApp", retryable: true }, 503);
+      if (!number) continue;
+      const { data: automations, error: automationsError } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
+      if (automationsError) return json({ error: "Não foi possível carregar as automações WhatsApp", retryable: true }, 503);
+      for (const message of value.messages || []) {
+        // Idempotência por wamid: cada entrega da Meta só é processada uma única vez.
+        // A segunda entrega colide na constraint UNIQUE(provider, external_event_id) e encerra com duplicate.
+        const messageId = String(message.id || "").trim();
+        const messageRaw = JSON.stringify(message);
+        const messageHash = await sha256(messageRaw);
+        const externalId = messageId || `meta-${messageHash}`;
+        const { error: eventError } = await admin.from("whatsapp_webhook_events").insert({
+          workspace_id: number.workspace_id,
+          provider: "official_meta",
+          external_event_id: externalId,
+          event_type: String(message.type || "message"),
+          payload_sha256: messageHash,
+          payload: message,
+          status: "received",
+        });
+        let retryingExisting = false;
+        if (eventError?.code === "23505") {
+          // A duplicate delivery may be a retry of an event that was persisted
+          // before a downstream provider timed out. Resume received/failed
+          // events; only terminal states are safe to acknowledge as duplicate.
+          const { data: existingEvent, error: existingEventError } = await admin.from("whatsapp_webhook_events").select("status").eq("provider", "official_meta").eq("external_event_id", externalId).maybeSingle();
+          if (existingEventError) return json({ error: "Não foi possível consultar o evento WhatsApp", retryable: true }, 503);
+          if (existingEvent?.status === "processed" || existingEvent?.status === "ignored") {
+            results.push({ event_id: externalId, status: "duplicate" });
+            continue;
+          }
+          retryingExisting = true;
+        }
+        if (eventError && !retryingExisting) return json({ error: "Não foi possível registrar o evento WhatsApp", retryable: true }, 503);
+
+        const contact = (value.contacts || []).find((item: any) => item.wa_id === message.from);
+        const text = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || null;
+        const referralTracking = extractMetaMessagingAttribution(message, "whatsapp");
+        if (referralTracking.referral) {
+          const resolved = await resolveReferralAd(admin, number.workspace_id, referralTracking.ad_id);
+          const mergedTracking = {
+            ...referralTracking,
+            ...(resolved.tracking || {}),
+            platform: referralTracking.platform || "whatsapp",
+          };
+          const crmLead = await upsertMetaMessagingCrmLead(admin, {
+            workspaceId: number.workspace_id,
+            sourceProvider: "meta_whatsapp",
+            externalId: `whatsapp:${phoneNumberId}:${message.from}`,
+            fullName: contact?.profile?.name || null,
+            phone: message.from || null,
+            adAccountId: resolved.accountId,
+            tracking: mergedTracking,
+            payload: { phone_number_id: phoneNumberId, message },
+          });
+          await syncCrmLeadToRD(admin, String(crmLead.id));
+        }
+        const messageDate = parseSafeDate(message.timestamp);
+        const { data: conversation, error: conversationError } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: messageDate, updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
+        if (conversationError || !conversation) return json({ error: "Não foi possível persistir a conversa WhatsApp", retryable: true }, 503);
+        const { error: messageError } = await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: messageDate }, { onConflict: "wamid" });
+        if (messageError) return json({ error: "Não foi possível persistir a mensagem WhatsApp", retryable: true }, 503);
+        await scheduleWhatsAppFollowups(admin, { workspaceId: number.workspace_id, whatsappNumberId: number.id, conversationId: conversation.id, agentId: number.agent_id, inboundAt: messageDate });
+        if (number.mode !== "human" && number.agent_id && internalSecret.length >= 24) {
+          try {
+            await fetchWithTimeout(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-agent-reply`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-internal-secret": internalSecret }, body: JSON.stringify({ conversation_id: conversation.id, trigger_message_id: message.id }) }, 15_000);
+          } catch (error) {
+            await admin.from("whatsapp_webhook_events").update({ status: "failed", error_message: error instanceof Error ? error.message : "Falha ao iniciar o agente", processed_at: null }).eq("provider", "official_meta").eq("external_event_id", externalId);
+            return json({ error: "Agente WhatsApp indisponível", retryable: true }, 503);
+          }
+        }
+        const matching = matchingWorkflowAutomations(automations || [], { type: "whatsapp_message", id: String(message.id || ""), text: text || "", whatsapp_number_id: String(number.id), phone_number_id: String(phoneNumberId) });
+        if (matching.length && internalSecret.length < 24) {
+          results.push({ event_id: message.id, status: "error", error: "AUTOMATION_INTERNAL_SECRET não configurado" });
+          continue;
+        }
+        for (const automation of matching) {
+          const response = await fetchWithTimeout(workflowUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { type: "whatsapp_message", id: message.id, text, whatsapp_number_id: number.id, phone_number_id: phoneNumberId, from: message.from, message_type: message.type, raw: message }, idempotency_key: `whatsapp:${automation.id}:${message.id}` }) }, 15_000);
+          const data = await response.json().catch(() => ({}));
+          results.push({ automation_id: automation.id, event_id: message.id, status: response.ok ? data?.status || "processed" : "failed", detail: data?.error || null });
+        }
+        const { error: processedEventError } = await admin.from("whatsapp_webhook_events").update({ status: "processed", error_message: null, processed_at: new Date().toISOString() }).eq("provider", "official_meta").eq("external_event_id", externalId);
+        if (processedEventError) return json({ error: "Não foi possível confirmar o evento WhatsApp", retryable: true }, 503);
+      }
+      await admin.from("whatsapp_numbers").update({ last_webhook_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", number.id);
+    }
+  }
+  return json({ received: true, processed_workflows: results.length, results });
+});

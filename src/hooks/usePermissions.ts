@@ -1,0 +1,227 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useIsMaster } from "./useIsMaster";
+import { useWorkspace } from "./useWorkspace";
+import { withRequestTimeout } from "@/lib/resilience";
+
+export type PagePermission =
+  | "dashboard"
+  | "crm"
+  | "commercial"
+  | "campaigns"
+  | "funnels"
+  | "flow"
+  | "socialMedia"
+  | "classes"
+  | "leads"
+  | "kanban"
+  | "tickets"
+  | "alerts"
+  | "automations"
+  | "finance"
+  | "storage"
+  | "brands"
+  | "products"
+  | "integrations"
+  | "metaConnect"
+  | "announcements"
+  | "users"
+  | "agents"
+  | "settings"
+  | "dataHealth"
+  | "expertDashboard";
+
+export function usePermissions() {
+  const { user, setBootstrapStep } = useAuth();
+  const { data: isMaster = false, isLoading: loadingMaster } = useIsMaster();
+  const {
+    data: workspace,
+    isLoading: loadingWorkspace,
+    isError: workspaceError,
+    refetch: refetchWorkspace,
+  } = useWorkspace();
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["permissions", user?.id, workspace?.id],
+    enabled: !!user && !!workspace,
+    // Permission reads can briefly fail while the Supabase session is being
+    // refreshed. Retry boundedly before showing the global access error;
+    // authorization is still fail-closed after all attempts are exhausted.
+    retry: 1,
+    retryDelay: 1_000,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    queryFn: async () => withRequestTimeout((async () => {
+      setBootstrapStep("permissions");
+      const scopedPermPromise =
+        workspace?.id && !workspace.id.startsWith("legacy-")
+          ? withRequestTimeout(
+              (supabase as any)
+                .from("workspace_user_permissions")
+                .select("*")
+                .eq("workspace_id", workspace.id)
+                .eq("user_id", user!.id)
+                .maybeSingle(),
+            )
+          : Promise.resolve({ data: null, error: null });
+      const legacyPermPromise = withRequestTimeout(
+        supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
+      );
+      const accsPromise =
+        workspace?.id && !workspace.id.startsWith("legacy-")
+          ? withRequestTimeout(
+              supabase
+                .from("user_ad_account_access")
+                .select("ad_account_id")
+                .eq("user_id", user!.id)
+                .eq("workspace_id", workspace.id),
+            )
+          : withRequestTimeout(
+              supabase
+                .from("user_ad_account_access")
+                .select("ad_account_id")
+                .eq("user_id", user!.id)
+                .is("workspace_id", null),
+            );
+      const funsPromise =
+        workspace?.id && !workspace.id.startsWith("legacy-")
+          ? withRequestTimeout(
+              supabase
+                .from("user_rd_funnel_access")
+                .select("rd_funnel_id")
+                .eq("user_id", user!.id)
+                .eq("workspace_id", workspace.id),
+            )
+          : withRequestTimeout(
+              supabase
+                .from("user_rd_funnel_access")
+                .select("rd_funnel_id")
+                .eq("user_id", user!.id)
+                .is("workspace_id", null),
+            );
+      const [scopedPerm, legacyPerm, accs, funs] = await Promise.all([
+        scopedPermPromise,
+        legacyPermPromise,
+        accsPromise,
+        funsPromise,
+      ]);
+      if (scopedPerm.error) throw scopedPerm.error;
+      if (legacyPerm.error) throw legacyPerm.error;
+      if (accs.error) throw accs.error;
+      if (funs.error) throw funs.error;
+      return {
+        perm: scopedPerm.data ?? legacyPerm.data,
+        allowedAdAccounts: (accs.data ?? []).map((a) => a.ad_account_id),
+        allowedRDFunnels: (funs.data ?? []).map((f) => f.rd_funnel_id),
+      };
+    })(), 10_000),
+  });
+
+  const workspaceRole = workspace?.role ?? null;
+  const canAdmin = isMaster || workspaceRole === "owner" || workspaceRole === "admin";
+  const configuredAccessRole = data?.perm?.access_role as "admin" | "editor" | "viewer" | "financial" | "analyst" | undefined;
+  // `editor` is the user-facing access profile. Older memberships may still
+  // carry the structural `member` role, so mutation UI must not infer
+  // read-only access from that structural value alone.
+  const isEditorProfile = configuredAccessRole === "editor" || (!configuredAccessRole && workspaceRole === "analyst");
+  const canEdit = canAdmin || isEditorProfile || workspaceRole === "financial";
+  const accessRole = canAdmin ? "admin" : configuredAccessRole ?? (canEdit ? "editor" : "viewer");
+
+  // A missing permission record is not authority. Keep owners/admins working,
+  // but deny members until the workspace permission record can be read.
+  const fallbackPerm = (key: string) => {
+    if (canAdmin) return true;
+    // React Query starts with `data` undefined while the workspace and the
+    // permission rows are being fetched. The shell calls this hook to decide
+    // which navigation items to paint, so dereferencing `data.perm` here used
+    // to throw before the first authenticated screen could render.
+    //
+    // Absence of a row remains fail-closed: it grants no permission. This is
+    // only a rendering guard, not a permissive fallback.
+    return !!data?.perm?.[key];
+  };
+
+  const canClasses = isMaster || fallbackPerm("can_classes");
+  // Page visibility and mutation authority are separate contracts. An
+  // Editor must have the Datas & Turmas page enabled; Analyst, Financial and
+  // Viewer profiles remain read-only even if they can open the page.
+  const canManageClasses = canAdmin || (isEditorProfile && canClasses);
+
+  return {
+    // Owners/admins already have authority through the workspace membership;
+    // masters have authority independently of the workspace bootstrap. Do not
+    // leave the whole platform behind a workspace/permissions query that can
+    // be slow or unavailable while the authenticated shell is already usable.
+    loading: !canAdmin && (loadingWorkspace || loadingMaster || isLoading),
+    // A workspace bootstrap error used to be ignored here. A protected route
+    // then redirected to the first "allowed" route with no permissions,
+    // which looked like a perpetual loading/reload to the user.
+    // Workspace owners/admins derive authority from the membership row and do
+    // not depend on the secondary permission catalog. A transient failure in
+    // that catalog must not blank the entire CRM/Funnel application for them.
+    // Non-admin members remain fail-closed when their permission read fails.
+    error: !canAdmin && (workspaceError || isError),
+    retry: async () => {
+      await refetchWorkspace();
+      return refetch();
+    },
+    isMaster,
+    workspaceRole,
+    accessRole: accessRole as "admin" | "editor" | "viewer",
+    configuredAccessRole,
+    canAdmin,
+    canEdit,
+    canDashboard: isMaster || fallbackPerm("can_dashboard"),
+    canCrm: isMaster || fallbackPerm("can_crm"),
+    canCommercial: isMaster || fallbackPerm("can_commercial"),
+    canCampaigns: isMaster || fallbackPerm("can_campaigns"),
+    canFunnels: isMaster || fallbackPerm("can_funnels"),
+    canFlow: isMaster || fallbackPerm("can_flow"),
+    canSocialMedia: isMaster || fallbackPerm("can_social_media"),
+    canClasses,
+    canManageClasses,
+    canLeads: isMaster || fallbackPerm("can_leads"),
+    canKanban: isMaster || fallbackPerm("can_kanban"),
+    canTickets: isMaster || fallbackPerm("can_tickets"),
+    canAlerts: isMaster || fallbackPerm("can_alerts"),
+    canAutomations: isMaster || fallbackPerm("can_automations"),
+    canFinance: isMaster || fallbackPerm("can_finance"),
+    canStorage: isMaster || fallbackPerm("can_storage"),
+    canBrands: isMaster || fallbackPerm("can_brands"),
+    canProducts: isMaster || fallbackPerm("can_products"),
+    // Meta Connect now lives in the integrations center. Keep legacy users
+    // with only the old Meta permission able to access the unified screen.
+    canIntegrations:
+      isMaster || fallbackPerm("can_integrations") || fallbackPerm("can_meta_connect"),
+    canMetaConnect: isMaster || fallbackPerm("can_meta_connect"),
+    canAnnouncements: isMaster || fallbackPerm("can_announcements"),
+    canUsers: isMaster || fallbackPerm("can_users"),
+    canAgents: isMaster || fallbackPerm("can_agents"),
+    canSettings: isMaster || fallbackPerm("can_settings"),
+    canDataHealth: isMaster || fallbackPerm("can_data_health"),
+    canExpertDashboard: isMaster || fallbackPerm("can_expert_dashboard"),
+    allowedAdAccounts: data?.allowedAdAccounts ?? [],
+    allowedRDFunnels: data?.allowedRDFunnels ?? [],
+  };
+}
+
+export function firstAllowedPath(p: ReturnType<typeof usePermissions>): string {
+  if (p.canDashboard) return "/";
+  if (p.canExpertDashboard) return "/painel-expert";
+  if (p.canCrm) return "/crm";
+  if (p.canCommercial) return "/comercial";
+  if (p.canCampaigns) return "/campanhas";
+  if (p.canFunnels) return "/analise-de-funis";
+  if (p.canKanban) return "/kanban";
+  if (p.canAlerts) return "/alertas";
+  if (p.canFinance) return "/financeiro";
+  if (p.canIntegrations) return "/integracoes";
+  if (p.canMetaConnect) return "/meta-connect";
+  if (p.canUsers) return "/usuarios";
+  if (p.canAgents) return "/agentes";
+  if (p.canSettings) return "/configuracoes";
+  if (p.canDataHealth) return "/saude-dos-dados";
+  return "/auth";
+}

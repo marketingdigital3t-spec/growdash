@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import { selectPrimaryRDIntegration } from "./rdIntegrationConnection";
+import { isRDConnectionReadableByUser } from "../../supabase/functions/_shared/rdConnection";
+
+const connection = (overrides: Partial<Parameters<typeof selectPrimaryRDIntegration>[0][number]>) => ({
+  id: "connection",
+  status: "connected",
+  external_account_id: null,
+  created_at: "2026-10-01T00:00:00.000Z",
+  ...overrides,
+});
+
+describe("selectPrimaryRDIntegration", () => {
+  it("keeps the owner-level RD connection stable when another account syncs later", () => {
+    const primary = connection({ id: "rd-owner", external_account_id: "rd:user:rd-station", created_at: "2026-10-10T00:00:00.000Z" });
+    const syncedAccount = connection({ id: "meta-account", external_account_id: "act_123", created_at: "2026-09-01T00:00:00.000Z" });
+
+    expect(selectPrimaryRDIntegration([syncedAccount, primary])?.id).toBe("rd-owner");
+  });
+
+  it("preserves an existing enabled permission while connections are normalized", () => {
+    const owner = connection({ id: "rd-owner", external_account_id: "rd:user:rd-station", write_enabled: false });
+    const enabledAccount = connection({ id: "enabled-account", external_account_id: "act_123", write_enabled: true });
+
+    expect(selectPrimaryRDIntegration([owner, enabledAccount])?.id).toBe("enabled-account");
+  });
+
+  it("uses a legacy RD-only row when the new owner-level row does not exist", () => {
+    const legacy = connection({ id: "legacy-rd", external_account_id: null });
+    const meta = connection({ id: "meta-account", external_account_id: "act_123" });
+
+    expect(selectPrimaryRDIntegration([meta, legacy])?.id).toBe("legacy-rd");
+  });
+
+  it("returns null when no RD connection exists", () => {
+    expect(selectPrimaryRDIntegration([])).toBeNull();
+  });
+});
+
+describe("RD connection read authorization", () => {
+  it("allows a workspace member to read an owner connection but not a legacy connection", () => {
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: "workspace" }, "member", true)).toBe(true);
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: null }, "member", true)).toBe(false);
+  });
+
+  it("keeps owner access independent of membership lookup", () => {
+    expect(isRDConnectionReadableByUser({ user_id: "owner", workspace_id: "workspace" }, "owner", false)).toBe(true);
+  });
+});
