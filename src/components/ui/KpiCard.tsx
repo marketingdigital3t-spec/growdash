@@ -14,6 +14,8 @@ export interface KpiCardProps {
   invertChangeColor?: boolean;
   /** Icone exibido dentro da moldura circular neon. */
   icon: ReactNode;
+  /** Marca o KPI de faturamento quando a meta de fase foi atingida. */
+  revenueTargetMet?: boolean;
   className?: string;
 }
 
@@ -33,6 +35,7 @@ export function KpiCard({
   changeLabel = "vs mês anterior",
   invertChangeColor = false,
   icon,
+  revenueTargetMet = false,
   className = "",
 }: KpiCardProps) {
   const hasChange = typeof changePercent === "number" && Number.isFinite(changePercent);
@@ -44,16 +47,18 @@ export function KpiCard({
   const ChangeIcon = isDrop ? TrendingDown : TrendingUp;
   const metricTone = getMetricTone(label);
   const metricToneClasses = {
-    success: "border-success bg-success/10 text-success shadow-phase-glow",
-    expense: "border-danger bg-danger/10 text-danger shadow-phase-glow",
-    phase: "border-primary bg-primary/10 text-primary shadow-phase-glow",
-    neutral: "border-card-border-active bg-primary/10 text-primary-neon shadow-phase-glow",
+    // A fase colore a moldura; a semântica fica reservada à variação abaixo.
+    success: "border-cardBorderActive bg-primary/10 text-primary-neon shadow-phase-glow",
+    expense: "border-cardBorderActive bg-primary/10 text-primary-neon shadow-phase-glow",
+    phase: "border-cardBorderActive bg-primary/10 text-primary-neon shadow-phase-glow",
+    neutral: "border-cardBorderActive bg-primary/10 text-primary-neon shadow-phase-glow",
   }[metricTone];
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-2xl border border-card-border bg-card-bg/85 p-5 shadow-glow-sm backdrop-blur-xl transition hover:-translate-y-1 hover:border-card-border-active hover:shadow-glow-lg ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border border-cardBorder bg-card p-5 shadow-phase-glow backdrop-blur-xl transition hover:-translate-y-1 hover:border-cardBorderActive hover:shadow-phase-glow-lg ${className}`}
       aria-label={`${label}: ${value}`}
+      {...(revenueTargetMet ? { "data-revenue-target": "met" } : {})}
     >
       {/* Linha luminosa no topo do card */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-neon to-transparent opacity-60" />

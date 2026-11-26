@@ -162,6 +162,7 @@ const safeMetrics = {
           value={formatCurrency(safeMetrics.revenue)}
           changePercent={safeMetrics.revenueChange}
           icon={<ShoppingCart className="h-5 w-5" />}
+          revenueTargetMet={Number.isFinite(currentRevenue) && currentRevenue >= 100_000}
         />
       </div>
 

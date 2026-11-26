@@ -43,9 +43,10 @@ type KpiTone = "neutral" | "positive" | "negative";
  * seletores, então cada tema controla a própria cor.
  */
 const toneClasses: Record<KpiTone, { text: string; border: string; icon: string }> = {
-  neutral: { text: "text-foreground", border: "border-l-border", icon: "text-muted-foreground" },
-  positive: { text: "gd-tone-positive", border: "border-l-emerald-500", icon: "gd-tone-positive" },
-  negative: { text: "gd-tone-negative", border: "border-l-red-500", icon: "gd-tone-negative" },
+  // A moldura e o ícone seguem a fase; apenas o valor preserva semântica.
+  neutral: { text: "text-foreground", border: "border-cardBorder", icon: "text-primary-neon" },
+  positive: { text: "gd-tone-positive", border: "border-cardBorder", icon: "text-primary-neon" },
+  negative: { text: "gd-tone-negative", border: "border-cardBorder", icon: "text-primary-neon" },
 };
 
 export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, metaLeads, metaLeadsAvailable = false, metaLeadsLoading = false, trafficReason, cpl, rdCpl, cac, roas, salesConversionRate, previousAvgDaysToConvert, metaAvailability, rdAvailability }: Props) {
@@ -122,7 +123,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
         const tone = toneClasses[c.tone];
         return (
           <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="gd-funnel-kpi-tooltip" showHint>
-            <Card data-kpi-tone={c.tone} className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${tone.border}`}>
+            <Card data-kpi-tone={c.tone} className={`gd-metric-card gd-funnel-kpi cursor-default bg-card border ${tone.border} shadow-phase-glow transition-shadow hover:shadow-phase-glow-lg backdrop-blur`}>
               <CardContent className="gd-funnel-kpi-content flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                   <span className="gd-funnel-kpi-label text-muted-foreground">{c.label}</span>

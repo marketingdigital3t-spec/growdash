@@ -35,9 +35,9 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line className="funnel-line-leads" type="monotone" dataKey="Leads" stroke="#34d399" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#34d399" }} />
-              <Line className="funnel-line-opportunities" type="monotone" dataKey="Oportunidades" stroke="#d97706" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#d97706" }} />
-              <Line className="funnel-line-sales" type="monotone" dataKey="Vendas" stroke="#16a34a" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#16a34a" }} />
+              <Line className="funnel-line-leads" type="monotone" dataKey="Leads" stroke="hsl(var(--primary))" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "hsl(var(--primary))" }} />
+              <Line className="funnel-line-opportunities" type="monotone" dataKey="Oportunidades" stroke="hsl(var(--primary) / .68)" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "hsl(var(--primary) / .68)" }} />
+              <Line className="funnel-line-sales" type="monotone" dataKey="Vendas" stroke="hsl(var(--primary) / .38)" fill="none" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "hsl(var(--primary) / .38)" }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

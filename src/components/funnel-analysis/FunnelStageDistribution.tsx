@@ -18,16 +18,16 @@ const STAGE_COLORS = [
   "hsl(var(--primary) / .68)",
   "hsl(var(--primary) / .52)",
   "hsl(var(--primary) / .38)",
-  "hsl(var(--warning))",
-  "hsl(25 95% 53%)",
-  "hsl(0 84% 60%)",
+  "hsl(var(--primary) / .30)",
+  "hsl(var(--primary) / .24)",
+  "hsl(var(--primary) / .18)",
 ];
 
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 function stageColor(stage: FunnelAnalytics["stages"][number], index: number) {
-  if (stage.is_won) return "hsl(142 71% 45%)";
+  if (stage.is_won) return "hsl(var(--primary))";
   if (stage.is_lost) return "hsl(0 84% 60%)";
   return STAGE_COLORS[index % STAGE_COLORS.length];
 }

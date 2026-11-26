@@ -47,11 +47,11 @@ export function FunnelOrbitalInteractive({
   return (
     <section
       aria-label="Funil orbital interativo"
-      className={`rounded-2xl border border-card-border bg-card-bg/85 p-5 shadow-glow-sm backdrop-blur-xl sm:p-6 ${className}`}
+      className={`rounded-2xl border border-cardBorder bg-card p-5 shadow-phase-glow backdrop-blur-xl sm:p-6 ${className}`}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-4">
+      <div className="flex items-center justify-between gap-3 border-b border-cardBorder/60 pb-4">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg border border-card-border-active bg-primary/10 text-primary-neon shadow-glow-sm">
+          <span className="grid h-8 w-8 place-items-center rounded-lg border border-cardBorder-active bg-primary/10 text-primary-neon shadow-phase-glow">
             <Target className="h-4 w-4" />
           </span>
           <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-text-primary sm:text-sm">
@@ -94,16 +94,10 @@ export function FunnelOrbitalInteractive({
                 <div
                   className="flex w-full items-center justify-center rounded-[999px/50%] border py-3 text-center transition-all"
                   style={{
-                    borderColor: isBottleneck
-                      ? "var(--danger)"
-                      : isSelected
-                      ? "var(--primary-neon)"
-                      : "var(--card-border-active)",
-                    backgroundColor: "rgba(5, 12, 24, 0.75)",
+                    borderColor: isBottleneck ? "var(--danger)" : "var(--card-border)",
+                    backgroundColor: "var(--card-bg)",
                     boxShadow: isBottleneck
                       ? "0 0 18px -4px var(--danger)"
-                      : isSelected
-                      ? "0 0 20px -4px var(--primary-neon)"
                       : "0 0 12px -6px var(--primary-neon)",
                   }}
                 >
@@ -123,7 +117,7 @@ export function FunnelOrbitalInteractive({
                     className={`absolute -right-16 sm:-right-20 top-1/2 -translate-y-1/2 rounded-md border px-2 py-0.5 text-[10px] font-bold tabular-nums shadow-sm ${
                       isBottleneck
                         ? "border-danger/40 bg-danger/10 text-danger"
-                        : "border-card-border bg-bg-elevated/80 text-primary-neon"
+                        : "border-cardBorder bg-bg-elevated/80 text-primary-neon"
                     }`}
                   >
                     {rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
@@ -137,7 +131,7 @@ export function FunnelOrbitalInteractive({
 
       {/* Detalhamento da etapa selecionada */}
       {selected ? (
-        <div className="rounded-xl border border-card-border-active bg-bg-elevated/70 p-4">
+        <div className="rounded-xl border border-cardBorder-active bg-bg-elevated/70 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary-neon">
@@ -151,7 +145,7 @@ export function FunnelOrbitalInteractive({
           </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-card-border/70 p-3">
+            <div className="rounded-lg border border-cardBorder/70 p-3">
               <span className="text-[10px] uppercase tracking-wider text-text-muted">
                 Período atual
               </span>
@@ -159,7 +153,7 @@ export function FunnelOrbitalInteractive({
                 {formatInteger(selected.current)}
               </b>
             </div>
-            <div className="rounded-lg border border-card-border/70 p-3">
+            <div className="rounded-lg border border-cardBorder/70 p-3">
               <span className="text-[10px] uppercase tracking-wider text-text-muted">
                 Período anterior
               </span>
@@ -167,7 +161,7 @@ export function FunnelOrbitalInteractive({
                 {formatInteger(selected.previous ?? 0)}
               </b>
             </div>
-            <div className="rounded-lg border border-card-border/70 p-3">
+            <div className="rounded-lg border border-cardBorder/70 p-3">
               <span className="text-[10px] uppercase tracking-wider text-text-muted">
                 Variação
               </span>
@@ -196,7 +190,7 @@ export function FunnelOrbitalInteractive({
           )}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-card-border p-4 text-center text-xs text-text-muted">
+        <p className="rounded-xl border border-dashed border-cardBorder p-4 text-center text-xs text-text-muted">
           Selecione uma etapa do funil para ver o comparativo entre os períodos.
         </p>
       )}

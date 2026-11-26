@@ -27,10 +27,11 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
   const valueTone = metricValueTone(title, value);
   const metricTone = metricCategoryTone(title);
   const metricToneClasses = {
-    success: "border-success bg-success/10 text-success shadow-phase-glow",
-    expense: "border-danger bg-danger/10 text-danger shadow-phase-glow",
-    phase: "border-primary bg-primary/10 text-primary shadow-phase-glow",
-    neutral: "border-card-border-active bg-primary/10 text-primary shadow-phase-glow",
+    // A moldura segue a fase; a cor semântica continua apenas no valor/variação.
+    success: "border-cardBorderActive bg-primary/10 text-primary shadow-phase-glow",
+    expense: "border-cardBorderActive bg-primary/10 text-primary shadow-phase-glow",
+    phase: "border-cardBorderActive bg-primary/10 text-primary shadow-phase-glow",
+    neutral: "border-cardBorderActive bg-primary/10 text-primary shadow-phase-glow",
   }[metricTone];
   const unavailable = availability?.state === "unavailable" || availability?.state === "loading" || Boolean(unavailableReason && !availability);
   const statusLabel = availability?.state === "loading" ? "Carregando…" : "Indisponível";
@@ -43,7 +44,7 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
       : "text-lg sm:text-xl 2xl:text-2xl";
 
   return (
-    <Card className="dashboard-terra-card gd-metric-card group h-full min-w-0 cursor-default overflow-hidden" title={description} aria-label={`${title}. ${description}`}>
+    <Card className="dashboard-terra-card gd-metric-card group h-full min-w-0 cursor-default overflow-hidden border border-cardBorder bg-card shadow-phase-glow transition-shadow hover:shadow-phase-glow-lg" title={description} aria-label={`${title}. ${description}`}>
       <CardContent className="gd-metric-card-content flex h-full min-h-[96px] min-w-0 flex-col justify-center p-3 sm:min-h-[104px] sm:p-4 xl:min-h-[112px] xl:p-5">
         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="flex min-w-0 flex-col items-start justify-center gap-1 text-left">

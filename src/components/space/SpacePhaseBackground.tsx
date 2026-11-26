@@ -1,6 +1,8 @@
 import { Fuel, Globe2, Rocket, Sparkles } from "lucide-react";
+import { useCallback, useState } from "react";
 import type { CSSProperties } from "react";
 import earthTexture from "@/assets/growth/earth-2k-web.jpg";
+import { EarthGlobe } from "./EarthGlobe";
 import { SpaceRocket } from "./SpaceRocket";
 
 /**
@@ -36,25 +38,30 @@ function meteorCount(phase: SpacePhase) {
 
 export function SpacePhaseBackground({ phase, dashboardScene = false }: { phase: SpacePhase; dashboardScene?: boolean }) {
   const copy = PHASE_COPY[phase];
+  const [globeReady, setGlobeReady] = useState(false);
+  const handleGlobeReady = useCallback(() => setGlobeReady(true), []);
   return (
     <div
       className="space-phase-bg"
       data-phase={phase}
       data-dashboard-scene={dashboardScene || undefined}
+      data-globe-ready={globeReady || undefined}
       style={{
+        position: "relative",
         "--earth-texture": `url(${earthTexture})`,
         "--earth-texture-hd": `url(${EARTH_8K_TEXTURE})`,
       } as CSSProperties}
       aria-hidden="true"
     >
       <div className="space-phase-nebula" />
-      <div className="space-phase-stars">{Array.from({ length: starCount(phase) }, (_, index) => <i key={index} style={{ "--star-x": `${(index * 47) % 100}%`, "--star-y": `${(index * 71) % 100}%`, "--star-delay": `${(index % 9) * 0.45}s` } as CSSProperties} />)}</div>
+      <div className="space-phase-stars" style={{ zIndex: 2, pointerEvents: "none" }}>{Array.from({ length: starCount(phase) }, (_, index) => <i key={index} style={{ "--star-x": `${(index * 47) % 100}%`, "--star-y": `${(index * 71) % 100}%`, "--star-delay": `${(index % 9) * 0.45}s` } as CSSProperties} />)}</div>
       {(dashboardScene || phase !== "terra") && <div className="space-phase-meteors">
         {Array.from({ length: meteorCount(phase) }, (_, index) => (
           <i key={index} />
         ))}
       </div>}
-      <div className="space-phase-planet"><span className="space-phase-atmosphere" /><span className="space-phase-rings" /></div>
+      {phase === "terra" && <EarthGlobe onReady={handleGlobeReady} />}
+      <div className="space-phase-planet" style={phase === "terra" && globeReady ? { opacity: 0.14 } : undefined}><span className="space-phase-atmosphere" /><span className="space-phase-rings" /></div>
       <div className="space-phase-orbit-map" aria-hidden="true">
         <i /><i /><i /><i />
         <span className="space-phase-orbit-line space-phase-orbit-line-a" />

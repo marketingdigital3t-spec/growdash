@@ -58,7 +58,7 @@ export function FunnelHourChart({ a }: { a: FunnelAnalytics }) {
               </Bar>
               <Bar dataKey="Conversões" radius={[4, 4, 0, 0]} cursor="pointer">
                 {data.map((d, i) => (
-                  <Cell key={`c-${i}`} fill="hsl(142 71% 45%)" opacity={selected && selected !== d.label ? 0.35 : 1} />
+                  <Cell key={`c-${i}`} fill="hsl(var(--primary) / .82)" opacity={selected && selected !== d.label ? 0.35 : 1} />
                 ))}
               </Bar>
             </BarChart>
@@ -114,7 +114,7 @@ export function FunnelHourChart({ a }: { a: FunnelAnalytics }) {
                           cursor={{ fill: "hsl(var(--muted) / 0.25)" }}
                           formatter={(v: number, name) => (name === "Receita" ? [fmtBRL(v), name] : [v, name])}
                         />
-                        <Bar dataKey="Vendas" radius={[4, 4, 0, 0]} fill="hsl(142 71% 45%)" />
+                        <Bar dataKey="Vendas" radius={[4, 4, 0, 0]} fill="hsl(var(--primary) / .82)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
