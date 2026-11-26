@@ -310,12 +310,12 @@ export function BudgetDetailSheet({ open, onOpenChange, accountId, accountName, 
                             key={`tu-${i}`}
                             yAxisId="left"
                             x={lbl}
-                            stroke="hsl(142 76% 45%)"
+                            stroke="var(--primary-neon)"
                             strokeDasharray="4 3"
                             label={{
                               value: `+${fmtCompact(t.amount)}`,
                               position: "top",
-                              fill: "hsl(142 76% 45%)",
+                              fill: "var(--primary-neon)",
                               fontSize: 9,
                             }}
                           />
