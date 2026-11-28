@@ -1154,7 +1154,7 @@ export default function KanbanPage() {
             </div>
           </div>
         ) : viewMode === "kanban" ? (
-          <div className="grid min-h-[calc(100vh-190px)] items-start gap-4 pb-4 grid-cols-1 md:grid-cols-3 w-full overflow-x-auto">
+          <div className="flex min-h-[calc(100vh-190px)] items-start gap-4 overflow-x-auto pb-4">
             {details.lists.map((list, index) => (
               <KanbanColumn
                 key={list.id}
@@ -1311,7 +1311,7 @@ export default function KanbanPage() {
           </div>
         </div>
       ) : visibleBoards.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
           {visibleBoards.map((board) => (
             <article
               key={board.id}
@@ -1724,7 +1724,7 @@ function KanbanColumn({
   };
   return (
     <section
-      className="gd-panel w-full min-w-[280px] bg-muted/25 p-3.5"
+      className="gd-panel w-[300px] shrink-0 bg-muted/25 p-3.5"
       aria-label={`Coluna ${list.name}`}
       onDragOver={(event) => {
         event.preventDefault();

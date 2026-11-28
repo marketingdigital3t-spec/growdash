@@ -309,7 +309,7 @@ export default function GrowdashLayout() {
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300 overflow-x-hidden",
-          showSidebarLabels ? "w-[220px]" : "w-16",
+          showSidebarLabels ? "w-[248px]" : "w-16",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
@@ -506,7 +506,7 @@ export default function GrowdashLayout() {
         "growdash-content-shell min-h-screen min-w-0 max-w-full overflow-x-hidden transition-[padding] duration-300",
         // Keep a visible 16px breathing room between the expanded sidebar and
         // the content canvas. The collapsed state keeps its existing offset.
-        effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]",
+        effectiveCollapsed ? "lg:pl-16" : "lg:pl-[248px]",
       )}>
         <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-14 min-w-0 items-center justify-between gap-3 border-b px-3 py-2 text-foreground shadow-sm sm:px-6">
           {/* Controles de navegacao a esquerda */}

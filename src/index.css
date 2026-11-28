@@ -6522,7 +6522,7 @@ html {
 
 @media (min-width: 1920px) {
   :root { --gd-page-gutter: clamp(1.25rem, 1.25vw, 2rem); }
-  .brand-sidebar { width: 238px; }
+  .brand-sidebar { width: 264px; }
   .brand-sidebar.w-16 { width: 4.5rem; }
   .growdash-main { font-size: 1.025rem; }
 }

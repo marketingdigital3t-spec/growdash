@@ -1678,3 +1678,30 @@ html[data-platform-theme="galaxia"] .brand-shell[data-space-phase] :is(
     opacity: 0.28;
   }
 }
+
+/* ===== BOTÕES OUTLINE SEGUNDO A FASE =====
+   O `variant="outline"` nasce com `bg-card/60` e `text-foreground`, que são
+   neutros: no modo Galáxia o botão saía cinza com fonte branca, sem nenhuma
+   relação com a paleta ativa. Aqui o outline passa a usar o acento da fase
+   na borda e no texto, mantendo o fundo escuro legível nas três fases. */
+.brand-shell button[class*="variant-outline"],
+.brand-shell a[class*="variant-outline"] {
+  border-color: rgba(var(--palette-accent-rgb), 0.42) !important;
+  background-color: rgba(var(--palette-accent-rgb), 0.08) !important;
+  color: var(--palette-accent-bright) !important;
+}
+
+.brand-shell button[class*="variant-outline"]:hover:not(:disabled),
+.brand-shell button[class*="variant-outline"]:focus-visible:not(:disabled),
+.brand-shell a[class*="variant-outline"]:hover {
+  border-color: rgba(var(--palette-accent-rgb), 0.78) !important;
+  background-color: rgba(var(--palette-accent-rgb), 0.16) !important;
+  color: var(--palette-accent-bright) !important;
+  box-shadow: 0 0 18px -6px rgba(var(--palette-accent-rgb), 0.55) !important;
+}
+
+.brand-shell button[class*="variant-outline"] svg,
+.brand-shell a[class*="variant-outline"] svg {
+  color: var(--palette-accent-bright) !important;
+  stroke: var(--palette-accent-bright) !important;
+}
