@@ -41,12 +41,18 @@ describe("contrato do dashboard da missao", () => {
   });
 
   it("a tela de login fica centralizada na vertical", () => {
-    expect(indexCss).toMatch(/\.auth-cosmic-right-panel\s*\{[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/);
+    // O redesign trocou a cena cósmica pela "prévia da plataforma": o card
+    // de acesso é centralizado pela própria composição em vez de um
+    // deslocamento artificial do painel.
+    expect(indexCss).toMatch(/\.auth-preview-login\s*\{[^}]*width:\s*min\(100%\s*-\s*32px,\s*468px\)/);
+    expect(indexCss).toMatch(/\.auth-preview\s*\{[^}]*display:\s*grid[^}]*place-items:\s*center/);
   });
 
-  it("o foguete da tela de login desce um pouco", () => {
-    // O deslocamento vertical da arte foi de 44% para 38%: a nave estava
-    // colada no topo da tela.
-    expect(indexCss).toContain("background-position: center 38%");
+  it("a tela de login mantem a previa da plataforma ao fundo", () => {
+    // O painel do dashboard ao fundo substitui o foguete: e a mesma ideia de
+    // "mostrar o produto antes de entrar", agora com os tokens da fase.
+    expect(indexCss).toContain(".auth-preview-dashboard");
+    expect(indexCss).toContain(".auth-preview-metrics");
+    expect(indexCss).not.toContain("auth-cosmic-right-panel");
   });
 });

@@ -20,9 +20,9 @@ async function authenticate(page: import("@playwright/test").Page) {
 
 test("login não cria overflow horizontal", async ({ page }) => {
   await page.goto("/auth");
-  // O redesign do login trocou o heading "Entrar" por "Seja Bem-Vindo(a)" e
-  // moveu a ação para o botão "Entrar na Plataforma".
-  await expect(page.getByRole("heading", { name: /bem-vindo|entrar|criar conta/i })).toBeVisible();
+  // O redesign do login trocou o heading "Entrar" por "Tudo pronto para
+  // avançar?" e moveu a ação para o botão "Entrar na Plataforma".
+  await expect(page.getByRole("heading", { name: /tudo pronto para avançar|bem-vindo|entrar|criar conta/i })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   // A altura da tela muda conforme a fonte web carrega; sem esta espera o

@@ -11,7 +11,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe("autenticação pública — interação e acessibilidade básica", () => {
   test("campos de acesso têm nome acessível e o fluxo de senha é alcançável", async ({ page }) => {
     await page.goto("/auth");
-    await expect(page.getByRole("heading", { name: /seja bem-vindo/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /tudo pronto para avançar/i })).toBeVisible();
 
     const email = page.getByRole("textbox", { name: "E-mail" });
     const password = page.getByRole("textbox", { name: "Senha" });

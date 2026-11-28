@@ -11,7 +11,7 @@ test("login público fica disponível sem mascarar falha do Auth gateway", async
   const response = await page.goto("/auth", { waitUntil: "domcontentloaded" });
 
   expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByRole("heading", { name: /seja bem-vindo/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /tudo pronto para avançar/i })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("textbox", { name: "E-mail" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Senha" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/não foi possível validar seu acesso|serviço de autenticação está temporariamente indisponível/i);
